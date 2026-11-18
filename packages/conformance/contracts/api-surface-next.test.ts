@@ -103,27 +103,29 @@ describe("core-next public API surface", () => {
   });
 
   it("a missing unbuilt-layer export is accepted, and fails once its layer is built", () => {
-    expect(next["."]?.doctor).toBeUndefined();
-    expect(layers.get(". doctor")?.layer).toBe("L11");
+    expect(next["."]?.signSnapshot).toBeUndefined();
+    expect(layers.get(". signSnapshot")?.layer).toBe("L12");
     expect(baseline.unbuilt).toContainEqual({
       entry: ".",
-      name: "doctor",
-      layer: "L11",
+      name: "signSnapshot",
+      layer: "L12",
     });
-    expect(baseline.failures.some((f) => f.includes(" . doctor "))).toBe(false);
-    expect(unshipped[". doctor"]).toBe("L11");
-    expect(gate(next, { current: "L11" }).failures).toContain(
-      "core-next . doctor (missing): contracts/next-unshipped.json lists it at L11, but layer L11 is built (current L11)",
+    expect(baseline.failures.some((f) => f.includes(" . signSnapshot "))).toBe(
+      false,
+    );
+    expect(unshipped[". signSnapshot"]).toBe("L12");
+    expect(gate(next, { current: "L12" }).failures).toContain(
+      "core-next . signSnapshot (missing): contracts/next-unshipped.json lists it at L12, but layer L12 is built (current L12)",
     );
   });
 
   // The guard lets an engine PR remove names from next-unshipped.json
   // (Jason, 2026-11-17); this gate is what catches a false removal.
   it("a name removed from next-unshipped.json that core-next does not ship fails", () => {
-    expect(next["."]?.doctor).toBeUndefined();
-    const { ". doctor": _, ...removed } = unshipped;
+    expect(next["."]?.signSnapshot).toBeUndefined();
+    const { ". signSnapshot": _, ...removed } = unshipped;
     expect(gate(next, { unshipped: removed }).failures).toEqual([
-      dropped(". doctor"),
+      dropped(". signSnapshot"),
     ]);
   });
 
@@ -279,9 +281,10 @@ describe("core-next public API surface", () => {
       `core-next . createSystem (missing): contracts/next-unshipped.json lists it at L0, but layer L0 is built (current ${current})`,
     ]);
     expect(
-      gate(next, { unshipped: { ...unshipped, ". doctor": "L12" } }).failures,
+      gate(next, { unshipped: { ...unshipped, ". signSnapshot": "L13" } })
+        .failures,
     ).toEqual([
-      "contracts/next-unshipped.json: . doctor is listed at L12, but lib/layers.ts places it at L11",
+      "contracts/next-unshipped.json: . signSnapshot is listed at L13, but lib/layers.ts places it at L12",
     ]);
     expect(
       gate(next, { unshipped: { ...unshipped, ". noSuchName": "L11" } })
