@@ -705,7 +705,8 @@ export function createResolvers(options: ResolversOptions): Resolvers {
   }
 
   /** Row (cd): each resolver's current life, which its runs share. */
-  const lives: Record<string, Life> = {};
+  // No prototype: a resolver id such as "toString" must not find Object.prototype.
+  const lives: Record<string, Life> = Object.create(null);
   /** A fresh run, stamped and in flight; `reqs` makes it a batch run. */
   const make = (
     resolverId: string,
