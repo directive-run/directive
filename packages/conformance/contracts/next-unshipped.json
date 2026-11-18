@@ -42,8 +42,6 @@
   ". validatePredicateAgainstSchema": "L11",
   ". validateSnapshot": "L12",
   ". verifySnapshotSignature": "L12",
-  "./internals createDisabledHistory": "L8",
-  "./internals createHistoryManager": "L8",
   "./internals dangerousRegex": "L11",
   "./internals hashObject": "L11",
   "./internals safeStringify": "L13"
