@@ -12,7 +12,7 @@
     "contracts/PACKAGES-2.0.md": "29d3f2db4bbf2233df392c7e1769fdb109913f49732fd268a25a930014245a6d",
     "contracts/STABILITY.md": "a35858c4d7840e79ab2d52a0009b727c9f82bd6363f5774417ca01d0b40740e0",
     "contracts/api-changes.json": "8dc64cb9b303e92eafe61b24e32193f45161af8628cd10529973b3f82188dc7f",
-    "contracts/api-surface-next.test.ts": "668d3819bdc7e82907fb3726c259d01e6cfa8e407bdc9c02e6b51471f0693850",
+    "contracts/api-surface-next.test.ts": "1833ec8bb4d4383d42687a016967230e08139a6e08adc39032c9bbf0d8e975c2",
     "contracts/api-surface.json": "b5018b9d0733186d94ed2b7756896723737005224c59e616562eeb72cbbd9b33",
     "contracts/api-surface.test.ts": "3fcf2b442931e70f6ef03f5c0752c35c468c647f5a702f5e84f003e26a8d0863",
     "contracts/golden.test.ts": "63ffbf7d5f27a2c56fa3e97266d04dbed9bde165f60402dcc3cdb5c7d6829edc",
