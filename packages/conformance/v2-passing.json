@@ -1669,6 +1669,20 @@
       "tests/core/l9-constraints-observed-derivations.test.ts": [
         "a disabled constraint > no longer keeps watched the derivation it read, and does again once enabled"
       ],
+      "tests/core/l9-trace-pins-oracle.test.ts": [
+        "a caller's tags array is copied when the system is built (U6) > emptying it, or adding to it, afterwards changes no answer",
+        "a function-form when has no data-form introspection (U15) > explain() of its unmet requirement has no Predicate clauses section",
+        "a function-form when has no data-form introspection (U15) > inspect() gives the constraint no whenSpec key",
+        "carriesTag answers undefined where it has no answer (U5) > for an unknown kind, __proto__, an unknown id and a derivation whose body throws",
+        "destroy() leaves the trace empty, not null (U9) > system.trace reads [] after destroy()",
+        "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > a plugin that re-emits from its own hook is called four times, for either member",
+        "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > after destroy(), a clobber-loop call reaches no plugin",
+        "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > guardrailBlocked and clobberLoopDetected share one cap",
+        "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > lists clobberLoopDetected, clobberLoopResolved, guardrailBlocked and guardrailCoverage",
+        "system.trace hands every reader the same array and the live entries (U1; row bh) > inspect().trace is a copy: an edit to it changes nothing",
+        "the 101st observer hears nothing (U7; row bj, declined) > gets a function back and no event, development warns, and a freed place takes a new observer",
+        "the observer's constraint.evaluate event has no whenExplain key (U16) > absent, not undefined, on every evaluation of a function-form when"
+      ],
       "tests/core/meta-query-does-not-watch.test.ts": [
         "a metadata query leaves no trace in the asker's dependencies > does not make the asker re-evaluate on unrelated derivation changes",
         "a metadata query leaves no trace in the asker's dependencies > does not put every derivation into the watched set"
@@ -2414,6 +2428,10 @@
         "history and hydrate() in production > hydrated data carrying a prototype-pollution key is skipped whole, quietly",
         "history and hydrate() in production > zeroConfig keeps a history that was asked for, and does not turn one on by itself"
       ],
+      "tests/core/l9-trace-pins-oracle-production.test.ts": [
+        "a function-form when in production (U15, U16) > has no whenSpec key, no whenExplain key and no Predicate clauses section",
+        "the 101st observer in production (U7; row bj, declined) > hears nothing and nothing is printed; a freed place takes a new observer"
+      ],
       "tests/core/multi-module-correctness.prod.test.ts": [
         "production build > ignores a resolver's $store write to a dependency key without throwing",
         "production build > ignores a resolver's write to a dependency module without throwing",
@@ -2467,6 +2485,12 @@
       "file": "tests/core/system.test.ts",
       "test": "Config Forwarding > history config forwarded (object)",
       "reason": "L8-pre (U15): the test passed on v2 only because toBeDefined() accepts null, which is what a system without history holds; it now asserts system.history is not null and that one goBack lands, so it fails until L8 builds history."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/core/system.test.ts",
+      "test": "Config Forwarding > trace config forwarded",
+      "reason": "L9-pre (U10): the test passed on v2 only because toBeDefined() accepts null, which is what a system without a trace holds; it now asserts system.trace is an array and that one write adds one run, so it fails until L9b builds the trace."
     }
   ]
 }

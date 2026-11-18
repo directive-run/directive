@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { engines } from "../engines.js";
 import {
   FEATURE_LAYERS,
+  FUZZ_TAGS,
   type FuzzBatch,
   type FuzzEffect,
   type FuzzModule,
@@ -21,6 +22,7 @@ import {
   specTriggers,
   toScenario,
   withoutHistory,
+  withoutIntrospection,
 } from "../fuzz/model.js";
 import type { TraceEntry } from "../record.js";
 import { currentLayer, runScenario, v2Runs } from "../scenario.js";
@@ -106,6 +108,7 @@ describe("fuzz generator ceiling", () => {
       twin: steps("twin"),
       history: specs.some((s) => s.history) && steps("back", "forward"),
       trace: specs.some((s) => s.trace),
+      meta: steps("meta"),
       batch: specs.some((s) => s.batch != null),
     };
 
@@ -290,6 +293,150 @@ describe("fuzz model abort records", () => {
       } else {
         expect(records(own, "timeout")).toEqual([]);
       }
+    }
+  });
+});
+
+describe("fuzz trace and meta reach (L9-pre; the L9 RFC's reach table, B1)", () => {
+  const specs = () => sample("L9", 1500);
+  const metaAdded = (s: FuzzSpec) =>
+    s.steps.some((x) => x.op === "meta") ||
+    s.modules.some(
+      (m) => m.factTags !== undefined || m.boundaries !== undefined,
+    );
+
+  it("draws maxRuns from 1, 3 and 100 in every trace case, and in no other", () => {
+    const all = specs();
+    const traced = all.filter((s) => s.trace);
+    expect(new Set(traced.map((s) => s.maxRuns))).toEqual(new Set([1, 3, 100]));
+    expect(all.filter((s) => !s.trace && s.maxRuns !== undefined)).toEqual([]);
+  });
+
+  it("tags facts, marks boundaries and puts meta steps in about one case in three", () => {
+    const all = specs();
+    const meta = all.filter(metaAdded);
+    expect(meta.length).toBeGreaterThan(all.length / 5);
+    expect(meta.length).toBeLessThan(all.length / 2);
+    for (const s of meta) {
+      expect(s.steps.some((x) => x.op === "meta")).toBe(true);
+      s.modules.forEach((m) => {
+        expect(m.factTags).toHaveLength(m.facts);
+        for (const i of m.boundaries ?? []) {
+          expect(i).toBeLessThan(m.derivations.length);
+        }
+      });
+    }
+    const tags = new Set(
+      meta.flatMap((s) => s.modules.flatMap((m) => (m.factTags ?? []).flat())),
+    );
+    expect([...tags].sort()).toEqual([...FUZZ_TAGS].sort());
+    expect(
+      meta.some((s) => s.modules.some((m) => (m.boundaries ?? []).length > 0)),
+    ).toBe(true);
+  });
+
+  it("draws none of it below L9, and every case below L9 is the one L8-pre drew", () => {
+    expect(
+      sample("L8", 600).filter((s) => metaAdded(s) || s.maxRuns !== undefined),
+    ).toEqual([]);
+    // Taking the additions out of an L9 case gives a case without them.
+    for (const s of specs().filter(metaAdded).slice(0, 50)) {
+      const plain = withoutIntrospection(s);
+      expect(
+        metaAdded(plain) || plain.trace || plain.maxRuns !== undefined,
+      ).toBe(false);
+    }
+  });
+
+  it("places each addition at L9 on its own", () => {
+    const base: FuzzSpec = {
+      modules: [
+        {
+          facts: 1,
+          date: false,
+          derivations: [
+            { facts: [0], derived: [], threshold: null, throwsAt: null },
+          ],
+          events: [{ target: 0, add: true }],
+          constraints: [],
+          effects: [],
+          source: null,
+        },
+      ],
+      boundary: null,
+      history: false,
+      trace: false,
+      steps: [{ op: "settle" }],
+    };
+    const m = base.modules[0] as FuzzModule;
+    expect(specLayer(base)).toBe("L0");
+    expect(specLayer({ ...base, steps: [{ op: "meta" }] })).toBe("L9");
+    expect(specLayer({ ...base, maxRuns: 3 })).toBe("L9");
+    expect(
+      specLayer({ ...base, modules: [{ ...m, factTags: [["pii"]] }] }),
+    ).toBe("L9");
+    expect(specLayer({ ...base, modules: [{ ...m, boundaries: [0] }] })).toBe(
+      "L9",
+    );
+  });
+
+  it("records byTag and carriesTag at a meta step, and passes the trace's maxRuns on", async () => {
+    const spec: FuzzSpec = {
+      modules: [
+        {
+          facts: 2,
+          date: false,
+          derivations: [
+            { facts: [0], derived: [], threshold: null, throwsAt: null },
+            { facts: [], derived: [0], threshold: null, throwsAt: null },
+          ],
+          events: [{ target: 0, add: true }],
+          constraints: [],
+          effects: [],
+          source: null,
+          factTags: [["pii"], []],
+          boundaries: [1],
+        },
+      ],
+      boundary: null,
+      history: false,
+      trace: true,
+      maxRuns: 1,
+      steps: [
+        { op: "set", module: 0, fact: 0, value: 2 },
+        { op: "settle" },
+        { op: "meta" },
+      ],
+    };
+    const [v1] = engines();
+    const result = await runScenario(toScenario(spec), {
+      candidates: [v1 as never],
+      divergences: [],
+    });
+    expect(result.report).toBe("");
+    const trace = result.traces.reference;
+    const options = trace.find(
+      (e) => e.k === "hook" && e.hook === "onTraceComplete",
+    );
+    expect(options).toBeDefined();
+    {
+      const meta = trace.find(
+        (e) =>
+          e.k === "external" && Array.isArray(e.data) && e.data[0] === "meta",
+      ) as
+        | { data: [string, string, { carries: [string, string, unknown][] }] }
+        | undefined;
+      expect(meta?.data[1]).toBe("pii");
+      const carries = Object.fromEntries(
+        (meta?.data[2].carries ?? []).map(([kind, id, answer]) => [
+          `${kind} ${id}`,
+          answer,
+        ]),
+      );
+      expect(carries["fact f0"]).toBe(true);
+      expect(carries["fact f1"]).toBe(false);
+      expect(carries["derivation d0"]).toBe(true);
+      expect(carries["derivation d1"]).toBe(false);
     }
   });
 });

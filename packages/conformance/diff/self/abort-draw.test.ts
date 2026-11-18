@@ -160,7 +160,24 @@ describe("the drawn respectsAbort (the L8 RFC's rule 9)", () => {
     // after drawing it, so these cannot move. A change to some other draw
     // moves them on purpose; update them with that change, never for this.
     expect(streamDigest(sample("L8", 600))).toBe("bc4d238dd8d6d869");
-    expect(streamDigest(sample(undefined, 600))).toBe("897d2f9752054a7c");
+    // L9-pre (the L9 RFC's B1) draws `maxRuns`, fact tags, `tagBoundary`
+    // derivations and meta steps after everything else: with them taken out,
+    // the cases with no ceiling are the ones drawn before, digest for digest.
+    const withoutL9Draws = (s: FuzzSpec): FuzzSpec => {
+      const { maxRuns: _runs, ...rest } = s;
+
+      return {
+        ...rest,
+        modules: s.modules.map(
+          ({ factTags: _tags, boundaries: _bounds, ...m }) => m,
+        ),
+        steps: s.steps.filter((x) => x.op !== "meta"),
+      };
+    };
+    expect(streamDigest(sample(undefined, 600).map(withoutL9Draws))).toBe(
+      "897d2f9752054a7c",
+    );
+    expect(streamDigest(sample(undefined, 600))).toBe("5213d2c0f87f1598");
   });
 
   it("never draws it below L8 or without history, as before", () => {

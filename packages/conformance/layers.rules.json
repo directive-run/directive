@@ -162,7 +162,12 @@
     "a navigation that moves a derivation an effect reads wakes the effect, and constraints do not see a change (U17)": "L8",
     "trace: per-run changelogs with causes": "L9",
     "meta, tags and tag inheritance queries": "L9",
-    "observe subscribed late sees only what follows; unsubscribe is idempotent": "L9"
+    "observe subscribed late sees only what follows; unsubscribe is idempotent": "L9",
+    "a run dropped from the ring while its resolver runs never reports (U2)": "L9",
+    "with maxRuns 0 the trace stays empty, and only runs without a resolver report (U2)": "L9",
+    "meta.subscribe is called for immediate only, not on a write or a new inheritance (U3)": "L9",
+    "byTag computes derivations nothing has read, and lists them as inherited (U4)": "L9",
+    "a resolver error is stored as its string, and a pass that only re-hits the constraint is its own run (U8)": "L9"
   },
   "rules": {
     "tests/core/blackbox-tracking.test.ts": {
@@ -348,7 +353,8 @@
       "rule": "L1"
     },
     "tests/core/data-forms.test.ts": {
-      "rule": "L1"
+      "rule": "L1",
+      "instruments": ["import flushMicrotasks"]
     },
     "tests/core/data-forms-namespaced.test.ts": {
       "rule": "L1"
@@ -702,6 +708,14 @@
     "tests/core/fact-origin-at-write.test.ts": {
       "rule": "L9"
     },
+    "tests/core/l9-trace-pins-oracle.test.ts": {
+      "rule": "L9",
+      "pin": true
+    },
+    "tests/core/l9-trace-pins-oracle-production.test.ts": {
+      "rule": "L9",
+      "pin": true
+    },
     "tests/core/notify-guardrail-blocked.test.ts": {
       "rule": "L9"
     },
@@ -835,6 +849,7 @@
     "tests/core/fact-origin-at-write.test.ts"
   ],
   "notes": {
+    "registerKeys": "B3 of the L9 RFC (owner instruction, 2026-11-15): fact-tags-immutable 'refuses a re-registration of a key that already exists' and fact-tags-recorded 'records a key registered through the store' call system.facts.$store.registerKeys, the store half of registerModule (L10). lib/layers.ts places the member at L10, so both tests sit at L10, not with meta at L9. The alternative, building registerKeys in L9a, would split L10's feature across two layers.",
     "multi-module-correctness": "The plan puts multi-module-correctness in L1 and its source parts in L5. Only the .prod file is black-box; the main file imports createCrossModuleFactsProxy and is white-box (see WHITE-BOX.md), so its split waits for that triage.",
     "effects": "The plan's ladder puts basic effects (run, cleanup, auto-tracking) at L0 and full effects (deps/on, prev, per-frame skip-tracking) at L4. So the black-box effects files' rule is L0 (read-only views, L1, for blackbox-effects-readonly) and each test that uses deps, on or prev is lifted to L4 by those options (lib/layers.ts OPTION_LAYERS). The plan's L4 files effects and effects-lazy-prev-facts are white-box (derivationDep, declaresPrevFacts).",
     "predicate": "predicate and predicate-describe (L11) and sweep-under are white-box.",
@@ -844,6 +859,6 @@
   "instrumentNotes": {
     "option plugins": "observes resolver outcomes through plugin hooks (onResolverComplete/Cancel/Error); L2 must expose them",
     "member .inspect": "reads requirement state through system.inspect(); L2 must expose it",
-    "import flushMicrotasks": "a one-line microtask flush from /testing; L2 tests need it before the testing subpath (L13) exists"
+    "import flushMicrotasks": "a one-line microtask flush from /testing; L2 tests need it before the testing subpath (L13) exists. data-forms.test.ts uses it the same way (the L9 RFC's U14): its tests are about data forms, so each is placed by what it exercises (a data-form when, on, patch or compute is L11), not by the flush"
   }
 }

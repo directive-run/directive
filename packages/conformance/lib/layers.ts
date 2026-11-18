@@ -197,6 +197,14 @@ const MEMBER_LAYERS: Record<string, Layer> = {
   watchDistributableSnapshot: "L12",
   registerModule: "L10",
   unregisterModule: "L10",
+  // B3 of the L9 RFC (owner instruction, 2026-11-15): the store's
+  // `registerKeys` is the store half of `registerModule`, so a test that
+  // calls it sits with dynamic registration at L10, not with meta at L9.
+  registerKeys: "L10",
+  // S4 of the L9 RFC: `notify`'s two clobber-loop members are L9's to
+  // build; `guardrailBlocked` and `guardrailCoverage` are already built.
+  clobberLoopDetected: "L9",
+  clobberLoopResolved: "L9",
   // B1 (owner, 2026-11-01): evict comes with the sources' onEvict at L5,
   // not with dynamic() at L10; neither does anything without the other.
   evict: "L5",
@@ -611,6 +619,20 @@ function featuresIn(root: Node, bindings: Map<string, Feature>): Feature[] {
             Node.isArrayLiteralExpression(spec))
         ) {
           out.push({ name: "option predicate data form", layer: "L11" });
+        }
+      }
+      // A resolver's `key` given as a KeySelector, a list of fields
+      // (`key: ["id"]`) instead of a function: a data form, evaluated with
+      // the others at L11. The L9 RFC's U14 found it: once the flush stopped
+      // placing data-forms.test.ts at L13, the KeySelector case fell to L2.
+      if (
+        matchesSuffix(chain, ["resolvers", "*", "key"]) &&
+        Node.isPropertyAssignment(node)
+      ) {
+        const value = node.getInitializer();
+        const spec = value ? unwrap(value) : undefined;
+        if (spec && Node.isArrayLiteralExpression(spec)) {
+          out.push({ name: "option resolver key data form", layer: "L11" });
         }
       }
       const last = chain[chain.length - 1];
