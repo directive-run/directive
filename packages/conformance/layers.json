@@ -7094,6 +7094,28 @@
         }
       }
     },
+    "tests/core/l11-explain-combinators-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "explain() — combinator clauses in a data-form when (production) > renders $all, $any and $not with a passing and a failing child": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        }
+      }
+    },
+    "tests/core/l11-explain-combinators-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "explain() — combinator clauses in a data-form when > renders $all, $any and $not with a passing and a failing child": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        }
+      }
+    },
     "tests/core/l11-predicate-describe-oracle.test.ts": {
       "category": "black-box",
       "rule": "L11",
