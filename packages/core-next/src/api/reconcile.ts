@@ -874,6 +874,7 @@ const build = (context: SystemContext) => {
       resolvers.drop_(id);
     },
     waits_: resolvers.waits_,
+    retire_: resolvers.retire_,
     // `call` on a resolver is dynamic.ts's own (it needs only the map).
   };
   system.constraints ??= {};
