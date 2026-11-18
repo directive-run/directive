@@ -183,14 +183,14 @@ export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
       shouldPersist(factKey),
     );
     // An empty schema declares nothing, so nothing in it is stale (as restore()).
-    if (schema && Object.keys(schema).length > 0) {
+    if (schema && Object.keys(schema).length) {
       for (const [factKey, value] of entries) {
         if (!Object.hasOwn(schema, factKey)) {
           stale.set(factKey, value);
         }
       }
     }
-    if (stale.size > 0) {
+    if (stale.size) {
       kept.set(sys, stale);
       if (isDevelopment) {
         console.warn(

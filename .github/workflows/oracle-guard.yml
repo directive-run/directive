@@ -4,7 +4,8 @@ name: Oracle guard
 # a PR that changes the harness needs the `oracle-change` label, and a PR that
 # touches packages/core-next may not also touch the conformance harness,
 # except to add or change signed entries in diff/divergences.json (with
-# harness.lock.json), or to remove entries (removal only tightens).
+# harness.lock.json), or to remove entries (removal only tightens), or to
+# remove the names it ships from contracts/next-unshipped.json.
 #
 # Why pull_request_target, and why it is safe here:
 # - The guard must not run the PR's own code, or a PR could rewrite the rules
@@ -13,7 +14,8 @@ name: Oracle guard
 # - The head is only ever read as data through the API: its changed-file
 #   list, the labels in the event payload, and pnpm-lock.yaml,
 #   packages/conformance/v2-passing.json and
-#   packages/conformance/diff/divergences.json as text (base and head, each
+#   packages/conformance/diff/divergences.json and
+#   packages/conformance/contracts/next-unshipped.json as text (base and head, each
 #   only when the PR changes it). It is never checked out, installed, or
 #   executed.
 # - The token is read-only (permissions below) and no secrets are used, so

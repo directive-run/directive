@@ -8,9 +8,9 @@
  * the core-next/harness path rule, with its signed-divergences exception. It
  * runs from the BASE branch under pull_request_target and reads the head
  * only as data through the GitHub API — the changed-file list, the labels in
- * the event payload, and pnpm-lock.yaml, v2-passing.json and
- * diff/divergences.json at both ends as text (each only when the PR changes
- * it). Nothing from the head is executed, so a PR cannot change the rules
+ * the event payload, and pnpm-lock.yaml, v2-passing.json,
+ * diff/divergences.json and contracts/next-unshipped.json at both ends as
+ * text (each only when the PR changes it). Nothing from the head is executed, so a PR cannot change the rules
  * that judge it.
  *
  * Usage: pnpm --filter @directive-run/conformance oracle:guard [--pr]
@@ -21,6 +21,7 @@ import { join } from "node:path";
 import { defaultRepoRoot } from "../lib/core-entries.js";
 import {
   DIVERGENCES_FILE,
+  UNSHIPPED_FILE,
   checkBaseline,
   checkPullRequest,
 } from "../lib/guard.js";
@@ -124,9 +125,25 @@ if (process.argv.includes("--pr")) {
       }
     : undefined;
 
+  // contracts/next-unshipped.json at both ends, for rule 3's removal exception.
+  const unshippedPath = `packages/conformance/${UNSHIPPED_FILE}`;
+  const unshipped = changed.includes(unshippedPath)
+    ? {
+        base: await textAt(unshippedPath, pr.base.sha),
+        head: await textAt(unshippedPath, pr.head.sha),
+      }
+    : undefined;
+
   const labels = pr.labels.map((l) => l.name);
   failures.push(
-    ...checkPullRequest(changed, labels, lockfile, ratchet, divergences),
+    ...checkPullRequest(
+      changed,
+      labels,
+      lockfile,
+      ratchet,
+      divergences,
+      unshipped,
+    ),
   );
   console.log(
     `[oracle-guard] PR #${pr.number}: ${changed.length} changed files, labels: ${labels.join(", ") || "none"}`,

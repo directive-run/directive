@@ -189,7 +189,8 @@
       "rule": "L0"
     },
     "tests/core/derivation-deps.test.ts": {
-      "rule": "L0"
+      "rule": "L0",
+      "instruments": ["import flushMicrotasks"]
     },
     "tests/core/mutants-derivations.test.ts": {
       "rule": "L0"
@@ -380,7 +381,8 @@
       "rule": "L2"
     },
     "tests/core/resolvers.test.ts": {
-      "rule": "L2"
+      "rule": "L2",
+      "instruments": ["import flushMicrotasks"]
     },
     "tests/core/resolver-outcomes.test.ts": {
       "rule": "L2",
@@ -463,7 +465,8 @@
       }
     },
     "tests/core/engine.test.ts": {
-      "rule": "L3"
+      "rule": "L3",
+      "instruments": ["import flushMicrotasks"]
     },
     "tests/core/l3-engine-oracle.test.ts": {
       "rule": "L3"
@@ -490,7 +493,8 @@
       "rule": "L3"
     },
     "tests/core/system.test.ts": {
-      "rule": "L3"
+      "rule": "L3",
+      "instruments": ["import flushMicrotasks"]
     },
     "tests/core/system-async-lifecycle.test.ts": {
       "rule": "L3"

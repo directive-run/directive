@@ -9,7 +9,8 @@
  * verified against first-principles expectations, then warmed up; gc() runs
  * before every timed block; the reported figure is the median of the timed
  * blocks (reported four ways: median and min of thread CPU time and of wall
- * time). Unlike the graph bench, steps may be async (settle), so blocks are
+ * time; a workload marked `steady` skips the gc() and one marked `retainedHeap`
+ * also reports live heap after a full gc, per step). Unlike the graph bench, steps may be async (settle), so blocks are
  * awaited, and a macrotask turn between blocks lets any deferred work finish
  * outside the timed region.
  */
@@ -173,17 +174,39 @@ async function runAll(engine, api, only) {
     const blockSteps = Math.max(1, Math.round(BLOCK_MS / perStep));
     const walls = [];
     const cpus = [];
+    // Retained heap (def.retainedHeap): live heap after the timed blocks, with a
+    // full gc, against live heap right after warm-up. Read outside the timed code.
+    let heap0 = 0;
+    if (def.retainedHeap) {
+      gc();
+      await tick();
+      gc();
+      heap0 = process.memoryUsage().heapUsed;
+    }
     for (let b = 0; b < BLOCKS; b++) {
       world.cleanBlock?.();
-      gc();
+      // def.steady: no forced gc, so a block pays the collector's real
+      // steady-state cost (the owner's "measure at steady state", B5).
+      if (!def.steady) {
+        gc();
+      }
       await tick();
       const r = await timeBlock(world.step, blockSteps, isAsync);
       walls.push(r.wall);
       cpus.push(r.cpu);
     }
+    let retainedBytesPerStep;
+    if (def.retainedHeap) {
+      gc();
+      await tick();
+      gc();
+      retainedBytesPerStep =
+        (process.memoryUsage().heapUsed - heap0) / (BLOCKS * blockSteps);
+    }
     world.done();
     const ops = def.ops ?? 1;
     results[name] = {
+      retainedBytesPerStep,
       cpuMedian: median(cpus) / ops,
       cpuMin: Math.min(...cpus) / ops,
       wallMedian: median(walls) / ops,
@@ -289,6 +312,13 @@ async function heapProbe(engine, api) {
   // One history-undo-100 step (100 writes and snapshots, 100 goBack calls)
   // in bytes, by the same method (L8a, scope item 6).
   const historyUndoBytesPerOp = await frameBytes("history-undo-100", 20);
+  // One trace-100 step (100 traced runs, then a read of the ring) in bytes,
+  // by the same method (L9b, the L9 RFC's B2).
+  const traceBytesPerOp = await frameBytes("trace-100", 20);
+  // One module-churn step (100 register/unregister pairs, a resolver in
+  // flight) in bytes, by the same method (L10b, the L10 RFC's B5).
+  const moduleChurnBytesPerOp = await frameBytes("module-churn", 5);
+  const moduleChurnLeakBytesPerOp = await frameBytes("module-churn-leak", 5);
 
   for (const writes of [200_000, 50_000, 12_000]) {
     const only = [];
@@ -316,6 +346,9 @@ async function heapProbe(engine, api) {
           framePersistBytesPerOp,
           batchFlushBytesPerOp,
           historyUndoBytesPerOp,
+          traceBytesPerOp,
+          moduleChurnBytesPerOp,
+          moduleChurnLeakBytesPerOp,
           cleanTrials: [keepClean(only).length, keepClean(full).length],
           calibration: { expected: 176, measured: calibratedBytes },
         },

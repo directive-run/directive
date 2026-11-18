@@ -91,9 +91,30 @@ a made-up number. The runner finds this out by trying: a workload that lists
 `requires: ["sources"]` runs on an engine only if a probe module's source attaches at
 start, so the v2 side begins to run by itself the day L5 lands.
 
+## The module-churn workloads (B5)
+
+Two variants run the SAME body (100 `registerModule` + `unregisterModule` pairs per
+step, each with a read of the module's derivation, a host resolver in flight the whole
+time). Only the timing differs; the workload is never changed.
+
+Owner decision, 2026-11-17, chosen verbatim: "Measure at steady state (Recommended)".
+Meaning: time per register/unregister pair measured at steady state WITHOUT the
+runner's forced gc() before each timed block, plus retained heap; the current
+forced-gc run stays as a leak check (report-only).
+
+- `module-churn` is the B5 bar (1.0 or better against 1.35, in time and bytes). It is
+  warmed up, then timed with no forced gc before a block, so a block pays the
+  collector's real cost. The table shows time per pair. Bytes come from the heap
+  probe (bytes per step of 100 pairs).
+- `module-churn-leak` is the old forced-gc run (gc() before every timed block). It is
+  a report-only leak check: it never decides the bar.
+- Both report retained heap: live heap after a full gc once the timed blocks are done,
+  minus live heap after a full gc following warm-up, per step. A number that stays near
+  zero is no leak; one that grows with the step count is.
+
 ## Other files
 
-- `workloads.mjs`: the eleven workloads, shared by both engines, each checked against
+- `workloads.mjs`: the workloads, shared by both engines, each checked against
   hand-worked expectations before it is timed.
 - `runner.mjs`: runs one engine in one process; `entry-v1.mjs`, `entry-v2.mjs` load it.
 - `run.mjs`: the driver (rounds, alternating order, tables, JSON, `--show`, `--compare`).
