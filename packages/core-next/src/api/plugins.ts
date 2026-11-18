@@ -41,8 +41,11 @@ declare module "../kernel.js" {
   }
 }
 
-/** Record kind → the 1.35 hook and the record fields passed as its arguments. */
-const HOOKS: Record<string, string[]> = {
+/**
+ * Record kind → the 1.35 hook and the record fields passed as its arguments.
+ * withDynamic adds its own kinds (dynamic.ts).
+ */
+export const HOOKS: Record<string, string[]> = {
   "system.start": ["onStart", "system"],
   "system.stop": ["onStop", "system"],
   "system.destroy": ["onDestroy", "system"],
@@ -129,7 +132,7 @@ async function init(plugins: Plugin[], system: unknown): Promise<void> {
   const done = new WeakSet<Plugin>();
   for (let pass = 0; pass < 100; pass++) {
     const todo = plugins.filter((p) => !done.has(p));
-    if (todo.length === 0) {
+    if (!todo.length) {
       break;
     }
     for (const plugin of todo) {
@@ -156,6 +159,7 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
   return (context) => {
     const { kernel, system } = context;
     scopes.set(system, context);
+    context.ends_ = initial.length;
     const plugins: StreamPlugin[] = [];
     let off: (() => void) | null = null;
     const wants = (at: EventKind): boolean => {
@@ -224,7 +228,7 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
         if (index !== -1) {
           plugins.splice(index, 1);
         }
-        if (plugins.length === 0 && off) {
+        if (!plugins.length && off) {
           off();
           off = null;
         }
@@ -237,7 +241,7 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
     let depth = 0;
     /** Re-entry through the hooks stops at depth 4, shared by three members. */
     const capped = (at: string, data: Record<string, unknown>) => {
-      if (!kernel.disposed && plugins.length > 0 && depth < 4) {
+      if (!kernel.disposed && plugins.length && depth < 4) {
         depth++;
         try {
           kernel.hooks.emit(at, data);
@@ -254,7 +258,7 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
         count: number,
         category?: string,
       ) {
-        if (kernel.disposed || plugins.length === 0 || depth >= 4) {
+        if (kernel.disposed || !plugins.length || depth >= 4) {
           return;
         }
         if (!plugins.some((p) => p.name === plugin)) {
@@ -278,7 +282,7 @@ export function withPlugins(initial: readonly Plugin[] = []): SystemPart {
         screenedDigest: string,
         reason: string,
       ) {
-        if (!kernel.disposed && plugins.length > 0) {
+        if (!kernel.disposed && plugins.length) {
           kernel.hooks.emit("guardrail.coverage", {
             plugin,
             screenedCount,

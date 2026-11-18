@@ -22,7 +22,7 @@
 
 import isDevelopment from "#is-development";
 import { createClock } from "../clock.js";
-import { Flags, Link, type ReactiveNode } from "../graph.js";
+import { Link, type ReactiveNode } from "../graph.js";
 import {
   type Kernel,
   type KernelEvent,
@@ -46,6 +46,7 @@ import {
   view,
   withTracking,
 } from "./facts.js";
+import type { Predicates } from "./predicate.js";
 import type { RequirementWithId } from "./requirements.js";
 import type { BatchHost, Batcher } from "./resolvers.js";
 import type { SourcesFeature } from "./sources.js";
@@ -128,6 +129,12 @@ interface Derivation {
   /** What it read when it last computed (the tracker's set, kept). */
   deps_?: Set<string>;
   /**
+   * 1.35's cachedValue: the last value a compute returned. A throw writes
+   * none, so after one it is still the value before it (the graph's node
+   * holds the error).
+   */
+  value_?: unknown;
+  /**
    * What a membership test (`"id" in derived`) reads: made on the first test,
    * never written. It is the edge a read would leave, without the read that
    * runs the derivation. See `invalidate`.
@@ -138,6 +145,16 @@ interface Derivation {
    * + the id, made once rather than on every test.
    */
   member_: string;
+}
+
+// The graph's Flags bits the core reads (graph.ts), as literals: a const enum
+// is inlined at each use, where Flags is an object every bundle would carry.
+// l10b-modules.test.ts pins each value to Flags.
+// biome-ignore lint/suspicious/noConstEnum: internal, never exported.
+const enum F {
+  Dirty = 4,
+  Running = 16,
+  Errored = 512,
 }
 
 /**
@@ -252,10 +269,68 @@ export interface SystemContext {
    */
   pass_?: (end?: 1) => void;
   /**
+   * How many plugins the system starts with, set by the plugins part: 1.35
+   * builds the reconcile.end record only with plugins configured
+   * (engine.ts:2180), so with none an observer hears no reconcile.end.
+   */
+  ends_?: number;
+  /**
    * inspect()'s counters (S3): the derivations watched by name, and the keys
    * written since the last pass began.
    */
   counts_(): [ReadonlySet<string>, ReadonlySet<string>];
+  /**
+   * L10: each kind's definition hooks, by 1.35's type name: the core's
+   * derivation seam here, the parts' (effects, reconcile) as they are built.
+   * withDynamic's registry drives them, after it writes the module's map.
+   */
+  kinds_: Record<string, DefHooks>;
+  /** L10, dynamic.ts relink: set by the first dynamic call. */
+  relink_?: (
+    node: ReactiveNode,
+    old: Set<string> | undefined,
+    deps: Set<string>,
+  ) => void;
+  /** L10b: the event handlers, unwrapped. */
+  events_: Record<string, Fn>;
+  /** L10b: a pass now (1.35's unregisterModule awaits one, engine.ts:4870). */
+  reconcile_(): Promise<void>;
+  /** L10b: the meta part's tags for keys the store registers (or drops, untyped). */
+  keys_?: (entries: [string, unknown?][]) => void;
+  /** L10: builds the reconcile part late, on a system that had no constraint or resolver. */
+  l2_?: () => void;
+  /** L10: true while a pass runs (1.35's isReconciling). */
+  readonly inPass_: boolean;
+  /** L10: called once where a pass ends (withDynamic's queue sets it). */
+  end_?: () => void;
+  /** L10: tells meta.subscribe's listeners (set by withMeta). */
+  metaChanged_?: () => void;
+  /** L11: the data-form slot (FormOf), filled by withPredicates. */
+  form_?: FormOf;
+  /** L11: a data form as its function, made at its first call (the seam). */
+  lazy_: FormOf;
+  /** L11: the predicates part's registration hooks. */
+  pred_?: Predicates;
+}
+
+/**
+ * L11 (the seam): turns a data form, an object `compute` or a `patch`
+ * event, into its function. Set by withPredicates; the core reads it at the
+ * form's first call, when every part has run.
+ */
+export type FormOf = (raw: any, key: string, id: string) => Fn;
+
+/** L10: one kind's definition hooks (the registry has written the map first). */
+export interface DefHooks {
+  add_(id: string, def?: unknown): void;
+  replace_(id: string, def?: unknown): void;
+  remove_(id: string, def?: unknown): void;
+  /** Absent on the resolver's: dynamic.ts calls the resolve itself. */
+  call_?(id: string, props?: any): unknown;
+  /** L10b, resolvers: what an unregister waits for. */
+  waits_?(ids: string[]): unknown[];
+  /** L10 (D7): whether one of the kind's definitions depends on `key`. */
+  reads_?(key: string): boolean;
 }
 
 /** An opt-in part: wires itself in through the kernel's feature registry. */
@@ -399,6 +474,7 @@ export const checkTick = (ms: number | undefined): void => {
 const defsOf = (
   src: Record<string, unknown> | undefined,
   key: string,
+  lazy: FormOf,
 ): Record<string, Fn> => {
   const out: Record<string, Fn> = {};
   for (const [id, raw] of Object.entries(src ?? {})) {
@@ -415,7 +491,22 @@ const defsOf = (
         `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof fn}`,
       );
     }
-    out[id] = fn as Fn;
+    if (
+      isDevelopment &&
+      key === "handler" &&
+      fn !== undefined &&
+      typeof raw === "object" &&
+      Object.hasOwn(raw as object, "patch")
+    ) {
+      console.warn(
+        `[Directive] event "${id}": both \`handler\` and \`patch\` provided — using \`handler\` (patch is ignored).`,
+      );
+    }
+    // L11: a data form (an object compute, or a patch event).
+    out[id] =
+      typeof fn === "object" || (fn === undefined && (raw as any)?.patch)
+        ? lazy(raw, key, id)
+        : (fn as Fn);
   }
 
   return out;
@@ -433,6 +524,46 @@ const tick = () => new Promise<void>((resolve) => queueMicrotask(resolve));
  * events, subscriptions and the reconcile pass; each part adds a feature.
  * The 1.35 `createSystem` (system.ts) passes them all.
  */
+/**
+ * 1.35's validateKeys, a security boundary that runs in every environment:
+ * a blocked key in any section, and (`dollar`) a schema key starting with
+ * "$". createSystem, the namespaced layer (no "$" check) and registerModule
+ * (1.35's shorter text, `tail` "") share it.
+ */
+/** The sections 1.35's validateKeys walks, in its order. */
+const SECTIONS = [
+  "schema",
+  "events",
+  "derive",
+  "effects",
+  "sources",
+  "constraints",
+  "resolvers",
+];
+export function validateKeys(
+  id: string,
+  mod: Record<string, any>,
+  facts: object | undefined,
+  dollar?: unknown,
+  tail = " This could indicate a prototype pollution attempt.",
+): void {
+  for (const section of SECTIONS) {
+    const obj = section === "schema" ? facts : mod[section];
+    for (const key of obj ? Object.keys(obj) : []) {
+      if (BLOCKED_PROPS.has(key)) {
+        throw new Error(
+          `[Directive] Security: Module "${id}" has dangerous key "${key}" in ${section}.${tail}`,
+        );
+      }
+      if (dollar && section === "schema" && key[0] === "$") {
+        throw new Error(
+          `[Directive] Module "${id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
+        );
+      }
+    }
+  }
+}
+
 export function createSystemCore<const M extends ModuleSchema>(
   options: SystemOptions<M>,
   parts: readonly SystemPart[] = [],
@@ -462,31 +593,9 @@ export function createSystemCore<const M extends ModuleSchema>(
   }
   const hooks_ = module.hooks_ ?? (module.hooks ? [module.hooks as Hooks] : []);
   const schema = (module.schema?.facts ?? {}) as Record<string, unknown>;
-  // A security boundary (1.35): runs in every environment.
-  for (const [section, obj] of [
-    ["schema", schema],
-    ["events", module.events],
-    ["derive", module.derive],
-    ["effects", module.effects],
-    ["sources", module.sources],
-    ["constraints", module.constraints],
-    ["resolvers", module.resolvers],
-  ] as const) {
-    for (const key of Object.keys(obj ?? {})) {
-      if (BLOCKED_PROPS.has(key)) {
-        throw new Error(
-          `[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. This could indicate a prototype pollution attempt.`,
-        );
-      }
-      if (section === "schema" && key.startsWith("$")) {
-        throw new Error(
-          `[Directive] Module "${module.id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
-        );
-      }
-    }
-  }
+  validateKeys(module.id, module, schema, 1);
   if (isDevelopment) {
-    if (Object.keys(module.crossModuleDeps ?? {}).length > 0) {
+    if (Object.keys(module.crossModuleDeps ?? {}).length) {
       console.warn(
         "[Directive] Single module mode ignores crossModuleDeps. Use multiple modules if cross-module access is needed: createSystem({ modules: { ... } })",
       );
@@ -499,8 +608,17 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
     }
   }
-  const deriveDefs = defsOf(module.derive, "compute");
-  const eventDefs = defsOf(module.events, "handler");
+  /** L11, the seam: read at the first call, when withPredicates has run. */
+  const lazy: FormOf = (raw, key, id) => {
+    let fn: Fn | undefined;
+
+    return (...args) =>
+      (fn ??= context.form_!(raw, key, id))(
+        ...(raw.scope_ ? raw.scope_(...args) : args),
+      );
+  };
+  const deriveDefs = defsOf(module.derive, "compute", lazy);
+  const eventDefs = defsOf(module.events, "handler", lazy);
   // The event `tickMs` dispatches: the first module's with a `tick` event.
   // (`load_` marks the namespaced form; a quoted "tick_" would not be mangled.)
   const tickKey = module.load_
@@ -652,7 +770,7 @@ export function createSystemCore<const M extends ModuleSchema>(
 
   /** Tell the subscribers of every derivation that went stale. */
   const notifyPending = () => {
-    if (pending.size === 0) {
+    if (!pending.size) {
       return;
     }
     const ids = [...pending];
@@ -677,7 +795,7 @@ export function createSystemCore<const M extends ModuleSchema>(
    * pass limit, 1.35's 100 iterations).
    */
   const release = () => {
-    if (--holdDepth > 0 || pending.size === 0) {
+    if (--holdDepth > 0 || !pending.size) {
       return;
     }
     if (destroyed) {
@@ -690,7 +808,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     try {
       kernel.request("sync");
     } catch (error) {
-      if (pending.size === 0) {
+      if (!pending.size) {
         throw error;
       }
       const remaining = [...pending];
@@ -706,16 +824,26 @@ export function createSystemCore<const M extends ModuleSchema>(
    * fact's subscriber in link order, depth first. A fact nothing in the graph
    * reads allocates nothing here.
    */
-  function invalidate(keys: readonly string[]): void {
+  function invalidate(
+    keys: readonly (string | object)[],
+    root?: ReactiveNode,
+  ): void {
     holdDepth++;
     let seen: Set<ReactiveNode> | undefined;
     let told: Set<ReactiveNode> | undefined;
     try {
       for (const key of keys) {
-        for (let l = factNodes.get(key)?.subs; l; l = l.nextSub) {
+        // A node (L10): its readers are walked as a fact's are.
+        for (
+          let l = (
+            typeof key === "string" ? factNodes.get(key) : (key as ReactiveNode)
+          )?.subs;
+          l;
+          l = l.nextSub
+        ) {
           const stack = [l.target];
           seen ??= new Set();
-          while (stack.length > 0) {
+          while (stack.length) {
             const node = stack.pop()!;
             const d = byNode.get(node);
             if (!d || seen.has(node)) {
@@ -736,14 +864,16 @@ export function createSystemCore<const M extends ModuleSchema>(
             d.stale_ = true;
             // Dirty, not just checked: like 1.35, the next read runs this
             // derivation first and computes what it reads on demand.
-            node.flags |= Flags.Dirty;
+            node.flags |= F.Dirty;
             if (wants("derivation.invalidate")) {
               emit("derivation.invalidate", { id: d.id_ });
             }
             pending.add(d.id_);
             // Wakes an effect that read this derivation (and maybe no fact).
             changedKeys.add(DERIVATION_DEP_PREFIX + d.id_);
-            for (let s = node.subs; s; s = s.nextSub) {
+            // A replaced root's readers are walked one by one after it, in
+            // order (1.35's invalidateReplacedDefinition), by `keys`.
+            for (let s = node === root ? null : node.subs; s; s = s.nextSub) {
               stack.push(s.target);
             }
             // As in 1.35, whoever asked whether it exists goes stale with it.
@@ -756,12 +886,12 @@ export function createSystemCore<const M extends ModuleSchema>(
       // A watched derivation that stays stale is behind the frontier the
       // walk stops at, yet a body that named it hears every change to what
       // it reads, through any depth (1.35's closure). Only watched ones pay.
-      if (watched.size > 0) {
+      if (watched.size) {
         for (const id of watched) {
           const d = derivations.get(id);
           if (d?.stale_) {
             const reads = closureOf(d);
-            if (keys.some((key) => reads.has(factNodes.get(key)!))) {
+            if (keys.some((key) => reads.has(factNodes.get(key as string)!))) {
               changedKeys.add(DERIVATION_DEP_PREFIX + id);
             }
           }
@@ -781,7 +911,7 @@ export function createSystemCore<const M extends ModuleSchema>(
    */
   function tell(asked: ReactiveNode, told: Set<ReactiveNode>): void {
     const stack = [asked];
-    while (stack.length > 0) {
+    while (stack.length) {
       for (let s = stack.pop()!.subs; s; s = s.nextSub) {
         const d = byNode.get(s.target);
         if (d && !told.has(s.target)) {
@@ -808,7 +938,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       closures.set(d.id_, (reads = new Set()));
       const seen = new Set<ReactiveNode>();
       const stack: ReactiveNode[] = [d.node_];
-      while (stack.length > 0) {
+      while (stack.length) {
         for (let l = stack.pop()!.deps; l; l = l.nextDep) {
           const source = l.source;
           if (!seen.has(source)) {
@@ -822,7 +952,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     return reads;
   }
   function compute(d: Derivation): unknown {
-    if (closures.size > 0) {
+    if (closures.size) {
       closures = new Map();
     }
     try {
@@ -831,24 +961,32 @@ export function createSystemCore<const M extends ModuleSchema>(
       );
       d.live_ = true;
       d.stale_ = false;
+      const old = d.deps_;
       d.deps_ = deps;
+      // 1.35's updateDependencies: a new dependency set unlinks the old one
+      // and links the new one, so this derivation's readers' lists end with
+      // it, and the next write's walk meets it last.
+      // 1.35 moves a derivation whose dependencies changed to the end of
+      // what it reads; L10's definitions change them (dynamic.ts relink).
+      context.relink_?.(d.node_, old, deps);
       if (wants("derivation.compute")) {
         emit("derivation.compute", {
           id: d.id_,
           value,
-          // The value before this compute: the graph stores the new one once
-          // this returns, and an error in its place after a throw (L9 seam).
-          oldValue: d.node_.flags & Flags.Errored ? undefined : d.node_.value,
+          // The last value computed, also after a throw (derivations.ts:524,
+          // 574): the trace's old value (L9 seam).
+          oldValue: d.value_,
           deps: Array.from(deps, describeDep),
         });
       }
+      d.value_ = value;
 
       return value;
     } catch (error) {
       d.live_ = true;
       // 1.35 keeps a throwing derivation stale: the next read runs it again,
       // which is also all "retry" asks. Marked first: "throw" leaves here.
-      d.node_.flags |= Flags.Dirty;
+      d.node_.flags |= F.Dirty;
       context.reportError("derivation", d.id_, error);
       throw error;
     }
@@ -863,15 +1001,22 @@ export function createSystemCore<const M extends ModuleSchema>(
    * something else (a branch) or by throwing before it gets there.
    *
    * So every derivation keeps one reader that never runs: the edge a read
-   * would leave, without the read.
+   * would leave, without the read. The edge is only on the derivation's
+   * side: `keep` never runs, so nothing walks its own list, and a list there
+   * would hold every derivation ever removed.
    */
   const keep = graph.computed(() => 0);
-  for (const id in deriveDefs) {
+  /**
+   * (bm), L10: a name asked about before it existed, and the node its asker
+   * linked to; registering the name hands the node to it and wakes them.
+   */
+  const asking = new Map<string, ReactiveNode>();
+  function define(id: string): Derivation {
     const d = {
       id_: id,
       stale_: true,
       live_: false,
-      asked_: null,
+      asked_: asking.get(id) ?? null,
       // MEMBER_DEP_PREFIX written out: importing it costs the floor bytes (a
       // test pins that the two agree).
       member_: `\u001E${id}`,
@@ -879,20 +1024,83 @@ export function createSystemCore<const M extends ModuleSchema>(
     const node = (d.node_ = graph.computed(() => compute(d), {
       equals: false,
     }));
-    const link = new Link(node, keep, keep.deps, node.subsTail);
-    keep.deps = link;
+    const link = new Link(node, keep, null, node.subsTail);
     node.subsTail ? (node.subsTail.nextSub = link) : (node.subs = link);
     node.subsTail = link;
     derivations.set(id, d);
     byNode.set(node, d);
+
+    return d;
   }
+  for (const id in deriveDefs) {
+    define(id);
+  }
+  const miss = (id: string): undefined => {
+    if (tracker.deps && tracker.deps !== tracker.effect_) {
+      // A derivation computing links to the name's node; a constraint
+      // depends on its membership key, as an effect's test does. Either is
+      // noted as asking, which is what a registration wakes.
+      const node = asking.get(id) ?? asking.set(id, graph.signal(0)).get(id)!;
+      graph.active ? graph.read(node) : tracker.deps.add(`\u001E${id}`);
+    }
+  };
+  /**
+   * The derivation seam (L10). The registry has written `module.derive` and
+   * hands each hook the compute, unwrapped.
+   */
+  const kinds: Record<string, DefHooks> = {
+    derivation: {
+      add_(id, fn) {
+        deriveDefs[id] =
+          typeof fn === "object" ? lazy(fn, "compute", id) : (fn as Fn);
+        const d = define(id);
+        // (bm): only a reader that asked about the name is owed anything; a
+        // name nobody asked about changes nothing (1.35).
+        if (asking.delete(id)) {
+          changedKeys.add(d.member_);
+          invalidate([d.asked_!]);
+        }
+      },
+      // 1.35 keeps the node and what it read (derivations.ts:418–446): stale
+      // with the new compute, and what reads it with it.
+      replace_(id, fn) {
+        // An assigned data form stays an object, and reading it throws
+        // (1.35, U19): only creation and register unwrap one.
+        deriveDefs[id] = (fn as any)?.compute ?? fn;
+        // Announced again even when it was stale already (1.35).
+        pending.add(id);
+        const node = derivations.get(id)!.node_;
+        invalidate([{ subs: { target: node } }, node], node);
+      },
+      remove_(id) {
+        const d = derivations.get(id)!;
+        derivations.delete(id);
+        byNode.delete(d.node_);
+        watched.delete(id);
+        listeners.delete(id);
+        pending.delete(id);
+        delete deriveDefs[id];
+        changedKeys.add(d.member_);
+        d.asked_ && asking.set(id, d.asked_);
+        invalidate([d.node_, d.asked_ ?? {}]);
+        // What it read no longer reaches it.
+        graph.dispose(d.node_);
+      },
+      call_(id) {
+        const node = derivations.get(id)!.node_;
+        node.flags |= F.Dirty;
+
+        return graph.read(node);
+      },
+    },
+  };
   function read(id: string): unknown {
     const d = derivations.get(id);
     if (!d) {
       throw new Error(`[Directive] Unknown derivation: ${id}`);
     }
     tracker.deps?.add(DERIVATION_DEP_PREFIX + id);
-    if (d.node_.flags & Flags.Running) {
+    if (d.node_.flags & F.Running) {
       // 1.35's text (derivations.ts:514–517), not the graph's.
       throw new Error(
         `[Directive] Circular dependency detected in derivation: ${id}`,
@@ -905,11 +1113,18 @@ export function createSystemCore<const M extends ModuleSchema>(
   const derive = view(
     (id) => derivations.has(id),
     () => [...derivations.keys()],
-    (id) => (BLOCKED_PROPS.has(id) ? undefined : read(id)),
+    no,
     {
       ...LOCKED,
       set: no,
       deleteProperty: no,
+      // A name that is not there is a miss ((bm), L10).
+      get: (_, id) =>
+        typeof id !== "string" || BLOCKED_PROPS.has(id)
+          ? undefined
+          : derivations.has(id)
+            ? read(id)
+            : miss(id),
       // As in 1.35, a membership test is a read that only follows its target:
       // the asker is tracked and goes stale with it, and the target is left
       // for whoever reads its value (a read would run it, and report its
@@ -929,6 +1144,8 @@ export function createSystemCore<const M extends ModuleSchema>(
           return !!d;
         }
         if (!d) {
+          typeof id === "string" && miss(id);
+
           return false;
         }
         tracker.deps?.add(DERIVATION_DEP_PREFIX + d.id_);
@@ -1120,7 +1337,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
       // A batch with a navigation's write takes the L8 path (navBatch);
       // every other batch, and every batch without history, main's.
-      if (backWrites > 0) {
+      if (backWrites) {
         navBatch(changes);
 
         return;
@@ -1171,13 +1388,13 @@ export function createSystemCore<const M extends ModuleSchema>(
       changedKeys = kept;
     }
     releaseHold();
-    if (back.length > 0) {
+    if (back.length) {
       for (const key of back) {
         restored.add(key);
       }
       scheduleReconcile();
     }
-    if (keys.length > 0) {
+    if (keys.length) {
       noteWrites(keys.length);
       changed(keys);
     }
@@ -1243,7 +1460,7 @@ export function createSystemCore<const M extends ModuleSchema>(
   // unless the kernel options say otherwise): one host callback per tick
   // for every system sharing the scheduler.
   kernel.onSettle((lane) => {
-    if (holdDepth === 0) {
+    if (!holdDepth) {
       notifyPending();
     }
     if (lane !== kernel.lane || !scheduled) {
@@ -1275,14 +1492,14 @@ export function createSystemCore<const M extends ModuleSchema>(
   function navOf(passKeys: Set<string>): Set<string> | null {
     follows = !plainWrites;
     navWrites = plainWrites = 0;
-    if (restored.size === 0) {
+    if (!restored.size) {
       return null;
     }
     const nav = restored;
     restored = new Set();
     // With ordinary keys in the pass, the derivations the navigation moved
     // are changes for constraints too, as 1.35 drains them (engine.ts:1907–1911).
-    if (passKeys.size > 0) {
+    if (passKeys.size) {
       for (const key of nav) {
         if (key.startsWith(DERIVATION_DEP_PREFIX)) {
           passKeys.add(key);
@@ -1306,12 +1523,11 @@ export function createSystemCore<const M extends ModuleSchema>(
     passKeys: Set<string>,
   ): void {
     snapping = false;
-    if (passKeys.size > 0) {
+    if (passKeys.size) {
       if (!follows && (!history.events_ || snapAsked)) {
-        if (chain === 0) {
-          const keys = [...passKeys].filter(
-            (key) => !key.startsWith(DERIVATION_DEP_PREFIX),
-          );
+        if (!chain) {
+          // Not the internal keys: a derivation's, or a membership one (L10).
+          const keys = [...passKeys].filter((key) => !(key[0]! < " "));
           history.snap_(
             `facts-changed:${keys.slice(0, 5).join(",")}${keys.length > 5 ? `+${keys.length - 5}more` : ""}`,
           );
@@ -1354,7 +1570,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       chain = 0;
       chainKeys = null;
       navWrites = plainWrites = 0;
-      if (kept.length > 0) {
+      if (kept.length) {
         for (const key of kept) {
           changedKeys.add(key);
         }
@@ -1370,10 +1586,10 @@ export function createSystemCore<const M extends ModuleSchema>(
     notifySettle();
     const passKeys = changedKeys;
     changedKeys = new Set();
-    chainKeys = chain > 0 ? passKeys : null;
+    chainKeys = chain ? passKeys : null;
     // Only a pass with a navigation's writes asks more (navOf).
     let nav: Set<string> | null = null;
-    if (navWrites > 0 || restored.size > 0) {
+    if (navWrites || restored.size) {
       nav = navOf(passKeys);
     } else {
       follows = false;
@@ -1422,7 +1638,8 @@ export function createSystemCore<const M extends ModuleSchema>(
         // 1.35 awaits its (empty) full evaluation after a navigation.
         await 0;
       }
-      if (wants("reconcile.end")) {
+      // Only with plugins configured, as 1.35 (`ends_`).
+      if (context.ends_ && wants("reconcile.end")) {
         emit("reconcile.end", {
           result: result ?? {
             unmet: [],
@@ -1442,11 +1659,13 @@ export function createSystemCore<const M extends ModuleSchema>(
       reconciling = false;
       // As 1.35 (engine.ts:2216), at the pass's end, after a stop's reset.
       snapped = snapping;
+      // L10: definitions asked for during the pass (1.35 engine.ts:2220).
+      context.end_?.();
       // As 1.35 (engine.ts:2244-2250): every constraint and effect of this
       // pass has finished, so the watched set keeps only what one still
       // reads. A derivation asked about once stops costing every later
       // write a scan. Removal only; nothing to do when nothing is watched.
-      if (watched.size > 0) {
+      if (watched.size) {
         const live = new Set<string>();
         features.reconcile?.observed_(live);
         features.effects?.observed_(live);
@@ -1457,8 +1676,8 @@ export function createSystemCore<const M extends ModuleSchema>(
         }
       }
       if (
-        changedKeys.size > 0 ||
-        restored.size > 0 ||
+        changedKeys.size ||
+        restored.size ||
         again ||
         features.effects?.reruns_()
       ) {
@@ -1639,7 +1858,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       if (initialized) {
         return;
       }
-      if (isDevelopment && loading > 0) {
+      if (isDevelopment && loading) {
         // (ah): 1.35 drops a loader still pending here, silently (H3).
         console.warn(
           "[Directive] initialize() ran while a hydrate() loader was still pending, so its facts will never be applied. Await hydrate() before initialize() or start().",
@@ -1829,8 +2048,8 @@ export function createSystemCore<const M extends ModuleSchema>(
           }
         });
         const ms = opts?.timeout;
-        if (ms !== undefined && ms > 0) {
-          cancel = after(ms, () => {
+        if (ms! > 0) {
+          cancel = after(ms!, () => {
             off();
             reject(new Error(`[Directive] when: timed out after ${ms}ms`));
           });
@@ -1931,6 +2150,14 @@ export function createSystemCore<const M extends ModuleSchema>(
       createFactsProxy(store, schema, tracker, writer, allow) as Facts<Schema>,
     derivationDeps: (id) => derivations.get(id)?.deps_,
     counts_: () => [watched, changedKeys],
+    kinds_: kinds,
+    // L10b: a module's events, and a pass now (unregisterModule).
+    events_: eventDefs,
+    lazy_: lazy,
+    reconcile_: reconcile,
+    get inPass_() {
+      return reconciling;
+    },
   };
   for (const part of parts) {
     part(context);
@@ -1943,8 +2170,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     // 1.35's never-started warning (system.ts:1040–1056), on the kernel
     // clock. Owned by the system, so destroy() clears it (candidate r,
     // approved; 1.35 warns even after destroy()).
-    const env = typeof process === "undefined" ? undefined : process.env;
-    if (env === undefined || env.NODE_ENV !== "test") {
+    if (typeof process === "undefined" || process.env?.NODE_ENV !== "test") {
       clock.setTimeout(
         () => {
           if (!running && !initialized) {

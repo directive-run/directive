@@ -1408,6 +1408,157 @@ describe("the oracle guard", () => {
       }
     });
   });
+
+  // Rule 3's second exception (Jason, 2026-11-17: "Route B: approve the rule
+  // (Recommended)"): an engine PR may remove the names it ships from
+  // contracts/next-unshipped.json.
+  describe("names removed from next-unshipped.json alongside packages/core-next", () => {
+    const engine = "packages/core-next/src/index.ts";
+    const file = "packages/conformance/contracts/next-unshipped.json";
+    const lock = "packages/conformance/harness.lock.json";
+    const label = ["oracle-change"];
+    const comment = "hand-maintained; remove a name when core-next ships it";
+    const list = (names: Record<string, string>, $comment = comment) =>
+      JSON.stringify({ $comment, ...names }, null, 2);
+    const base = list({
+      ". doctor": "L11",
+      ". predict": "L11",
+      ". memorySink": "L12",
+    });
+    const guard = (
+      head: string | null,
+      changed = [engine, file, lock],
+      labels = label,
+      from: string | null = base,
+    ) =>
+      checkPullRequest(changed, labels, undefined, undefined, undefined, {
+        base: from,
+        head,
+      });
+
+    it("passes a pure removal alongside core-next", () => {
+      expect(
+        guard(list({ ". predict": "L11", ". memorySink": "L12" }), [
+          engine,
+          file,
+        ]),
+      ).toEqual([]);
+      expect(guard(list({}))).toEqual([]);
+    });
+
+    it("passes harness.lock.json changing with only the removal", () => {
+      expect(
+        guard(list({ ". memorySink": "L12" }), [engine, file, lock]),
+      ).toEqual([]);
+    });
+
+    it("still needs the oracle-change label", () => {
+      expect(guard(list({}), undefined, []).join("\n")).toMatch(
+        /needs the oracle-change label/,
+      );
+    });
+
+    it("fails an added name", () => {
+      expect(
+        guard(
+          list({
+            ". doctor": "L11",
+            ". predict": "L11",
+            ". memorySink": "L12",
+            ". extra": "L13",
+          }),
+        ).join("\n"),
+      ).toMatch(/next-unshipped\.json adds \. extra; .*may only remove names/);
+      // Swapping one name for another is a removal plus an addition.
+      expect(
+        guard(list({ ". doctor": "L11", ". other": "L11" })).join("\n"),
+      ).toMatch(/adds \. other/);
+    });
+
+    it("fails a changed layer", () => {
+      expect(guard(list({ ". doctor": "L12" })).join("\n")).toMatch(
+        /changes the layer of \. doctor from "L11" to "L12"/,
+      );
+    });
+
+    it("fails a $comment edit", () => {
+      expect(
+        guard(list({ ". doctor": "L11" }, "anything goes")).join("\n"),
+      ).toMatch(/changes its \$comment/);
+      const { $comment: _, ...noComment } = JSON.parse(list({}));
+      expect(guard(JSON.stringify(noComment)).join("\n")).toMatch(
+        /changes its \$comment/,
+      );
+    });
+
+    it("fails the removal with any other harness file", () => {
+      expect(
+        guard(list({}), [
+          engine,
+          file,
+          lock,
+          "packages/conformance/lib/guard.ts",
+        ]).join("\n"),
+      ).toMatch(
+        /changes packages\/core-next and the conformance harness \(packages\/conformance\/lib\/guard\.ts\)/,
+      );
+    });
+
+    it("fails closed on text it cannot read", () => {
+      for (const [head, from, why] of [
+        ["{", base, /not valid JSON at the head/],
+        ["[]", base, /must be an object at the head/],
+        [list({}), "{", /not valid JSON at the base/],
+        [null, base, /deleted at the head/],
+        [list({}), null, /new at the head/],
+      ] as const) {
+        expect(
+          guard(head, undefined, label, from).join("\n"),
+          String(head),
+        ).toMatch(why);
+      }
+      expect(checkPullRequest([engine, file], label).join("\n")).toMatch(
+        /next-unshipped\.json changed but its base and head were not provided/,
+      );
+    });
+
+    it("checks signed divergences and the removal together", () => {
+      const div = "packages/conformance/diff/divergences.json";
+      const signed = JSON.stringify([
+        { id: "d1", reason: "r", approvedBy: "Jason", date: "2026-11-17" },
+      ]);
+      const removal = { base, head: list({}) };
+      expect(
+        checkPullRequest(
+          [engine, div, file, lock],
+          label,
+          undefined,
+          undefined,
+          { base: "[]", head: signed },
+          removal,
+        ),
+      ).toEqual([]);
+      expect(
+        checkPullRequest(
+          [engine, div, file],
+          label,
+          undefined,
+          undefined,
+          { base: "[]", head: signed },
+          { base, head: list({ ". x": "L11" }) },
+        ).join("\n"),
+      ).toMatch(/adds \. x/);
+    });
+
+    it("leaves a removal with no core-next change to rule 2: it needs the label", () => {
+      expect(guard(list({}), [file, lock], []).join("\n")).toMatch(
+        /changes the oracle \(.*next-unshipped\.json.*\) and needs the oracle-change label/,
+      );
+      expect(guard(list({}), [file, lock])).toEqual([]);
+      // Without core-next, the census judges the list, not the PR guard.
+      expect(guard(list({ ". x": "L13" }), [file, lock])).toEqual([]);
+    });
+  });
 });
 
 describe("the v1 pin", () => {

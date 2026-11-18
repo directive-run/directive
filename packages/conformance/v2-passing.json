@@ -38,7 +38,10 @@
         "a throwing derivation > keeps working for the dependants of a recovered derivation",
         "a throwing derivation > rethrows to the reader, reports to plugins, and recovers",
         "reading a derivation that does not exist > throws a message that names the problem",
+        "registering and replacing derivations at runtime > a derivation registered after start is computed and tracked",
+        "registering and replacing derivations at runtime > a function-valued entry and an object-form entry both run",
         "registering and replacing derivations at runtime > rejects a null or non-object compute",
+        "registering and replacing derivations at runtime > replacing a derivation wakes its subscribers and dependants with fresh values",
         "subscribing to derivations > a new listener on a fully unsubscribed derivation is heard",
         "subscribing to derivations > one unsubscribe leaves the other listener of the same derivation",
         "subscribing to derivations > unsubscribing twice is harmless and stays unsubscribed",
@@ -56,6 +59,7 @@
       "tests/core/blackbox-effects-readonly.test.ts": [
         "a reported write reaches the error boundary too > the boundary's callback sees the effect id",
         "an in-place change to a nested fact > a nested read leaves no complaint behind",
+        "an in-place change to a nested fact > is reported for a call()",
         "an in-place change to a nested fact > is reported for an async auto-tracked effect",
         "an in-place change to a nested fact > is reported for an auto-tracked effect",
         "an in-place change to a nested fact > is reported to plugins, naming the effect and the path",
@@ -71,7 +75,8 @@
         "the facts an effect reads through > is also refused after an await",
         "the facts an effect reads through > is refused from a cleanup too",
         "the facts an effect reads through > reads see live values",
-        "the facts an effect reads through > the store behind it refuses set and delete and reports them"
+        "the facts an effect reads through > the store behind it refuses set and delete and reports them",
+        "the facts an effect reads through > the store behind it still reads, batches and subscribes"
       ],
       "tests/core/blackbox-effects.test.ts": [
         "a namespaced non-reader costs fewer snapshots > copies the store less for a one-parameter effect than for a reader",
@@ -107,6 +112,11 @@
         "an effect that can read prevFacts is handed them > with explicit deps, when it has only a rest parameter",
         "an effect that can read prevFacts is handed them > with explicit deps, when it has the arguments object",
         "an effect that can read prevFacts is handed them > with explicit deps, when it has two named parameters",
+        "an effect that cannot read prevFacts costs no snapshot > a data gate makes the snapshot even though the body ignores it",
+        "an effect that cannot read prevFacts costs no snapshot > a module registered later brings its effects, and a reader is backfilled",
+        "an effect that cannot read prevFacts costs no snapshot > a reader assigned over a non-reader is backfilled",
+        "an effect that cannot read prevFacts costs no snapshot > assigning a non-reader over the last reader stops the copying",
+        "an effect that cannot read prevFacts costs no snapshot > unregistering the last reader stops the copying",
         "an effect that cannot read prevFacts costs no snapshot > when it has a bare arrow parameter",
         "an effect that cannot read prevFacts costs no snapshot > when it has a computed key with a call inside",
         "an effect that cannot read prevFacts costs no snapshot > when it has a destructured array",
@@ -130,36 +140,71 @@
         "cleanup > a cleanup that throws is reported and the effect still re-runs",
         "cleanup > a late cleanup that throws is reported, and needs no listener",
         "cleanup > a returned value that is not a function is not kept as a cleanup",
+        "cleanup > a static effect cannot be unregistered",
         "cleanup > an async auto-tracked effect's cleanup is stored when it settles",
         "cleanup > an async effect settling after stop() has its cleanup called at once",
         "cleanup > an async effect's cleanup is stored when it settles",
         "cleanup > an auto-tracked effect settling after stop() is cleaned up at once",
         "cleanup > an auto-tracked effect's cleanup is stored too",
+        "cleanup > assign on an unknown effect says so",
         "cleanup > before stop(), a settling effect's cleanup is kept, not called",
+        "cleanup > call stores a cleanup from a sync and from an async effect",
         "cleanup > destroy() runs pending cleanups",
+        "cleanup > registering an id twice is refused",
+        "cleanup > replacing a definition cleans up the old one first",
         "cleanup > runs before the next run, once, and not again",
         "cleanup > stop() runs every pending cleanup, once",
+        "cleanup > unregistering an unknown effect is a no-op",
+        "cleanup > unregistering cleans up, and the effect no longer runs",
+        "data-form on > fires only when the gate holds, and only for changes to its facts",
+        "data-form on > freezes the spec it was given",
+        "data-form on > keeps the predicate's facts as its deps whatever the body reads",
         "data-form on > rejects a value that is not a predicate, by what it is",
+        "data-form on > swapping a function-form effect for a gated one installs the gate",
+        "data-form on > swapping to a function-form effect drops the old gate",
+        "data-form on > unregistering a gated effect drops its gate",
         "declared dependencies > a derivation name runs the effect when the derivation changes",
+        "declared dependencies > a derivation registered after the effect is picked up",
         "declared dependencies > a fact name among unresolved ones keeps working",
         "declared dependencies > an empty deps array means the effect never runs for a change",
+        "declared dependencies > an unresolved name never makes the effect run for unrelated changes",
+        "declared dependencies > one of several unresolved names becoming a derivation is enough",
+        "effects after a history navigation > a real change right after a navigation wakes both",
         "effects after a history navigation > an onNavigate skip effect still runs for a real change",
+        "effects after a history navigation > re-runs a mirroring effect and sits out an onNavigate skip one",
+        "more behaviour of the run loop > a data gate with $changed ignores a write that left that fact alone",
+        "more behaviour of the run loop > an effect that fails after being unregistered is not run again",
+        "more behaviour of the run loop > an effect that reads nothing and opts out of navigation sits a rewind out",
+        "more behaviour of the run loop > call on an unknown effect says it does not exist",
         "more behaviour of the run loop > enable, disable and isEnabled on an unknown effect throw",
         "more behaviour of the run loop > settle waits for every async effect, whichever finishes last",
         "prevFacts values > a data gate on $changed works although the body reads no prev",
+        "prevFacts values > a data gate registered later fires only for a real change",
+        "prevFacts values > a reader registered after the last one left is backfilled",
+        "prevFacts values > an effect registered later sees the facts as they were at registration",
         "prevFacts values > is null on the first run and the previous pass's facts after",
         "prevFacts values > is refreshed after a pass in which an effect threw",
         "prevFacts values > is refreshed after a pass whose effects are async",
+        "what a run tells the trace > an auto-tracked effect starts with none and then lists what it read",
+        "what a run tells the trace > call reports its deps too, and none when none are known",
+        "what a run tells the trace > lists declared deps, with derivations as derive.<id>",
+        "what a run tells the trace > records an effect error in the trace",
+        "what a run tells the trace > works with no plugins and no trace",
         "which effects run > a disabled effect drops the derivations it pinned",
         "which effects run > a disabled effect is skipped, enabling brings it back",
+        "which effects run > a run reports itself to plugins and names the effect on the stack",
         "which effects run > a synchronous effect has finished by the time the write settles",
         "which effects run > an async auto-tracked effect makes settle() wait for it too",
         "which effects run > an async effect makes settle() wait for it",
         "which effects run > an auto-tracked effect runs only for what it read",
         "which effects run > an auto-tracked effect that read nothing runs on every change",
         "which effects run > an effect disabled by an earlier one in the same pass does not run",
+        "which effects run > call on a disabled effect does nothing",
+        "which effects run > call on an unknown effect names it",
+        "which effects run > call reports a throw and an async rejection, and does not reject",
         "which effects run > every enabled effect runs once at start, and a disabled one waits",
-        "which effects run > explicit deps run for their own changes and not for others"
+        "which effects run > explicit deps run for their own changes and not for others",
+        "which effects run > system.effects.call runs the effect now, even without a change"
       ],
       "tests/core/blackbox-facts-proxy.test.ts": [
         "facts proxy: assignment refused > deletes an ordinary fact and reports success",
@@ -172,6 +217,7 @@
         "facts proxy: property access > hides prototype-pollution keys",
         "facts proxy: property access > reads unknown symbols as undefined",
         "facts proxy: reflection > answers `in` for the reserved accessors and for facts that have a value",
+        "facts proxy: reflection > follows the schema when keys are added by a dynamically registered module",
         "facts proxy: reflection > lists the schema's keys",
         "facts proxy: reflection > refuses to define properties"
       ],
@@ -180,6 +226,7 @@
         "facts: batching > defers a write made from a batch listener until the flush cycle is over",
         "facts: batching > does not call anyone for an empty batch or one that changed nothing",
         "facts: batching > holds notifications until the outermost of nested batches ends",
+        "facts: batching > labels what a restore wrote as restore, and the rest as authored",
         "facts: batching > lets a derivation read see a fact deleted earlier in the same batch",
         "facts: batching > notifies a key deleted inside a batch once, after the batch",
         "facts: batching > notifies once after a batch, not once per write",
@@ -192,6 +239,10 @@
         "facts: hand-rolled schema entries > accepts anything for an entry that carries no validators",
         "facts: hand-rolled schema entries > falls back to the declared type name when there is one",
         "facts: hand-rolled schema entries > runs validators in order, skipping entries that are not functions",
+        "facts: history snapshots > goes back and forward over a deleted fact",
+        "facts: history snapshots > keeps Dates and Maps inside objects of a rebuilt array",
+        "facts: history snapshots > snapshots a fact that holds null, inside and outside an object",
+        "facts: history snapshots > snapshots an array that was rebuilt from reads of its elements",
         "facts: nested mutation (development) > allows symbol-keyed assignment, and hands symbol-keyed objects back as they are",
         "facts: nested mutation (development) > hides prototype-pollution keys on nested values",
         "facts: nested mutation (development) > keeps working on frozen and sealed containers",
@@ -238,8 +289,14 @@
         "facts: schema validation (development) > validates a first write of a fact that was never set",
         "facts: schema validation (development) > validates a write made inside a batch before applying it",
         "facts: schema validation (development) > validates writes made through the store directly",
+        "facts: teardown and dynamic registration > does not wake tag watchers more than once for a module that declares no facts",
         "facts: teardown and dynamic registration > drops its listeners when the system is destroyed",
+        "facts: teardown and dynamic registration > ignores a late write to a fact whose module was unregistered",
+        "facts: teardown and dynamic registration > lets a re-registered module's facts be written again",
         "facts: teardown and dynamic registration > refuses to re-declare an existing fact through a second module",
+        "facts: teardown and dynamic registration > registers a module with no facts without disturbing the existing ones",
+        "facts: teardown and dynamic registration > reports an unregistered module's facts to plugins as one batch of deletions",
+        "facts: teardown and dynamic registration > serialises a dynamically registered module only once its facts hold values",
         "facts: unknown keys (development) > refuses to write a key the schema does not declare",
         "facts: unknown keys (development) > still stores the value, without throwing, when the schema declares no facts",
         "facts: Zod-style schemas > accepts a value the schema parses and rejects one it does not",
@@ -373,6 +430,9 @@
         "effects track what they read > runs again for a fact it read and reads the new value",
         "effects track what they read > runs again when a derivation it read changes",
         "reads outside any body are plain reads > returns current values and records nothing",
+        "reads that are not dependencies > a metadata question does not make its subject a dependency",
+        "reads that are not dependencies > an effect reading after a metadata question keeps its other reads",
+        "reads that are not dependencies > reads after a metadata question are still tracked",
         "the prototype guard on facts > answers nothing for prototype-chain names",
         "tracking nests: each body gets its own dependencies > a three-step chain stays fresh from the bottom",
         "tracking nests: each body gets its own dependencies > an outer body depends on its own reads and on the inner derivation",
@@ -406,7 +466,8 @@
         "constraints.disable / constraints.enable / constraints.isDisabled > isDisabled returns true after disable()",
         "inspect() includes disabled field on constraints > inspect().constraints includes disabled: false by default",
         "inspect() includes disabled field on constraints > inspect().constraints shows disabled: false after re-enable()",
-        "inspect() includes disabled field on constraints > inspect().constraints shows disabled: true after disable()"
+        "inspect() includes disabled field on constraints > inspect().constraints shows disabled: true after disable()",
+        "inspect() includes disabled field on constraints > inspect().traceEnabled reflects trace config"
       ],
       "tests/core/constraint-reevaluation.test.ts": [
         "a resolver that fails after satisfying its requirement > passes on the original error",
@@ -416,14 +477,35 @@
         "constraint re-evaluation > start() re-evaluates every constraint"
       ],
       "tests/core/data-forms-namespaced.test.ts": [
+        "dynamic constraint register — data-form when > assign swaps a function-form constraint to a data-form `when`",
+        "dynamic constraint register — data-form when > register accepts a data `when` and evaluates it correctly",
+        "namespace-pivot `self` and dep-namespace forms > already-prefixed keys in `$all` pass through unchanged",
+        "namespace-pivot `self` and dep-namespace forms > constraint when: { self: { phase } } evaluates and fires",
+        "namespace-pivot `self` and dep-namespace forms > constraint with crossModuleDeps fires for `self` + dep pivots together",
         "namespaced constraint abortOn — clobber detection > each module's abortOn is scoped to its own namespace",
         "namespaced constraint abortOn — clobber detection > prefixes abortOn keys so clobber detection fires in a multi-module system",
-        "namespaced effect `$changed` operator > fires when the watched fact transitions between values; not on first run"
+        "namespaced constraint when — data form > fires when the predicate holds and produces requirements",
+        "namespaced constraint when — data form > inspect exposes the data-form whenSpec with namespaced keys",
+        "namespaced derivation compute — data forms > computes boolean derivations from a predicate and string derivations from a template",
+        "namespaced effect `$changed` operator > fires when the watched fact transitions between values; not on first run",
+        "namespaced effect on — data trigger > runs only when the predicate currently holds for its own module's fact",
+        "namespaced event handler + patch — dev warn > dev-warns when both `handler` and `patch` are provided, keeps the handler",
+        "namespaced event patch — data form > sets facts from literals, $ref payload copies, and $template strings",
+        "namespaced resolver key — KeySelector via dynamic register > dedups equivalent requirements by selected fields"
       ],
       "tests/core/data-forms.test.ts": [
         "constraint `when` — $changed rejected unconditionally > throw message mentions the fix (move to effect or boolean derivation)",
         "constraint `when` — $changed rejected unconditionally > throws at createSystem time when $changed appears in a constraint `when`",
-        "constraint `when` — $changed rejected unconditionally > throws for $changed nested inside a combinator"
+        "constraint `when` — $changed rejected unconditionally > throws for $changed nested inside a combinator",
+        "constraint when — data form > fires when the predicate holds and produces requirements",
+        "data-form introspection > explain(requirementId) renders the predicate clause tree with ✓/✗",
+        "data-form introspection > inspect() exposes the predicate spec on constraints with a data `when`",
+        "data-form introspection > observe() emits whenExplain for a data-form constraint evaluation",
+        "derivation compute — data forms > computes boolean derivations from a predicate and string derivations from a template",
+        "effect on — data trigger > runs only when the predicate currently holds for a referenced fact",
+        "event handler + patch conflict > dev-warns and uses handler (patch is ignored) when both are provided",
+        "event patch — data form > sets facts from literals, $ref payload copies, and $template strings",
+        "resolver key — KeySelector > dedups equivalent requirements by selected fields"
       ],
       "tests/core/dep-namespace-injective.test.ts": [
         "the derivation dependency namespace > leaves an ordinary fact-and-derivation name pair alone",
@@ -443,20 +525,32 @@
         "a fact and a derivation with the same name > keeps waking an effect whose body never reads the derivation it named",
         "a fact and a derivation with the same name > re-evaluates an async constraint whose explicit deps name a derivation",
         "a fact and a derivation with the same name > re-runs an effect whose explicit deps name a derivation",
+        "a fact and a derivation with the same name > resolves an effect's declared derivation name when the derivation arrives after it",
         "a fact and a derivation with the same name > still invalidates a derivation that reads the like-named fact",
         "derivation dependencies > leaves a system whose constraints read only facts unchanged",
         "derivation dependencies > re-evaluates a constraint gated only on a derivation",
         "derivation dependencies > re-runs an effect that reads a derivation and no facts",
         "invalidation cost > announces a derivation going stale once, not once per later write",
+        "invalidation cost > carries a reassigned derivation through to what composes it",
         "invalidation cost > does not pay for the size of a graph nothing is watching",
         "invalidation cost > keeps waking a watcher while the derivation it named stays stale",
-        "invalidation cost > says nothing about a derivation no dependency set names"
+        "invalidation cost > says nothing about a derivation no dependency set names",
+        "registering a derivation over a live one > carries the replacement through to what composes it",
+        "registering a derivation over a live one > drops the replaced definition's dependency links"
       ],
       "tests/core/derivation-hold-reentrancy.test.ts": [
         "a nested batch cannot release its parent's hold > announces once per batch even when a plugin batches inside the broadcast",
         "a nested batch cannot release its parent's hold > does not let a listener observe a value before every plugin has seen it",
         "derivation hold re-entrancy > still announces once per batch when nothing nests",
         "derivation hold re-entrancy > survives a plugin that opens a batch from inside onFactsBatch"
+      ],
+      "tests/core/derivation-tag-inheritance.test.ts": [
+        "tags along the derivation graph > answers about the state the system is in, not every state it could reach",
+        "tags along the derivation graph > carries through composition",
+        "tags along the derivation graph > exposes what a derivation picked up, separately from what was authored",
+        "tags along the derivation graph > leaves an untagged graph alone",
+        "tags along the derivation graph > reports a derivation that reads a tagged fact",
+        "tags along the derivation graph > stops where the author says the claim stops holding"
       ],
       "tests/core/derive-reach-back-warning.test.ts": [
         "reaching for a derivation where a module name belongs > does not fire in a single-module system, where the read is correct",
@@ -475,15 +569,68 @@
         "derived is an object > answers `in`, Object.keys, spread, and JSON.stringify",
         "derived is an object > answers the same way once the module is composed",
         "derived is an object > keeps the prototype guards through enumeration",
+        "dynamic registration receives derived > hands it to a constraint registered after start",
         "when a derived read is tracked, and when it is not > does not wake a body that declared deps without naming the derivation",
         "when a derived read is tracked, and when it is not > wakes that same body once the derivation is named in deps"
       ],
       "tests/core/docs-derivations-example.test.ts": [
         "docs/derivations.md — the example on that page must keep compiling > compiles and composes"
       ],
+      "tests/core/dynamic-definitions.test.ts": [
+        "Concurrent deferred operations > multiple effects defer different operations in a single reconciliation",
+        "Constraints dynamic definitions > assign overrides an existing constraint",
+        "Constraints dynamic definitions > assign throws if ID does not exist",
+        "Constraints dynamic definitions > call evaluates constraint and returns requirements array",
+        "Constraints dynamic definitions > register adds a new constraint, isDynamic returns true, listDynamic includes it",
+        "Constraints dynamic definitions > register throws if ID already exists",
+        "Constraints dynamic definitions > unregister on static constraint warns and no-ops",
+        "Constraints dynamic definitions > unregister removes a dynamic constraint, isDynamic returns false",
+        "Deferred operations during reconciliation > register from within an effect is deferred and applied after reconciliation",
+        "Derivations dynamic definitions > assign overrides an existing derivation (value changes)",
+        "Derivations dynamic definitions > call recomputes and returns the value",
+        "Derivations dynamic definitions > register adds a new derivation, accessible via system.derive",
+        "Derivations dynamic definitions > register throws if ID already exists",
+        "Derivations dynamic definitions > unregister removes a dynamic derivation",
+        "Disabled interactions with call > constraints.call respects disabled state (returns empty array)",
+        "Disabled interactions with call > effects.call respects disabled state (does not run)",
+        "Dynamic definitions safety > all operations throw on destroyed system",
+        "Dynamic definitions safety > call on non-existent ID throws for all types",
+        "Dynamic definitions safety > derivation assign with reserved name throws",
+        "Dynamic definitions safety > derivation register with reserved name throws",
+        "Dynamic definitions safety > register with __proto__ throws",
+        "Dynamic definitions safety > register with constructor throws",
+        "Dynamic definitions safety > register with empty string throws",
+        "Dynamic definitions safety > register with ID containing :: throws",
+        "Effects dynamic definitions > assign overrides an existing effect (new run function executes)",
+        "Effects dynamic definitions > call executes effect immediately",
+        "Effects dynamic definitions > register adds a new effect",
+        "Effects dynamic definitions > register throws if ID already exists",
+        "Effects dynamic definitions > unregister removes a dynamic effect and runs cleanup",
+        "isDynamic / listDynamic > isDynamic returns false for static definitions",
+        "isDynamic / listDynamic > isDynamic returns true after register, false after unregister",
+        "isDynamic / listDynamic > listDynamic returns only dynamic IDs",
+        "Lifecycle: assign → unregister > register → assign → unregister preserves dynamic tracking through assign",
+        "Lifecycle: assign → unregister > resolver assign → unregister lifecycle",
+        "Lifecycle: register → unregister → re-register > constraint ID can be reused after unregister",
+        "Lifecycle: register → unregister → re-register > effect ID can be reused after unregister",
+        "Namespaced system dynamic registration > dynamic constraint registration works in multi-module system",
+        "regression: constraints.assign chain swaps whenSpec correctly > function-form → data-form → function-form correctly adds/removes whenSpec",
+        "Resolver assign triggers reconciliation > assigning a resolver schedules reconciliation",
+        "Resolvers dynamic definitions > assign overrides an existing resolver",
+        "Resolvers dynamic definitions > call executes resolver with a requirement object",
+        "Resolvers dynamic definitions > register adds a new resolver",
+        "Resolvers dynamic definitions > register throws if ID already exists",
+        "Resolvers dynamic definitions > unregister removes a dynamic resolver"
+      ],
       "tests/core/effect-deps-startup.test.ts": [
         "startup + wake behaviour by dep kind > derivation dep",
         "startup + wake behaviour by dep kind > fact dep"
+      ],
+      "tests/core/effect-navigation-rerun.test.ts": [
+        "effects after a history navigation > does not re-attach a gated source",
+        "effects after a history navigation > keeps the redo stack intact",
+        "effects after a history navigation > leaves an onNavigate: \"skip\" effect alone",
+        "effects after a history navigation > re-runs an effect whose dependency was restored"
       ],
       "tests/core/effect-readonly-facts.test.ts": [
         "an effect writing a fact > does not stop an effect from dispatching an event",
@@ -499,11 +646,17 @@
         "a refused effect write > is reported to plugins and observers",
         "a refused effect write > names the effect, shows an example and links the docs",
         "a refused effect write > reports a nested mutation in development, naming the path",
+        "a rewind followed by a write in the same pass > dispatches for the write",
         "a write made while a pass is running > cuts an effect that keeps waking itself, warns, and settles",
         "a write made while a pass is running > wakes the effect for the first write after start()",
+        "an effect re-run by a navigation > warns when it dispatches, naming the effect",
+        "an effect that dispatches while re-run by a navigation > keeps the redo stack",
         "cutting a self-waking chain > keeps a write that is not the chain's own",
         "effect facts types > forbid assigning a fact in a single module",
         "effect facts types > forbid assigning a fact in every namespace",
+        "history with an effect that dispatches > records settled states only, so undo lands on one",
+        "requirements after a history navigation > dispatches when a later write satisfies the constraint again",
+        "requirements after a history navigation > does not re-dispatch resolvers for the rewound state",
         "the retired legacy effect-writes key > grants nothing: an effect carrying it still cannot write",
         "the retry strategy for an effect > re-runs the failed effect until it succeeds",
         "the retry strategy for an effect > stops after three retries in a row"
@@ -602,15 +755,38 @@
       ],
       "tests/core/fact-origin-at-write.test.ts": [
         "fact origin is stamped at the write > delivers the rest of a batch when an observer throws",
-        "fact origin is stamped at the write > labels hydrated state as hydration, not as something the program did"
+        "fact origin is stamped at the write > does not label a write the program made during a restore",
+        "fact origin is stamped at the write > keeps both origins apart when one batch carries both",
+        "fact origin is stamped at the write > keeps the label when a restore runs inside a wider batch",
+        "fact origin is stamped at the write > labels hydrated state as hydration, not as something the program did",
+        "fact origin is stamped at the write > reconciles a write made during a restore"
       ],
       "tests/core/fact-set-listener-isolation.test.ts": [
         "a throwing subscriber is contained > keeps notifying the subscribers that did not throw",
         "a throwing subscriber is contained > still announces the write to plugins"
       ],
+      "tests/core/fact-tags-immutable.test.ts": [
+        "a fact's tags cannot be taken back > never consults a caller's tags object when deciding what to screen",
+        "a fact's tags cannot be taken back > refuses a _meta reassignment on the live schema type",
+        "a fact's tags cannot be taken back > refuses a re-registration of a key that already exists",
+        "a fact's tags cannot be taken back > rejects a tags value that is not an array of strings"
+      ],
+      "tests/core/fact-tags-recorded.test.ts": [
+        "a fact's tags are recorded before the fact is reachable > answers definitively for an untagged fact, and not at all for an unknown one",
+        "a fact's tags are recorded before the fact is reachable > records a key registered through the store, rather than leaving it unanswerable-as-untagged",
+        "a fact's tags are recorded before the fact is reachable > records a module's tags before a source it registers can publish"
+      ],
       "tests/core/frozen-facts.test.ts": [
         "frozen values in facts > can be read back",
         "frozen values in facts > can be read back when the whole tree is frozen"
+      ],
+      "tests/core/history-clone-integrity.test.ts": [
+        "history and the development warning proxies > captures and restores a fact updated the documented way",
+        "history and the development warning proxies > leaves an uncapturable fact at its current value when restoring",
+        "history snapshots never alias live state > does not let a later mutation rewrite a snapshot already taken",
+        "history snapshots never alias live state > keeps the facts it can capture rather than degrading the whole snapshot",
+        "history snapshots never alias live state > names the fact it could not capture",
+        "history snapshots never alias live state > still deep-clones ordinary facts"
       ],
       "tests/core/l1-derivations-effects.test.ts": [
         "a derivation reading a derivation > then a fact depends on that fact too",
@@ -759,6 +935,15 @@
         "what is not reported > facts that are null, undefined or primitive",
         "what is not reported > reading without changing anything",
         "what is not reported > thousands of small objects, each within bounds is left unchecked, quietly"
+      ],
+      "tests/core/l10-batch-resolvers-dynamic-oracle.test.ts": [
+        "assigning abortOn to a constraint whose requirement is queued in a batch > binds the batch to the live facts: its write to the key lands",
+        "unregistering a batched resolver > aborts a batch that is running, and what it returns afterwards completes nothing",
+        "unregistering a batched resolver > cancels the requirements still queued, and the handler never runs",
+        "unregistering a batched resolver > is a clean slate for a resolver registered under the same id afterwards",
+        "unregistering a batched resolver > leaves another batched resolver's queue and running batch alone",
+        "unregistering a module that owns a batched resolver > gives up waiting on a batch that ignores its signal and never settles",
+        "unregistering a module that owns a batched resolver > waits for the batch it aborted to finish before it resolves"
       ],
       "tests/core/l2-constraints-oracle-state.test.ts": [
         "a constraint enabled again still waits for the one it follows > does not run before that constraint's resolver has finished",
@@ -1101,6 +1286,9 @@
         "constraints and resolvers in a composed system > hands a resolver its own facts, and ctx.deps only when the module declares dependencies",
         "constraints and resolvers in a composed system > holds a constraint back until the constraints it follows have resolved",
         "constraints and resolvers in a composed system > re-evaluates a constraint with explicit deps only when those facts change",
+        "data-form constraint `when` in a composed system > does not read another module's fact of the same name",
+        "data-form constraint `when` in a composed system > evaluates every form against the module's own facts",
+        "data-form constraint `when` in a composed system > re-evaluates when the facts it reads change",
         "derivations, effects and flat access in a composed system > computes a derivation given as an object with a compute function",
         "derivations, effects and flat access in a composed system > reads a module's own facts by bare name when crossModuleDeps is empty",
         "derivations, effects and flat access in a composed system > runs a module's effect against its own facts and reruns it on change",
@@ -1424,9 +1612,64 @@
         "the batch window > takes a retracted requirement out of the batch before it runs",
         "the batch window > windowMs holds requirements back until it has passed"
       ],
+      "tests/core/l8-history-gate-debt-oracle.test.ts": [
+        "a batched write in the same tick as a navigation > takes its snapshot",
+        "a navigation leaves no snapshot request behind > an unlisted event after goBack() takes no snapshot and keeps redo",
+        "a navigation leaves no snapshot request behind > nor does a listed event a listener dispatches during the rewind",
+        "a snapshot's label > names the keys its pass changed, up to five, then counts the rest",
+        "an effect's writes fold into the snapshot of the pass that ran it > a chain of two effect passes both fold into the first pass's snapshot",
+        "an effect's writes fold into the snapshot of the pass that ran it > after a pass that took no snapshot, an effect's write refreshes none",
+        "an effect's writes fold into the snapshot of the pass that ran it > an effect re-run for a navigation does not refresh the snapshot a same-tick write took",
+        "an effect's writes fold into the snapshot of the pass that ran it > an effect's own write under a filter refreshes the snapshot, not a new one",
+        "an effect's writes fold into the snapshot of the pass that ran it > an unlisted event an effect dispatches after an await does not refresh it",
+        "an effect's writes fold into the snapshot of the pass that ran it > an unlisted event an effect dispatches synchronously refreshes the snapshot",
+        "effects after a navigation > a rewind made while a pass awaits an effect wakes effects once it ends",
+        "effects after a navigation > after an effect chain is cut, a listener's write during a rewind keeps redo",
+        "effects after a navigation > an effect on a derivation re-runs with the rewound value",
+        "effects after a navigation > an onNavigate skip effect on a derivation sits out the rewind",
+        "effects after a navigation > start() after a navigation made while stopped does not treat its first pass as a rewind",
+        "history.snapshotEvents and writes outside an event > a listener's write during an unlisted event takes no snapshot",
+        "history.snapshotEvents and writes outside an event > a write inside system.batch() takes a snapshot",
+        "history.snapshotEvents and writes outside an event > with no fact set at start, an unlisted event takes no snapshot",
+        "onHistoryChange > a write it makes while a snapshot is taken gets a snapshot of its own",
+        "onHistoryChange > is not told of a navigation after destroy()",
+        "onHistoryChange > is not told of a navigation after destroyAsync()",
+        "onHistoryChange > is told of each snapshot and each navigation, until it unsubscribes"
+      ],
+      "tests/core/l8-history-pins-oracle.test.ts": [
+        "a changeset and goBack(steps) (U8) > (c) at a changeset's start > goBack(steps) jumps to the start of an earlier changeset whose end is within steps",
+        "a changeset and goBack(steps) (U8) > (c) at a changeset's start > goBack(steps) moves steps snapshots when no earlier changeset ends within them",
+        "export and import of a Date, a Map and a Set (U1) > export writes a Date as an ISO string and a Map and a Set as {}",
+        "export and import of a Date, a Map and a Set (U1) > import writes that string and those empty objects into the facts",
+        "going back over a fact the snapshot did not hold (U10) > goForward does not delete a fact again: delete n, goBack gives 1, goForward is still 1",
+        "going back over a fact the snapshot did not hold (U10) > leaves a fact set after the snapshot at its current value",
+        "pause() inside a changeset (U18) > a later goBack from two snapshots past it still moves one snapshot, not to the changeset's start",
+        "pause() inside a changeset (U18) > records no range when the only write was paused, so goBack moves one snapshot",
+        "redactSnapshot and a navigation (U11) > a navigation writes the redacted value into the live fact",
+        "snapshot ids after an import (U6) > do not repeat when the system is already past the imported ids",
+        "the members of system.history (U12) > carries takeSnapshot, restore, refreshLatestSnapshot, isEnabled and isRestoring",
+        "the members of system.history (U12) > is null when history is not asked for",
+        "the members of system.history (U12) > takeSnapshot takes one snapshot now, with the trigger it is given",
+        "what a snapshot keeps of a Date, a function and a class instance (U2) > a class instance comes back as a plain object in the per-fact tier and in the JSON tier",
+        "what a snapshot keeps of a Date, a function and a class instance (U2) > a class instance comes back as a plain object when the whole record clones",
+        "what a snapshot keeps of a Date, a function and a class instance (U2) > a fact mixing a Date with a function is copied through JSON: the Date comes back as a string and the function is gone"
+      ],
       "tests/core/l8-system-oracle.test.ts": [
+        "history.snapshotModules in a namespaced system > is quiet for entries that name a module of the system, and warns once for one that names none",
         "hydrate() data in a single-module system > carrying a prototype-pollution key is skipped whole, with a warning in development",
-        "hydrate() data in a single-module system > is applied over initialFacts when it is clean"
+        "hydrate() data in a single-module system > is applied over initialFacts when it is clean",
+        "zeroConfig and history > turns history on in development when none is asked for, and leaves an explicit false alone"
+      ],
+      "tests/core/l9-constraints-observed-derivations.test.ts": [
+        "a disabled constraint > no longer keeps watched the derivation it read, and does again once enabled"
+      ],
+      "tests/core/meta-query-does-not-watch.test.ts": [
+        "a metadata query leaves no trace in the asker's dependencies > does not make the asker re-evaluate on unrelated derivation changes",
+        "a metadata query leaves no trace in the asker's dependencies > does not put every derivation into the watched set"
+      ],
+      "tests/core/meta-query-timing.test.ts": [
+        "metadata answers reflect the write being announced > agrees with the batched path",
+        "metadata answers reflect the write being announced > sees the derivation join the tagged set on the write that opens the gate"
       ],
       "tests/core/module.test.ts": [
         "createModule — pivot-name conflict > does NOT throw when fact keys do not collide",
@@ -1468,17 +1711,63 @@
         "createModuleFactory > returns a factory function"
       ],
       "tests/core/mutants-derivations.test.ts": [
+        "derivations: a body whose reads change shape stays fresh > after 1 runs on one branch, then a flip",
+        "derivations: a body whose reads change shape stays fresh > after 2 runs on one branch, then a flip",
+        "derivations: a body whose reads change shape stays fresh > after 3 runs on one branch, then a flip",
+        "derivations: a body whose reads change shape stays fresh > after 4 runs on one branch, then a flip",
+        "derivations: a body whose reads change shape stays fresh > after 5 runs on one branch, then a flip",
+        "derivations: a body whose reads change shape stays fresh > after 8 runs on one branch, then a flip",
+        "derivations: assign > announces the invalidation once per valid-to-stale edge",
+        "derivations: assign > assigning over a derivation nobody has read yet just works",
+        "derivations: assign > leaves notification batching intact afterwards",
+        "derivations: assign > notifies subscribers and recomputes dependents",
+        "derivations: assign > wakes a constraint that gates on the replaced derivation",
+        "derivations: call() recomputes every time > keeps returning fresh values after many consecutive calls",
+        "derivations: housekeeping on replace and remove > a replacement without meta still drops the previous meta",
+        "derivations: housekeeping on replace and remove > an unregistered name leaves no meta and no old subscriber behind",
         "derivations: housekeeping on replace and remove > entries that are not definitions at all are tolerated at registration",
+        "derivations: meta for unknown names > a name that is not a derivation carries no tags and does not throw",
+        "derivations: object-form definitions > assign on a missing derivation throws",
+        "derivations: object-form definitions > assign swaps the function and drops the old meta",
+        "derivations: object-form definitions > freezes a predicate spec and a template spec at registration",
+        "derivations: object-form definitions > registers object-form derivations at runtime with their meta",
         "derivations: object-form definitions > rejects a compute that is neither function, template nor predicate",
         "derivations: odd definitions > an object-form entry with no compute is tolerated at registration",
+        "derivations: only outside readers make a derivation watched > a derivation read only by another derivation is not watched",
+        "derivations: only outside readers make a derivation watched > a derivation read through system.derive from a body is not watched",
+        "derivations: only outside readers make a derivation watched > a membership test from a constraint makes the name watched",
+        "derivations: only outside readers make a derivation watched > a membership test inside a derivation does not",
+        "derivations: only outside readers make a derivation watched > nothing pending when nothing is watched; one thing when one is",
+        "derivations: replacing a live name through registerModule > the new definition wins, the old meta goes, and everyone is told",
+        "derivations: replacing a live name through registerModule > the old dependencies stop mattering and the new ones take over",
+        "derivations: subscriptions > a subscriber that keeps re-invalidating trips the loop guard",
         "derivations: subscriptions > a throwing subscriber is reported and does not stop the others",
         "derivations: subscriptions > delivers to every subscriber, and unsubscribing one leaves the rest",
         "derivations: the derived parameter behaves like a read-only record > answers membership, descriptors and mutation attempts",
+        "derivations: unregister > answers membership checks fresh after a definition goes away",
+        "derivations: unregister > leaves no phantom dependent behind for a watcher to be told about",
+        "derivations: unregister > recomputes and notifies dependents, and forgets the removed one",
+        "derivations: unregister housekeeping > a removed derivation stops counting as watched at once",
+        "derivations: unregister housekeeping > keeps notification batching intact after removing a depended-on one",
+        "derivations: unregister housekeeping > removing a derivation nobody has read is clean",
         "derivations: waking constraints that read derivations > reaches every watcher downstream of one change, through a diamond",
         "derivations: waking constraints that read derivations > wakes only the watcher whose derivation moved"
       ],
       "tests/core/mutants-facts-system.test.ts": [
-        "fact store behaviour seen through a system > re-derives when a derivation asks whether a fact exists"
+        "fact store behaviour seen through a system > keeps a cyclic object fact in history",
+        "fact store behaviour seen through a system > keeps a nested object, Date and Map in history when the fact holds read-back wrappers",
+        "fact store behaviour seen through a system > re-derives when a derivation asks whether a fact exists",
+        "fact store behaviour seen through a system > reports an unregistered module's facts as deletions, with their previous values",
+        "fact store behaviour seen through a system > stops delivering a batch to an observer once its own write runs away"
+      ],
+      "tests/core/navigation-side-effects.test.ts": [
+        "a reactive write during a history navigation > does not carry a navigation made while stopped into a later pass",
+        "a reactive write during a history navigation > does not destroy the redo stack",
+        "a reactive write during a history navigation > does not extend the exemption to a later write of the same key",
+        "a reactive write during a history navigation > does not let a rewind reaction cover an ordinary write of the same key",
+        "a reactive write during a history navigation > does not re-attach a gated source",
+        "a reactive write during a history navigation > does not suppress an ordinary write that shares the pass",
+        "a reactive write during a history navigation > holds when the reaction goes through an event dispatch"
       ],
       "tests/core/nested-mutation-checks.test.ts": [
         "a resolver mutating a dependency module's value in place > is quiet for a resolver that only reads",
@@ -1518,13 +1807,17 @@
         "observe() and batched writes > keeps one event per key, in the order the keys were first written",
         "observe() and batched writes > labels an ordinary write as authored",
         "observe() and batched writes > records a delete the same way batched or not",
+        "observe() and batched writes > records a history restore, labelled as one",
         "observe() and batched writes > records a write made inside system.batch()",
         "observe() and batched writes > records the same write whether or not a batch wraps it"
       ],
       "tests/core/observe-stream-reconstructs.test.ts": [
+        "the emitted stream > chains prev to next across the whole batch",
+        "the emitted stream > reconstructs the value a mixed-origin batch left behind",
         "the emitted stream > still coalesces a hot loop to a single entry"
       ],
       "tests/core/observe.test.ts": [
+        "system.observe() > caps at 100 observers",
         "system.observe() > receives constraint.evaluate events",
         "system.observe() > receives effect.run events",
         "system.observe() > receives fact.change events",
@@ -1553,7 +1846,11 @@
         "a resolver whose own write retracts its requirement > completes, never canceled (wait 3 microtasks, batched)",
         "a resolver whose own write retracts its requirement > completes, never canceled (wait 3 microtasks, via a derivation)",
         "a resolver whose own write retracts its requirement > completes, never canceled (wait 3 microtasks)",
-        "a resolver whose own write retracts its requirement > is still canceled when something else retracts the requirement"
+        "a resolver whose own write retracts its requirement > is still canceled when something else retracts the requirement",
+        "coalescing > does not change because an unrelated resolver is running",
+        "coalescing > does not change with how long the gap between writes is",
+        "coalescing > gives each awaited write its own pass, effect run and snapshot",
+        "coalescing > gives writes in one synchronous run a single pass"
       ],
       "tests/core/requeue-after-resolver-finishes.test.ts": [
         "ctx.requeue() while the requeuing resolver is still in flight > does not re-fire a requeue twice",
@@ -1594,9 +1891,16 @@
         "attribution is per run > a keyed sibling's write does not shield a run the user canceled",
         "attribution is per run > one batch's write does not shield another batch of the same definition"
       ],
+      "tests/core/restore-flush-reconcile.test.ts": [
+        "a write made while a restore is flushing > is reconciled, so anything waiting on it still runs"
+      ],
       "tests/core/round-1-findings.test.ts": [
         "a derivation may be named after an Object.prototype member > returns its value rather than the builtin",
+        "a disabled effect stops pinning what it read > releases its derivations, the way a disabled constraint does",
         "the prune does not run when there is nothing to prune > stays correct in a system that reads no derivation at all"
+      ],
+      "tests/core/round-2-criticals.test.ts": [
+        "replacing a derivation definition > does not leave the system waiting for quiet forever"
       ],
       "tests/core/schema-builders.test.ts": [
         "chaining and composition > chaining multiple validators preserves all checks",
@@ -1690,7 +1994,9 @@
         "t.uuid() > rejects non-string values"
       ],
       "tests/core/schema-freeze-scope.test.ts": [
-        "the schema freeze covers our own types only > leaves a self-caching validator writable"
+        "the schema freeze covers our own types only > answers a dotted fact key exactly, not by its first segment",
+        "the schema freeze covers our own types only > leaves a self-caching validator writable",
+        "the schema freeze covers our own types only > still freezes the types we build, so a tag cannot be removed"
       ],
       "tests/core/schema-introspection.test.ts": [
         "getKind — chain wrappers > t.number().optional() adds nullable: true (undefined → null for predicate purposes)",
@@ -1729,7 +2035,22 @@
       ],
       "tests/core/snapshot-events.test.ts": [
         "history.snapshotEvents > dev warning for empty history.snapshotEvents array",
-        "history.snapshotEvents > dev warning for invalid history.snapshotEvents entries"
+        "history.snapshotEvents > dev warning for invalid history.snapshotEvents entries",
+        "history.snapshotEvents > direct fact mutation creates snapshot even with filtering",
+        "history.snapshotEvents > dispatch() path respects history.snapshotEvents filtering",
+        "history.snapshotEvents > history.snapshotEvents: [] disables all event snapshots",
+        "history.snapshotEvents > history.snapshotModules > dev warning for single-module system",
+        "history.snapshotEvents > history.snapshotModules > dev warning for unknown module name",
+        "history.snapshotEvents > history.snapshotModules > intersects with per-module history.snapshotEvents",
+        "history.snapshotEvents > history.snapshotModules > omitted snapshotModules snapshots all modules (backward compat)",
+        "history.snapshotEvents > history.snapshotModules > only listed modules create snapshots",
+        "history.snapshotEvents > isDispatching resets correctly when handler throws",
+        "history.snapshotEvents > multi-module: each module controls its own events",
+        "history.snapshotEvents > multi-module: non-snapshot events do NOT create snapshots",
+        "history.snapshotEvents > only creates snapshots for listed events",
+        "history.snapshotEvents > snapshots all events when history.snapshotEvents is omitted (backward compat)",
+        "history.snapshotEvents > undo reverses only snapshot events",
+        "history.snapshotEvents > unlisted events do NOT create snapshots"
       ],
       "tests/core/ssr.test.ts": [
         "SSR > getSnapshot() → restore() round-trip > restores facts from a snapshot into a running system",
@@ -1773,6 +2094,8 @@
       ],
       "tests/core/system.test.ts": [
         "Config Forwarding > errorBoundary config forwarded",
+        "Config Forwarding > history config forwarded (boolean)",
+        "Config Forwarding > history config forwarded (object)",
         "Config Forwarding > plugins array forwarded to engine",
         "Config Forwarding > plugins forwarded in single module mode",
         "Config Forwarding > trace config forwarded",
@@ -1780,6 +2103,10 @@
         "Cross-Module Dependencies > derivation can read facts from another module via crossModuleDeps",
         "dispatch() > dispatch forwards to engine in namespaced mode",
         "dispatch() > dispatch forwards to engine in single module mode",
+        "Dynamic Module Registration > registerModule adds a new namespace in namespaced mode",
+        "Dynamic Module Registration > registerModule throws if namespace contains '::'",
+        "Dynamic Module Registration > registerModule throws if namespace is a blocked prop",
+        "Dynamic Module Registration > registerModule throws on duplicate namespace",
         "Engine Passthrough Methods > batch coalesces mutations",
         "Engine Passthrough Methods > inspect returns system state",
         "Engine Passthrough Methods > isSettled reflects engine state",
@@ -1868,11 +2195,70 @@
         "timerOps integration with virtualClock > repeat fires every interval"
       ],
       "tests/core/trace.test.ts": [
+        "Trace > attributes async resolver completion to the correct trace",
+        "Trace > attributes resolver errors to the correct trace",
+        "Trace > calls onTraceComplete plugin hook with finalized trace entry",
+        "Trace > cleans up maps when pending runs are evicted",
+        "Trace > cleans up trace state on destroy",
+        "Trace > creates a trace entry on fact change",
+        "Trace > derivation entries use object format with id and deps",
+        "Trace > evicts old runs when maxRuns is exceeded",
+        "Trace > generates causal chain on settled traces",
+        "Trace > includes dependency arrays on constraint hit entries",
+        "Trace > includes fromConstraint on removed requirements",
+        "Trace > includes trace in inspect() when enabled",
+        "Trace > keeps trace pending while multiple resolvers are inflight",
         "Trace > returns cached array on repeat access without changes (E1)",
-        "Trace > returns null when trace is not enabled"
+        "Trace > returns deep-copied trace from inspect()",
+        "Trace > returns null when trace is not enabled",
+        "Trace > skips traces with no activity",
+        "Trace > tracks constraints and requirements when triggered",
+        "Trace > tracks derivation recomputation with dependency edges",
+        "Trace > tracks effects with triggeredBy dependency arrays",
+        "Trace > transitions from pending to settled when resolver completes",
+        "Trace fields > flags a run where a resolver errored",
+        "Trace fields > records a requirement going away, and which constraint it came from",
+        "Trace fields > records an effect that threw",
+        "Trace fields > records which derivations recomputed, with their dependencies"
       ],
       "tests/core/tracking-frame-kind.test.ts": [
+        "a derivation's private reads stay in its own frame > keeps the dependency shape stable across the fast-path threshold",
+        "the watched set counts external readers only > counts a constraint reading through the same accessor",
+        "the watched set counts external readers only > counts a derivation read through the parameter, once",
         "the watched set counts external readers only > does not count a derivation composing through system.derive"
+      ],
+      "tests/core/unregister-module.test.ts": [
+        "unregisterModule > aborts an in-flight resolver that watches the signal",
+        "unregisterModule > announces a module's removal once, not once per fact",
+        "unregisterModule > cancels a pending linger timer so a gated source cannot re-attach",
+        "unregisterModule > detaches the module's sources",
+        "unregisterModule > does not let a retired module's late write reach its replacement",
+        "unregisterModule > drops a write from an orphaned resolver instead of throwing",
+        "unregisterModule > emits an observation event naming the module",
+        "unregisterModule > frees the name so the same module can be registered again",
+        "unregisterModule > frees the namespace again when registerModule itself fails",
+        "unregisterModule > is callable without a cast, and works on a single-module system",
+        "unregisterModule > leaves a sibling instance's source attached",
+        "unregisterModule > leaves a surviving module's requirement key in place",
+        "unregisterModule > leaves other modules running and their cross-module reads defined",
+        "unregisterModule > notifies subscribers that the facts are gone",
+        "unregisterModule > recomputes a dependent module's derivation instead of freezing it",
+        "unregisterModule > rejects an unknown namespace",
+        "unregisterModule > rejects on a destroyed system",
+        "unregisterModule > releases the name even when hooks.onStop throws",
+        "unregisterModule > removes the namespace and its facts",
+        "unregisterModule > resolves only once in-flight resolvers have drained",
+        "unregisterModule > retires one instance of a factory-built module and leaves its siblings",
+        "unregisterModule > stops the module's derivations, events and effects",
+        "unregisterModule > tears down in the documented order",
+        "unregisterModule > tears down the module the caller named, not one that shares its id",
+        "unregisterModule > waits for an in-flight batched resolver and aborts it"
+      ],
+      "tests/core/watched-set-shrinks.test.ts": [
+        "the watched set shrinks when readers stop reading > a gate that closes gives its value back",
+        "the watched set shrinks when readers stop reading > does not accumulate across many gates",
+        "the watched set shrinks when readers stop reading > keeps watching a value a constraint still reads",
+        "the watched set shrinks when readers stop reading > still wakes a gate that reopens after being pruned"
       ],
       "tests/package/dist-types.test.ts": [
         "declaration emit > lets a consumer export a schema built with chained builders",
@@ -1938,6 +2324,7 @@
     "conformance:v2:prod": {
       "tests/core/blackbox-effects-production.test.ts": [
         "effects in production > a retried failing effect does not warn when the retries run out",
+        "effects in production > does not check for an in-place mutation, sync, async or via call()",
         "effects in production > does not warn about an async effect that read nothing",
         "effects in production > drops a write quietly when nobody is listening",
         "effects in production > drops a write to facts, reports it to plugins, and does not throw",
@@ -1948,6 +2335,7 @@
         "facts in production > does not warn about non-JSON values or nested mutation",
         "facts in production > hands nested objects back as stored, and a Date stays a Date",
         "facts in production > neither throws nor warns about unknown keys",
+        "facts in production > still ignores a write to a fact whose module was unregistered",
         "facts in production > still notifies, batches and deletes"
       ],
       "tests/core/blackbox-readonly-module-production.test.ts": [
@@ -2008,8 +2396,15 @@
       "tests/core/l7-batch-pins-oracle-production.test.ts": [
         "a batched resolver with no handler, in production (U9) > builds with no error and completes each requirement once the window closes"
       ],
+      "tests/core/l8-history-pins-oracle-production.test.ts": [
+        "a Date, a Map and a Set in production (U1, U2) > a fact mixing a Date with a function falls to JSON: its Date is a string, while a Date in a fact that clones stays a Date",
+        "a Date, a Map and a Set in production (U1, U2) > come back as themselves through goBack when the whole record clones",
+        "a Date, a Map and a Set in production (U1, U2) > leave an export as an ISO string and two empty objects, and import writes those",
+        "redactSnapshot and a navigation, in production (U11) > a navigation writes the redacted value into the live fact"
+      ],
       "tests/core/l8-system-oracle-production.test.ts": [
-        "history and hydrate() in production > hydrated data carrying a prototype-pollution key is skipped whole, quietly"
+        "history and hydrate() in production > hydrated data carrying a prototype-pollution key is skipped whole, quietly",
+        "history and hydrate() in production > zeroConfig keeps a history that was asked for, and does not turn one on by itself"
       ],
       "tests/core/multi-module-correctness.prod.test.ts": [
         "production build > ignores a resolver's $store write to a dependency key without throwing",

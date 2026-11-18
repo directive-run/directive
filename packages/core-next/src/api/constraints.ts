@@ -24,7 +24,9 @@
 
 import isDevelopment from "#is-development";
 import type { Clock } from "../clock.js";
+import type { ClauseResult } from "../types/predicate.js";
 import { DERIVATION_DEP_PREFIX, type Tracker, withTracking } from "./facts.js";
+import type { Predicates } from "./predicate.js";
 import {
   type Requirement,
   type RequirementKeyFn,
@@ -59,6 +61,8 @@ export interface ConstraintsOptions {
   clock: Clock;
   onEvaluate: (id: string, active: boolean) => void;
   onError: (id: string, error: unknown) => void;
+  /** L11: the predicates part's hooks (a data-form `when`). */
+  pred?: Predicates;
 }
 
 export interface Constraints {
@@ -86,8 +90,26 @@ export interface Constraints {
   isDisabled(id: string): boolean;
   /** 1.35's constraint state, for inspect() and explain(). */
   state_(id: string): ConstraintState | undefined;
+  /**
+   * L10: a constraint registered or assigned, and one unregistered. `full`
+   * rebuilds the `after` order (an assign, or a register that lists `after`).
+   */
+  add_(id: string, full?: unknown): void;
+  remove_(id: string): void;
+  /** L10 (D8): the requirements it would add now, with `props` merged in. */
+  call_(
+    id: string,
+    props?: Record<string, unknown>,
+  ): Promise<RequirementWithId[]>;
   /** Every constraint's state, in declaration order. */
   states_(): ConstraintState[];
+  /**
+   * L11: each data-form `when`'s spec and what evaluation reads ((bp)).
+   * An assign drops it first (R2); unregister leaves it (R3, as 1.35).
+   */
+  specs_: Map<string, [object, object]>;
+  /** L11 (I2): the clause rows of a data-form `when`, now. */
+  explain_(id: string): ClauseResult[] | undefined;
 }
 
 /** What inspect() reports of a constraint (1.35's ConstraintState subset). */
@@ -102,10 +124,12 @@ export interface ConstraintState {
 
 /** A `require` that threw, with what it read before it threw. */
 class RequireError {
-  constructor(
-    readonly original: unknown,
-    readonly deps: Set<string>,
-  ) {}
+  declare readonly original: unknown;
+  declare readonly deps: Set<string>;
+  constructor(original: unknown, deps: Set<string>) {
+    this.original = original;
+    this.deps = deps;
+  }
 }
 
 /** An async constraint's `when` gives up after this long, unless it sets `timeout`. */
@@ -116,27 +140,31 @@ const EMPTY: RequirementWithId[] = [];
 export function createConstraints(options: ConstraintsOptions): Constraints {
   const { defs, facts, derived, tracker, keys } = options;
   const ids = Object.keys(defs);
-  for (const id of ids) {
+  const check = (id: string) => {
     const spec = defs[id]?.when;
     // 1.35: `$changed` is effects-only, refused at registration in every
     // build. (The rest of the data form is the L11 compiler.)
-    if (spec !== undefined && typeof spec !== "function" && hasChanged(spec)) {
+    if (typeof spec !== "function" && hasChanged(spec)) {
       throw new Error(
         `[Directive] constraint "${id}": $changed is effects-only — constraint when has no previous-facts snapshot. Move the change-detection to an effect, or use a boolean derivation as a synthetic previous value.`,
       );
     }
-  }
+    // L11 (E1): the data form becomes its function, the spec kept.
+    if (spec !== undefined && typeof spec !== "function" && options.pred) {
+      specs.set(id, options.pred.when_(id, defs[id] as never));
+    }
+  };
+  const specs = new Map<string, [object, object]>();
+  ids.forEach(check);
+  const fresh = (id: string): ConstraintState => ({
+    id,
+    priority: defs[id]!.priority ?? 0,
+    lastResult: null,
+    hitCount: 0,
+    lastActiveAt: null,
+  });
   const states = new Map<string, ConstraintState>(
-    ids.map((id) => [
-      id,
-      {
-        id,
-        priority: defs[id]!.priority ?? 0,
-        lastResult: null,
-        hitCount: 0,
-        lastActiveAt: null,
-      },
-    ]),
+    ids.map((id) => [id, fresh(id)]),
   );
   /** 1.35's recordConstraintResult: the answer, and a hit when active. */
   const onEvaluate = (id: string, active: boolean) => {
@@ -150,7 +178,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   };
   /** 1.35's recordConstraintError: a `when` that threw is not active. */
   const onWhenError = (id: string, error: unknown) => {
-    states.get(id)!.lastResult = false;
+    // 1.35's lazy getState: a refused registration has none yet.
+    (states.get(id) ?? states.set(id, fresh(id)).get(id)!).lastResult = false;
     options.onError(id, error);
   };
   const onError = options.onError;
@@ -166,6 +195,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   const unanswered = new Set(ids);
   /** Held back by an `after` dependency when last asked. */
   const held = new Set<string>();
+  /** 1.35's resolvedConstraints: a requirement of theirs once resolved. */
+  const resolved = new Set<string>();
   const asyncIds = new Set(ids.filter((id) => defs[id]!.async));
   let evaluated = false;
   if (isDevelopment) {
@@ -202,14 +233,28 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     visiting.pop();
     topo.set(id, topo.size);
   };
-  ids.forEach(visit);
-  const sorted = [...ids].sort(
-    (a, b) =>
-      (defs[b]!.priority ?? 0) - (defs[a]!.priority ?? 0) ||
-      topo.get(a)! - topo.get(b)!,
-  );
+  let sorted: string[] = [];
+  /**
+   * The order again (L10: a definition came, changed or went). As 1.35
+   * (constraints.ts registerDefinitions), a register rebuilds the `after`
+   * order only when the new constraint lists `after`; until then it ranks
+   * with the first (1.35's `topologicalIndex.get(id) ?? 0`).
+   */
+  const resort = (full?: unknown) => {
+    const all = Object.keys(defs);
+    if (full) {
+      topo.clear();
+      all.forEach(visit);
+    }
+    sorted = all.sort(
+      (a, b) =>
+        (defs[b]!.priority ?? 0) - (defs[a]!.priority ?? 0) ||
+        (topo.get(a) ?? 0) - (topo.get(b) ?? 0),
+    );
+  };
+  resort(1);
   const enabled = () =>
-    disabled.size === 0 ? sorted : sorted.filter((id) => !disabled.has(id));
+    disabled.size ? sorted.filter((id) => !disabled.has(id)) : sorted;
 
   // --- dependencies ------------------------------------------------------
   const named = (list: readonly string[]) =>
@@ -230,7 +275,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
    */
   function setDeps(id: string, next: Set<string>): void {
     const prev = deps.get(id);
-    if (prev !== undefined && prev.size === next.size && prev.size > 0) {
+    if (prev?.size === next.size && next.size) {
       let same = true;
       for (const key of next) {
         if (!prev.has(key)) {
@@ -259,7 +304,8 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     [...asyncIds].filter((id) => !defs[id]!.deps && !disabled.has(id));
 
   // --- evaluating one constraint -------------------------------------------
-  const call = (fn: Fn) => fn(facts, derived);
+  // Named as 1.35's, for the TypeError of a refused data form's `when`.
+  const call = (whenFn: Fn) => whenFn(facts, derived);
   /** `fn`, tracked; a throw is caught and kept with what it read before it. */
   function tracked(fn: Fn) {
     let threw = false;
@@ -382,7 +428,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   }
   function inactive(id: string): void {
     const read = whenDeps.get(id);
-    if (read !== undefined) {
+    if (read) {
       setDeps(id, read);
     }
     last.set(id, EMPTY);
@@ -438,11 +484,16 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   };
 
   // --- one evaluation pass (1.35's shape, so it awaits where 1.35 does) ----
-  /** `dep` may still act: enabled, and unanswered or a requirement unresolved. */
+  /**
+   * `dep` may still act: enabled, and a requirement unresolved, or unanswered
+   * and never resolved. One that ever resolved is not held for being asked
+   * later in the pass (1.35's resolvedConstraints): a constraint registered
+   * later ranks with the first, so its dependent may come before it.
+   */
   const blocks = (dep: string) =>
     !!defs[dep] &&
     !disabled.has(dep) &&
-    (unanswered.has(dep) ||
+    ((unanswered.has(dep) && !resolved.has(dep)) ||
       (last.get(dep) ?? EMPTY).some((r) => !met.has(r.id)));
   const afterReady = (id: string) => !(defs[id]!.after ?? []).some(blocks);
   /** Ask again each held-back constraint that nothing blocks any more. */
@@ -468,28 +519,40 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       answer(id, active, into);
     }
   }
+  /**
+   * 1.35 sorts a pass into blocked and ready before it asks any, and a
+   * dependency that ever resolved blocks nothing (isAfterDepSatisfied). Quirk
+   * e still holds a dependent while its dependency may act, checked at the
+   * dependent's turn: one asked earlier in the pass has answered by then, so
+   * with nothing unmet the dependent is asked in 1.35's place.
+   */
   async function batch(
     todo: string[],
     into: Map<string, RequirementWithId>,
   ): Promise<string[]> {
     const blocked: string[] = [];
     const ready: string[] = [];
+    const hold = (id: string) => {
+      held.add(id);
+      blocked.push(id);
+      add(into, last.get(id) ?? EMPTY);
+    };
     for (const id of todo) {
-      if (afterReady(id)) {
-        held.delete(id);
-        ready.push(id);
-      } else {
-        held.add(id);
-        blocked.push(id);
-        add(into, last.get(id) ?? EMPTY);
-      }
+      (defs[id]!.after ?? []).some((dep) => !resolved.has(dep) && blocks(dep))
+        ? hold(id)
+        : ready.push(id);
     }
-    if (ready.length === 0) {
+    if (!ready.length) {
       return blocked;
     }
     const late: [string, Promise<boolean>][] = [];
     const asyncReady: string[] = [];
     for (const id of ready) {
+      if (!afterReady(id)) {
+        hold(id);
+        continue;
+      }
+      held.delete(id);
       if (asyncIds.has(id)) {
         asyncReady.push(id);
         continue;
@@ -501,10 +564,10 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         answer(id, result, into);
       }
     }
-    if (late.length > 0) {
+    if (late.length) {
       await settle(late, into);
     }
-    if (asyncReady.length > 0) {
+    if (asyncReady.length) {
       await settle(
         asyncReady.map((id) => [id, evaluateAsync(id)]),
         into,
@@ -519,7 +582,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       const into = new Map<string, RequirementWithId>();
       const all = enabled();
       let todo: string[];
-      if (!evaluated || !changed || changed.size === 0) {
+      if (!evaluated || !changed || !changed.size) {
         todo = all;
         evaluated = true;
         dirty.clear();
@@ -554,7 +617,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       for (const id of todo) {
         unanswered.add(id);
       }
-      for (let rounds = todo.length + 1; todo.length > 0 && rounds > 0; ) {
+      for (let rounds = todo.length + 1; todo.length && rounds > 0; ) {
         const before = todo.length;
         todo = await batch(todo, into);
         if (todo.length === before) {
@@ -570,10 +633,10 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       return [...into.values()];
     },
     unaffected(changed) {
-      if (sorted.length === 0 && dirty.size === 0) {
+      if (!sorted.length && !dirty.size) {
         return EMPTY;
       }
-      if (!evaluated || untrackedAsync().length > 0) {
+      if (!evaluated || untrackedAsync().length) {
         return null;
       }
       for (const id of dirty) {
@@ -594,20 +657,23 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         add(into, last.get(id) ?? EMPTY);
       }
 
-      return into.size === 0 ? EMPTY : [...into.values()];
+      return into.size ? [...into.values()] : EMPTY;
     },
     depsOf: (id) => deps.get(id),
     isAsync: (id) => asyncIds.has(id),
     markResolved(req) {
       met.add(req.id);
+      resolved.add(req.fromConstraint);
       // As 1.35, the asking constraint's dependents are asked again; so are
-      // those of any other constraint that emits the same requirement.
-      const emitters = ids.filter(
+      // those of any other constraint that emits the same requirement. Every
+      // constraint there is now, one registered later too (dependsOnMe).
+      const all = Object.keys(defs);
+      const emitters = all.filter(
         (id) =>
           id === req.fromConstraint ||
           (last.get(id) ?? EMPTY).some((r) => r.id === req.id),
       );
-      for (const other of ids) {
+      for (const other of all) {
         if (defs[other]!.after?.some((dep) => emitters.includes(dep))) {
           dirty.add(other);
         }
@@ -615,7 +681,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     },
     forget: (id) => met.delete(id),
     markAllDirty() {
-      for (const id of ids) {
+      for (const id in defs) {
         dirty.add(id);
       }
     },
@@ -642,10 +708,11 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
         return false;
       }
       disabled.add(id);
-      // As 1.35: its requirements leave the next pass, and what it read no
-      // longer wakes it.
+      // As 1.35: its requirements leave the next pass, what it read no
+      // longer wakes it, and its dependency record goes (constraints.ts:1596).
       last.delete(id);
       setDeps(id, new Set());
+      deps.delete(id);
       whenDeps.delete(id);
 
       // Quirk e: it no longer holds anything back.
@@ -668,8 +735,67 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       }
     },
     isDisabled: (id) => disabled.has(id),
+    // L10: the registry's hooks; it has written `defs` first.
+    add_(id, full) {
+      unanswered.add(id);
+      defs[id]!.async ? asyncIds.add(id) : asyncIds.delete(id);
+      dirty.add(id);
+      resort(full);
+      // As 1.35 (constraints.ts:1677–1679): a refused definition stays,
+      // without a state until its next evaluation fails (onWhenError).
+      check(id);
+      // 1.35's assign starts the state again too (initState).
+      states.set(id, fresh(id));
+    },
+    remove_(id) {
+      // I3: gone from `states` and `last` together.
+      setDeps(id, new Set());
+      for (const set of [
+        states,
+        last,
+        whenDeps,
+        deps,
+        dirty,
+        disabled,
+        held,
+        unanswered,
+        asyncIds,
+        resolved,
+      ]) {
+        set.delete(id);
+      }
+      resort(1);
+    },
+    async call_(id, props) {
+      if (disabled.has(id)) {
+        return [];
+      }
+      // 1.35's callOne awaits only a promise: a sync answer costs no tick.
+      let active = (asyncIds.has(id) ? evaluateAsync : evaluateSync)(id);
+      if (active instanceof Promise) {
+        active = await active;
+      }
+
+      return active
+        ? requirementsOf(id).reqs.map((req) => {
+            const requirement = props ? { ...req, ...props } : req;
+
+            return {
+              requirement,
+              id: requirementId(requirement, keys[requirement.type]),
+              fromConstraint: id,
+            };
+          })
+        : [];
+    },
     state_: (id) => states.get(id),
     states_: () => [...states.values()],
+    specs_: specs,
+    explain_(id) {
+      const spec = specs.get(id);
+
+      return spec && options.pred!.explain_(spec[1], facts as never);
+    },
   };
 }
 
@@ -726,7 +852,7 @@ function hasChanged(
       !(value instanceof RegExp)
     ) {
       const ops = Object.keys(value);
-      if (ops.length > 0 && ops.every((op) => op.startsWith("$"))) {
+      if (ops.length && ops.every((op) => op.startsWith("$"))) {
         if (ops.includes("$changed")) {
           return true;
         }

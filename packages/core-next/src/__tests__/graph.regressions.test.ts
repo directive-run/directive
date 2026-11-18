@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { type ReactiveNode, createGraph } from "../graph";
+import { Link, type ReactiveNode, createGraph } from "../graph";
 
 describe("flush() while effects are held", () => {
   it("is a no-op inside an effect's first run, so the effect never re-enters", () => {
@@ -237,5 +237,26 @@ describe("a cleanup that registers a cleanup while its effect is disposed", () =
     });
     g.write(s, 1);
     expect(calls).toBe(1);
+  });
+});
+
+describe("the edge layout", () => {
+  // V8 drops a class's field layout at a full GC when no instance is left,
+  // and every compiled function that used it with it (module churn paid
+  // that after every full GC). The module holds one edge for that.
+  it("holds one edge for the life of the module, linked to nothing", () => {
+    const g = createGraph();
+    const s = g.signal(0);
+    const c = g.computed(() => g.read(s));
+    g.read(c);
+    g.dispose(c);
+    expect(s.subs).toBe(null);
+    const held = Object.values(Link).filter((v) => v instanceof Link);
+    expect(held).toHaveLength(1);
+    expect(held[0]).toMatchObject({
+      source: undefined,
+      target: undefined,
+      nextSub: null,
+    });
   });
 });

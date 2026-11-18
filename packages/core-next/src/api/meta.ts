@@ -37,15 +37,26 @@ interface Row {
  */
 const prepared = new WeakSet<object>();
 
-export const withMeta: SystemPart = ({
-  kernel,
-  module,
-  system,
-  tracker,
-  derived,
-  derivationDeps,
-}) => {
+export const withMeta: SystemPart = (context) => {
+  const { kernel, module, system, tracker, derived, derivationDeps } = context;
+  /** meta.subscribe's listeners, told of each definition change (L10, D6). */
+  const listeners = new Set<() => void>();
+  context.metaChanged_ = () => {
+    for (const fn of [...listeners]) {
+      try {
+        fn();
+      } catch (error) {
+        console.error("[Directive] Metadata subscriber error:", { error });
+      }
+    }
+  };
+  // The namespaced form lists its modules; a single module is its own row.
+  // L10b: one list, which registerModule and unregisterModule change.
   const m = module as Record<string, any>;
+  let mods = (m.modules_ ??= [module]) as {
+    id: string;
+    meta?: Meta;
+  }[];
   const schema = (m.schema?.facts ?? {}) as Record<string, { _meta?: Meta }>;
   const derive = (m.derive ?? {}) as Defs;
   // 1.35's byTag order: modules, facts, then these, then derivations.
@@ -55,8 +66,6 @@ export const withMeta: SystemPart = ({
       (m[kind === "event" ? "events" : `${kind}s`] ?? {}) as Defs,
     ]),
   );
-  // The namespaced form lists its modules; a single module is its own row.
-  const mods = (m.modules_ ?? [m]) as { id: string; meta?: Meta }[];
   for (const defs of [...kinds.values(), derive, mods]) {
     for (const def of Object.values(defs)) {
       if (def?.meta) {
@@ -65,20 +74,38 @@ export const withMeta: SystemPart = ({
     }
   }
   const tagSets = new Map<string, ReadonlySet<string>>();
-  for (const key in schema) {
-    const type = schema[key]!;
-    if (type && !prepared.has(type)) {
-      prepared.add(type);
-      if (type._meta) {
-        type._meta = freezeMeta(type._meta);
-      }
-      // Only the types this package builds: a Zod schema caches onto itself.
-      if ("_typeName" in type) {
-        Object.freeze(type);
+  /**
+   * Facts that join, or (an entry with no type slot, L10b: unregisterModule)
+   * leave. As 1.35 (recordFactTags, engine.ts:2477–2491; registerModule,
+   * 4509–4527): every joining key's tags first, untagged keys too, then each
+   * type is prepared once, where a missing type throws (the WeakSet refuses
+   * it) after the keys joined.
+   */
+  const note = (entries: [string, unknown?][]) => {
+    for (const entry of entries) {
+      const tags = (entry[1] as { _meta?: Meta })?._meta?.tags;
+      1 in entry
+        ? tagSets.set(entry[0], new Set(tags?.length ? tags : []))
+        : tagSets.delete(entry[0]);
+    }
+    for (const entry of entries) {
+      const type = entry[1] as { _meta?: Meta };
+      if (1 in entry && !prepared.has(type)) {
+        prepared.add(type);
+        if (type._meta) {
+          type._meta = freezeMeta(type._meta);
+        }
+        // Only the types this package builds, which are objects (1.35's
+        // isOwnSchemaType, engine.ts:253–259): a Zod schema caches onto
+        // itself.
+        if (typeof type === "object" && "_typeName" in type) {
+          Object.freeze(type);
+        }
       }
     }
-    tagSets.set(key, new Set(type?._meta?.tags));
-  }
+  };
+  note(Object.entries(schema));
+  context.keys_ = note;
   const fenced = <T>(fn: () => T): T =>
     kernel.graph.untracked(() => withoutTracking(tracker, fn));
   const has = Object.hasOwn as (o: object, id: string) => boolean;
@@ -89,7 +116,7 @@ export const withMeta: SystemPart = ({
     if (authored?.tagBoundary !== true) {
       const seen = new Set<string>();
       const queue = [id];
-      while (queue.length > 0) {
+      while (queue.length) {
         const current = queue.pop()!;
         if (seen.has(current) || !has(derive, current)) {
           continue;
@@ -140,7 +167,7 @@ export const withMeta: SystemPart = ({
       push("derivation", id, meta);
       // An unannotated derivation still carries what its inputs carry.
       const tags = inherited(id);
-      if (tags.length > 0) {
+      if (tags.length) {
         push("derivation", id, withTags(meta, { tags }), "inherited");
       }
     }
@@ -148,8 +175,17 @@ export const withMeta: SystemPart = ({
     return rows;
   };
   const metaOf = (kind: string) => (id: string) => kinds.get(kind)![id]?.meta;
+  const modMeta = (id: string) => mods.find((mod) => mod.id === id)?.meta;
+  // 1.35's destroy clears its module and event meta maps and its meta
+  // subscribers (engine.ts:3504–3506, 3552–3554) and keeps every other
+  // definition's: a module teardown that finishes later tells no one.
+  kernel.onDispose(() => {
+    mods = [];
+    kinds.set("event", {});
+    listeners.clear();
+  });
   Object.assign(system.meta as object, {
-    module: (id: string) => mods.find((mod) => mod.id === id)?.meta,
+    module: modMeta,
     fact: (key: string) => schema[key]?._meta,
     event: metaOf("event"),
     constraint: metaOf("constraint"),
@@ -159,7 +195,7 @@ export const withMeta: SystemPart = ({
       const authored = derive[id]?.meta;
       const tags = fenced(() => inherited(id));
 
-      return tags.length > 0
+      return tags.length
         ? withTags(authored, { inheritedTags: Object.freeze(tags) })
         : authored;
     },
@@ -193,7 +229,7 @@ export const withMeta: SystemPart = ({
       const defs = kinds.get(kind);
       const meta =
         kind === "module"
-          ? mods.find((mod) => mod.id === id)?.meta
+          ? modMeta(id)
           : defs && has(defs, id)
             ? (defs[id]?.meta ?? (kind === "event" ? undefined : {}))
             : undefined;
@@ -212,8 +248,11 @@ export const withMeta: SystemPart = ({
       if (((fn === tags ? listener : options) as typeof options)?.immediate) {
         fn();
       }
+      listeners.add(fn);
 
-      return () => {};
+      return () => {
+        listeners.delete(fn);
+      };
     },
   });
 };
