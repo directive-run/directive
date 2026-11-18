@@ -295,11 +295,14 @@ const registry = (ctx: SystemContext): Kinds => {
         def.meta = freezeMeta(def.meta as DefinitionMeta);
       }
       // 1.35 hands a derivation's hook its compute, unwrapped at creation
-      // and register, but an assigned one as given (its merged map's entry).
-      const original =
-        type === "derivation" && !ASSIGNED.has(map[id])
-          ? computeOf(map[id])
-          : map[id];
+      // and register (a data form compiled to its function, derivations.ts:
+      // 247–288), but an assigned one as given (its merged map's entry).
+      let original = map[id];
+      if (type === "derivation" && !ASSIGNED.has(original)) {
+        original = computeOf(original);
+        typeof original === "object" &&
+          (original = ctx.lazy_(original, "compute", id));
+      }
       map[id] = def;
       if (op === "register") {
         // The reconcile part is built at the first constraint or resolver
@@ -380,6 +383,12 @@ const registry = (ctx: SystemContext): Kinds => {
     }
   };
   const guarded = (op: string, type: string) => (id: string, def?: unknown) => {
+    // 1.35 (engine.ts:2659–2665) drops a resolver's key function before its
+    // registry checks the unregister, so one it refuses (a static or a
+    // namespaced id, a destroyed system) or defers has dropped it already.
+    op === "unregister" &&
+      type === "resolver" &&
+      ctx.kinds_.resolver?.unkey_!(m.resolvers?.[id]);
     check(op, type, id);
     if (!ctx.inPass_) {
       return apply(op, type, id, def);

@@ -580,8 +580,22 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     return go;
   }
 
+  /**
+   * 1.35's `running` (resolvers.ts:2043–2048): a run until its promise
+   * settles, aborted or not. drainResolvers waits on these, so a run that
+   * stop() or a retraction aborted, still going, holds unregisterModule.
+   */
+  const live = new Set<Run>();
+  const execute: typeof executeResolve = (def, run, ...rest) => {
+    const p = executeResolve(def, run, ...rest);
+    const off = () => live.delete(run);
+    live.add(run);
+    p.then(off, off);
+
+    return p;
+  };
   /** 1.35's executeResolve: the retry loop, ending in one `report` at most. */
-  async function execute(
+  async function executeResolve(
     def: ResolverDef,
     run: Run,
     baseline: ReadonlyMap<string, unknown> | undefined,
@@ -840,7 +854,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
     },
     // L10b: 1.35's drainResolvers waits on these (resolvers.ts:2051).
     waits_: (ids) =>
-      [...inflight.values(), ...detached]
+      [...live]
         .filter((run) => ids.includes(run.resolver_))
         .map((run) => run.p_),
     // Row (cd): the module's runs, ended or not, may not write its keys.
