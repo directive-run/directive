@@ -6769,6 +6769,116 @@
         }
       }
     },
+    "tests/core/l10-dynamic-gate-debt-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L10",
+      "pin": true,
+      "tests": {
+        "createSystem refuses two modules whose namespaced keys collide (L10 gate debt) > for a fact": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"]
+        },
+        "createSystem refuses two modules whose namespaced keys collide (L10 gate debt) > `for a ${section}`": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "dynamic": true
+        },
+        "createSystem refuses two modules whose namespaced source keys collide (L10 gate debt) > for a source": {
+          "layer": "L5",
+          "by": ["option sources"]
+        },
+        "registerModule's refusals (L10 gate debt) > refuses during reconciliation, from an effect": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "registerModule's refusals (L10 gate debt) > refuses on a destroyed system": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "registerModule's refusals (L10 gate debt) > refuses a blocked key and a $ schema key": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "registerModule's refusals (L10 gate debt) > warns when a registered derivation shares a fact's name": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "unregisterModule's refusals and re-entry (L10 gate debt) > names an id-less target <module> and rejects a name nothing registered": {
+          "layer": "L10",
+          "by": ["member .unregisterModule"]
+        },
+        "unregisterModule's refusals and re-entry (L10 gate debt) > refuses during reconciliation, from an effect": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "unregisterModule's refusals and re-entry (L10 gate debt) > runs the teardown once for two concurrent calls": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "registerModule merges history.snapshotEvents (L10 gate debt) > filters from the first module that names its events, keeps the earlier ones, and adds every event of a later unfiltered module": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "registerModule records module and source meta (L10 gate debt) > stores a module's meta frozen, and tells plugins a source's meta": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        },
+        "unregisterModule drops a requirement key no surviving resolver owns (L10 gate debt) > so a surviving constraint's requirement is keyed without it": {
+          "layer": "L10",
+          "by": ["member .unregisterModule"]
+        },
+        "meta.subscribe over runtime definitions (L10 gate debt) > is told of a register, survives a listener that throws, and stops after unsubscribe": {
+          "layer": "L10",
+          "by": [
+            "member .constraints.register",
+            "member .constraints.unregister",
+            "member .registerModule",
+            "member .unregisterModule"
+          ]
+        },
+        "meta.subscribe over runtime definitions (L10 gate debt) > `forgets its listeners on ${how}(), even for a module teardown that finishes later`": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"],
+          "dynamic": true
+        },
+        "destroy() forgets runtime definitions (L10 gate debt) > `listDynamic() is empty after ${how}()`": {
+          "layer": "L10",
+          "by": [
+            "member .constraints.listDynamic",
+            "member .constraints.register"
+          ],
+          "dynamic": true
+        },
+        "runtime definitions (L10 gate debt) > a runtime resolver that fails reaches no module hook and settles": {
+          "layer": "L10",
+          "by": ["member .constraints.register", "member .resolvers.register"]
+        },
+        "runtime definitions (L10 gate debt) > inspect() lists a runtime constraint, and a fact a failed registerModule left with no schema type": {
+          "layer": "L10",
+          "by": ["member .constraints.register", "member .registerModule"]
+        },
+        "runtime definitions (L10 gate debt) > explain() says unknown for a requirement whose constraint was replaced": {
+          "layer": "L10",
+          "by": ["member .constraints.assign"]
+        },
+        "an effect's deps across a fact that leaves (L10 gate debt) > keeps a name that meant a fact when registered, after the fact leaves and a derivation of that name joins": {
+          "layer": "L10",
+          "by": [
+            "member .effects.register",
+            "member .registerModule",
+            "member .unregisterModule"
+          ]
+        },
+        "evict(deadline) (L10 gate debt; evict is L5) > waits for an eviction that finishes before the deadline": {
+          "layer": "L5",
+          "by": ["member .evict", "option sources"]
+        },
+        "evict(deadline) (L10 gate debt; evict is L5) > returns at the deadline while the eviction is still running": {
+          "layer": "L5",
+          "by": ["member .evict", "option sources"]
+        }
+      }
+    },
     "tests/core/l10-dynamic-pins-oracle-production.test.ts": {
       "category": "black-box",
       "rule": "L10",
