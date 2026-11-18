@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794971811758,
+  "lastUpdate": 1794976227990,
   "repoUrl": "https://github.com/directive-run/directive",
   "entries": {
     "@directive-run/core": [
@@ -33630,6 +33630,576 @@ window.BENCHMARK_DATA = {
             "value": 699302.59,
             "unit": "ns/op",
             "extra": "samples: 715, rme: ±7.24%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jasonwcomes@gmail.com",
+            "name": "Jason Comes",
+            "username": "jasoncomes"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bf0bdeb488610d9e378668540b6d4ae13b4dc5fc",
+          "message": "conformance: L9 gate — layer nine (trace and introspection) on for 2.0 (#404)\n\n* conformance: L8 gate — current L8\n\nlayers.rules.json current goes from L7 to L8: core-next runs every test and\ndifferential scenario placed at L8 or below (history), and the fuzz\ngenerates v2 cases up to L8, its history ops included. The census\nself-test's layer-tagged golden checks now treat the history part (L8) as\nbuilt: it must pass, and skipping it fails; the ledger (L12) stays the part\nabove current.\n\n* conformance: L8 gate — 52 signed entries for the approved history rows\n\nRows (ay), (az) and (bb) (\"Approve all as recommended (Recommended)\",\n2026-11-10) and L7's row (av) in its navigation-made shape. Hand entries,\nexact with excuses and counts: (ay) 5 (U4), (az) 10 (U5, goTo then replay,\nU7's import, export and import), (bb) 29 (U7's buffer drop, redo cut and\nimport). Fuzz entries, each with its when, bound and group: row-ay 3\n(navigatedPaused; the third, l8-fuzz-ay-hook-onSnapshot-missing-unannounced,\ncovers PR seeds 14 up-to-L8 #48 and 20 all #53, where no history record lies\nbetween the navigation and the next write), row-az 2 (replayedOrImported),\nav-moved-nav 3 (batched, batchMaxSize, navigated). Each is signed on the\nowner's instruction (GATE-2 rule 1). The three (av) twins quote their row's\napproval (\"Approve: once (Recommended)\", 2026-11-07) and the L8 signing\ninstruction. No entry on main changed or was removed.\n\n* conformance: L8 gate — U3, U6, U8 and U9 keep only what 1.35 and 2.0 share\n\nThe six l8-history-pins-oracle cases an approved L8 row changes keep only the\nassertions both engines share, with a comment naming the row (#339's\nmechanism, as at L7): U3's two cases in development and production ((bd)),\nU6's import into a system whose counter is behind ((ba)), U8 (a) and (b)\n((be); one goBack step, which both engines take alike) and U9 ((bc)). Titles\nsay what is still pinned. Edited in packages/core's originals and re-ported.\n\n* conformance: L8 gate — changeset trigger self-tests for a goTo and an end with no open changeset\n\n#383's review left two follow-ups: no goTo self-test, and no test for an end\nwith no open changeset. changesetMoved and changesetSteps now hold that a goTo\ninside a changeset records a range, a back alone does not, and an end with no\nbegin, or a second end, records none.\n\n* conformance: L8 gate — the 44 L8 feature-layer triage entries become later-layer\n\ncurrent is L8, so the 44 feature-layer L8 entries in engine.json become\nlater-layer. The gate=L8 run 43549853523 (0c6aa657, ceiling L8) records 43\nKilled, each by an l8-history-gate-debt-oracle test named in its note, and one\nTimeout (1803:9, the restored-keys pass), for which Stryker names no killer.\n\n* conformance: L8 gate — ratchet +115 (holds 1,879)\n\nratchet --update adds the 115 tests core-next now passes at L8 on source and\ndist (l8-history-gate-debt-oracle 22, l8-history-pins-oracle 22 and its\nproduction file 6, snapshot-events 15, navigation-side-effects 7,\neffect-reconcile-boundaries 6, history-clone-integrity 6 and 31 more). It\ndrops none: tested by name against main's 1,764.\n\n* conformance: L8 gate — oracle:update\n\n* conformance: L8 gate — GATE-7.md, run 1, with the open stops\n\nThe gate record for L8: the owner's decisions in his words, the 52 signed\nentries by row, the six trimmed pins and the core-next tests that pin 2.0's\nside, the history golden (unchanged byte for byte, read both ways), the 44\nmutation entries converted, the ratchet (1,764 to 1,879), the 21 PR seeds\n(all exit 0) and the deep runs in report mode. Three stops stay open for run 2:\ntwo /internals history names core-next does not ship (conformance:checks),\ntwo stale fuzz groups in the census's run (quirk-g, av-moved-nav), and deep\nseed 24301 timing out in report mode. oracle:update locks the file.\n\n* conformance: L8 gate — pinned cases for quirk g and the navigation-made (av) twins\n\nAt L8 the census seed (24301, pull-request count) draws no case that uses\nan entry of group quirk-g or av-moved-nav, so both read as stale. Both\nstill cover real differences on other seeds: quirk-g on 18 cases of PR\nseeds 2, 3, 5, 7, 8, 10, 12, 16, 17 and 18; av-moved-nav on PR seed 13\ncase all#119. Pin one passing case of each (seed 10 up to L8#79; seed 13\nall#119), as #372 pinned quirk g's aborted-extra entry.\n\n* conformance: L8 gate — a run past its budget stalls nowhere; case files keep each trace's head\n\nDeep seed 24301, up-to-L8 case 508: the approved (at) stop\nl7-fuzz-at-hook-onResolverStart-extra ends the comparison at step 2, then\n2.0 livelocks at 35 ms past the 20,000-callback budget (1.35 settles after\n14). By the owner's rule the case is discarded after the stop. But past the\nbudget the harness clears every timer itself, so the shared wait at step 12\nfound a batched call live with no timer and reported a stall: the case\nfailed on the harness's own doing, and report mode wrote its 2,280,368-record\ntrace, a 536 MB file, near V8's longest string. The seed did not finish in\nan hour.\n\n- The shared wait reports no stall once the run is past its budget; the run\n  is judged as a runaway instead.\n- A case file keeps at most 100,000 records of each trace, with the full\n  length of each it cut.\n- Self-tests: diff/self/stall-after-budget.test.ts.\n\n* conformance: L8 gate — GATE-7.md, run 2\n\nRun 2's results: every check passes but the /internals stop (the census's\n10 problems and conformance:checks' 9 failures are all its); the 21 PR\nseeds and deep seeds 1, 2 and 24301 run to the end, 19 batched cases\nreported, all known; the stale groups and the 24301 stall explained and\nfixed in the harness. quirk-g covers 16 passing cases on 11 PR seeds (the\npinning commit's count was off).\n\n* conformance: L8 gate — the history golden is held byte for byte (E1), with a probe that bites\n\n* conformance: L8 gate — a stall below the budget, with no ends stop, is reported\n\n* conformance: L8 gate — GATE-7.md, run 3: the golden's byte check, the stall self-test, the pins in p8/pin-ba-bc-be\n\n* conformance: L8 gate — oracle:update (harness lock re-hashed for run 3)\n\n* conformance: L8 gate — GATE-7.md names #391 and corrects the RFC's (be) sentence\n\n* conformance: L9-pre-a — pin 1.35's trace and introspection (U1–U12, U14–U16), the fuzz reaches the ring and meta, trace timing by contract\n\n- U1, U5–U7, U9, U11, U12, U15, U16: l9-trace-pins-oracle (dev) and its\n  production twin (U7's silent cap, U15/U16), black-box, at L9.\n- U2 (two), U3, U4, U8: diff/scenarios/l9-trace-pins.test.ts, at L9.\n- U10: system.test \"trace config forwarded\" asserts an array and one run\n  per write; it no longer passes on null (v2-passing.json moves it).\n- U14: data-forms.test.ts instruments the flush; the three data-form\n  introspection tests land at L11, and the KeySelector case, which fell to\n  L2, is placed at L11 by its data-form key (lib/layers.ts).\n- B3: registerKeys is L10 (lib/layers.ts, layers.rules.json note); the\n  clobber-loop notify members are L9 (S4).\n- B1: maxRuns drawn from 1, 3, 100 in trace cases; fact tags,\n  tagBoundary derivations and a meta step in one case in three; all drawn\n  after everything else, so every case below L9 is the one L8-pre drew\n  (abort-draw digest). Rule 1: trace times by contract, the chain's (Nms)\n  masked, duration anomalies dropped, run ids by place. Rule 2 self-tests:\n  a dropped onTraceComplete, a wrong carriesTag, a skewed clock, and the\n  projection masking only timing.\n- WHITE-BOX.md: the L9 bullet for sources.test.ts's 11 internals cases.\n\n* conformance: L9-pre-b — l9-meta-trace-gate-debt-oracle: 21 black-box pins for meta, trace, observe and explain at L9\n\n* conformance: L9-pre-b — triage: 138 gate=L9 entries killed, 20 equivalent, 10 moved to feature-layer L10\n\n* conformance: L9-pre-b — kill the last two gate=L9 entries: engine.ts:2024:62 (async constraint with no dependency record) and 3338:7 (start() resets a navigation made while stopped)\n\n* conformance: L9-pre-b — 2479:20's reason is feature-layer L10, as its note says\n\n* conformance: L9 gate — current L9\n\nlayers.rules.json current goes from L8 to L9: core-next runs every test and\ndifferential scenario placed at L9 or below (trace, meta, observe, explain,\nnotify), and the fuzz compares its trace cases on v2. The census self-test's\ncomment names L9; no golden is tagged L9.\n\n* conformance: L9 gate — harness: the trace contract's masks, two pairing fixes, the L9 triggers and classes\n\n- Trace ids by order (the L9 RFC's rule 1; #392's review): traceIdProblems\n  checks every engine, the reference too, as drawProblems does: each\n  inspect().trace list holds integer ids in strictly increasing order, and no\n  run is reported to onTraceComplete twice. The projection still masks the\n  id's value.\n- anomalies: an empty list is no longer masked as an absent field. 1.35\n  writes the field only when it has an anomaly (core engine-trace.ts:345); a\n  list of only a duration anomaly is still left out.\n- onTraceComplete records pair by their projected run among the longest\n  pairings (traceRunText, the console stream's tie-break): row (bi)'s one\n  extra report no longer shifts every later report by one.\n- An ends stop drops a missing record whose equal twin it drops on the engine\n  under test (shiftedTwins): quirk a's extra pass left onResolverComplete\n  unpaired on both engines, and only 2.0's copy was dropped (fuzz cases\n  19:all#25, 2:all#93).\n- stepOps reads a fuzz history step's op from its run label, so during can\n  name back, forward and the other history ops (the L8 gate's follow-up).\n- Triggers traceRing (row (bi)), disableRetracts (row t under disable),\n  batchWriteRetracts (row t's batch path) and batchClobbered (row (ap)); LIKE\n  classes traceRunWithResolvers, derivation and batchItems.\n\nSelf-tests: diff/self/trace-contract.test.ts (a true extra, missing or\nchanged record still fails) and diff/self/l9-triggers.test.ts.\n\n* conformance: L9 gate — signed entries for (bi), (bb), row t, (ap) and (av)+(at)\n\nEach entry is signed on the owner's instruction (GATE-2 rule 1) and quotes\nits row's approval.\n\n- (bi), \"I approve you for to do everything\" (2026-11-15): the two U2 hand\n  entries (one record each), the fuzz entry for the extra onTraceComplete\n  (when traceRing, bound traceRunWithResolvers), and an ends entry for the\n  report 2.0 makes where 1.35 reports a different run, with as many reports\n  on each side (8:all#181, 12:all#149): resolversStarted[0] absent on 1.35,\n  a resolver row on 2.0, when traceRing.\n- (bb), \"Approve all as recommended (Recommended)\" (2026-11-10): an ends\n  entry for the first changed invalidation of a back step in a\n  changesetMoved case (11:all#175).\n- Row t, \"If all are better or non user facing they are all approved.\"\n  (2026-11-01): the three cancel records missing on 2.0 under disable\n  (disableRetracts, 1:all#4038), and the batch path's changed resolver id\n  (batchWriteRetracts, ends, 24301:all#3397).\n- (av)+(at): the fallback run's start missing on 2.0 (ends; 7:all#187,\n  2:all#2625, 24301:all#2659).\n- (ap): the early start, narrowed by batchClobbered (ends; 18:all#156).\n\n* conformance: L9 gate — U1 and U12 keep only what 1.35 and 2.0 share\n\nRow (bh) freezes the trace's array and each settled entry on 2.0, so the\nthree l9-trace-pins-oracle cases that edit the trace through a read (U1's\npush and entry edit, U12's plugin edit) keep only the assertions both\nengines share, with a comment naming the row (#339's mechanism, as at L6 to\nL8). Titles say what is still pinned. 2.0's side is pinned by core-next's\nl9b-trace \"(bh) a read cannot edit the trace\". Edited in packages/core's\noriginal and re-ported.\n\n* conformance: L9 gate — the 135 L9 feature-layer triage entries become later-layer\n\ncurrent is L9, so the 135 feature-layer L9 entries (engine.json 132,\nschema-builders.json 3; the RFC's 160 was before L9-pre-b killed or moved\nsome) become later-layer. Each note already names its killer from the\nL9-pre-b local run at ceiling L9. The gate=L9 run 43815165003 (ea25c6ff on\nmain) was dispatched before L9-pre's tests were written: it records 110 of\nthem NoCoverage, 23 Survived and 2 both, so it names no killer, and each\nnote says a gate=L9 run of this branch confirms the kill before merge.\n\n* conformance: L9 gate — the U2/U8 look step projects anomalies; the plainest batch keeps its item\n\n- l9-trace-pins' look step recorded run.anomalies raw, so a duration anomaly\n  (which depends on time) would be compared exactly. It now records them as\n  the comparison projects a run (traceRunContract; #392's review).\n- The L7 batch-trigger self-test's plainest batch wrote 0 under its\n  source's bar of 1, which is batchWriteRetracts: it writes 1 now, and a\n  case for value 0 names the new trigger.\n\n* conformance: L9 gate — ratchet +99 (holds 1,977)\n\nratchet --update adds the 99 tests core-next now passes at L9 on source and\ndist (trace 23, l9-meta-trace-gate-debt-oracle 17, l9-trace-pins-oracle 15,\nand 44 more in 20 files). It drops none: tested by name against the\nbranch's 1,878.\n\n* conformance: L9 gate — entry shapes the census asks for; oracle:update; GATE-8.md, run 1\n\n- The three `ends` changed entries name their path, as the census requires.\n- Row t's three disable entries are their own group, quirk-t-disable: a\n  group is one signed decision with one `when`.\n- oracle:update re-hashes the harness lock and the baseline.\n- GATE-8.md records gate run 1: the entries, the harness changes with their\n  self-tests, the pins, the mutation conversion, the checks so far, the deep\n  runs, the four L8 batch cases and the open stops.\n\n* conformance: L9 gate — the (bi) and (bb) ends entries require their row's own mark elsewhere in the case\n\nThe (bi) dropped-run entry now also needs an extra onTraceComplete on 2.0 anywhere in the case, and the (bb) back entry a changed onHistoryNavigate. A traceRing case where no run was pushed out, or a back that lands on the same snapshot, is outside them. 8:all#181, 12:all#149 and 11:all#175 still pass. oracle:update.\n\n* conformance: L9 gate — GATE-8.md, run 2\n\n#403 fixed run 1's five stops; the pins pass on v2 and v2:dist. Run 2's checks, the PR seeds at CI's 120 s, deep seed 1's cases, and why the (bi) and (bb) entries need ends. Two new stops: PR seed 24301 fails on a 2.0 hang after a batch stop (24301:all#175), and seeds 7, 9 and 11 pass only past 120 s (7:all#187 takes 340 s alone). oracle:update.\n\n* conformance: L9 gate — a missing-record stop counts at the last paired record before it (seed d)\n\nJason, 2026-11-17: \"Approve the wider wording (Recommended)\". stopsBefore\nnow also counts a missing stop at the engine's index of its shared match\npoint. Self-tests (runaway-after-stop.test.ts, block f): 24301:all#175's\nshape is discarded; a missing record with no stop still fails; an extra\nstop still counts at its own index. Seed 24301 exits 0. GATE-8.md, run 3:\nthe census finds seven signed L9 fuzz entries stale on the census seed\n(stop). Ratchet reordered, 2,171 held; harness lock refreshed.\n\n* conformance: L9 gate — pinned cases for row-bb, quirk-t-disable, quirk-t-batch, row-av and row-ap\n\nWith seed 24301 passing at L9, the census found seven signed L9 fuzz entries\nstale: the seed's 287 cases draw none of these five groups. Each still covers\na real difference on its own seed. Pin one case per group, rebuilt by index\nfrom its seed's across-every-layer phase, as the L8 gate did: 11:all#175\n(row-bb), 1:all#4038 (quirk-t-disable), 24301:all#3397 (quirk-t-batch),\n24301:all#2659 (row-av) and 18:all#156 (row-ap). Each replays compared on v2,\nuses its group's entries and has 0 unexplained differences. No entry was\nwidened, removed or re-signed. The census exits 0; GATE-8.md records the\nstop closed.",
+          "timestamp": "2026-11-17T22:28:08-06:00",
+          "tree_id": "2aa8c833f851999cbad8944ebf25cffb64db8e9c",
+          "url": "https://github.com/directive-run/directive/commit/bf0bdeb488610d9e378668540b6d4ae13b4dc5fc"
+        },
+        "date": 1794976227010,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > Directive",
+            "value": 122.23,
+            "unit": "ns/op",
+            "extra": "samples: 4090696, rme: ±0.11%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > Zustand",
+            "value": 64.14,
+            "unit": "ns/op",
+            "extra": "samples: 7796008, rme: ±0.09%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > Redux Toolkit",
+            "value": 62.95,
+            "unit": "ns/op",
+            "extra": "samples: 7943325, rme: ±0.09%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > MobX",
+            "value": 103.01,
+            "unit": "ns/op",
+            "extra": "samples: 4854022, rme: ±0.17%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > Jotai",
+            "value": 167.54,
+            "unit": "ns/op",
+            "extra": "samples: 2984348, rme: ±0.73%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > Preact Signals",
+            "value": 63.27,
+            "unit": "ns/op",
+            "extra": "samples: 7902776, rme: ±0.17%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > XState",
+            "value": 67.27,
+            "unit": "ns/op",
+            "extra": "samples: 7432474, rme: ±0.21%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > Directive",
+            "value": 473.42,
+            "unit": "ns/op",
+            "extra": "samples: 1056151, rme: ±1.90%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > Zustand",
+            "value": 139.57,
+            "unit": "ns/op",
+            "extra": "samples: 3582521, rme: ±1.31%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > Redux Toolkit",
+            "value": 1070.82,
+            "unit": "ns/op",
+            "extra": "samples: 466934, rme: ±0.87%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > MobX",
+            "value": 269.83,
+            "unit": "ns/op",
+            "extra": "samples: 1853023, rme: ±0.80%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > Jotai",
+            "value": 839.62,
+            "unit": "ns/op",
+            "extra": "samples: 595510, rme: ±1.19%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > Preact Signals",
+            "value": 70.01,
+            "unit": "ns/op",
+            "extra": "samples: 7142058, rme: ±0.10%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > XState",
+            "value": 2016.88,
+            "unit": "ns/op",
+            "extra": "samples: 247908, rme: ±0.92%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > Directive",
+            "value": 230406.46,
+            "unit": "ns/op",
+            "extra": "samples: 2171, rme: ±0.92%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > Zustand",
+            "value": 67844.68,
+            "unit": "ns/op",
+            "extra": "samples: 7370, rme: ±0.89%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > Redux Toolkit",
+            "value": 948650.54,
+            "unit": "ns/op",
+            "extra": "samples: 528, rme: ±0.87%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > MobX",
+            "value": 189258.7,
+            "unit": "ns/op",
+            "extra": "samples: 2642, rme: ±0.77%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > Jotai",
+            "value": 842799.23,
+            "unit": "ns/op",
+            "extra": "samples: 594, rme: ±1.27%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > Preact Signals",
+            "value": 19239.43,
+            "unit": "ns/op",
+            "extra": "samples: 25989, rme: ±1.75%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > XState",
+            "value": 1956139.14,
+            "unit": "ns/op",
+            "extra": "samples: 256, rme: ±1.38%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > Directive",
+            "value": 1368.56,
+            "unit": "ns/op",
+            "extra": "samples: 365350, rme: ±0.18%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > Zustand",
+            "value": 175.93,
+            "unit": "ns/op",
+            "extra": "samples: 2841962, rme: ±4.32%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > Redux Toolkit",
+            "value": 1133.48,
+            "unit": "ns/op",
+            "extra": "samples: 441119, rme: ±9.60%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > MobX",
+            "value": 460.61,
+            "unit": "ns/op",
+            "extra": "samples: 1085528, rme: ±0.61%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > Jotai",
+            "value": 2366.03,
+            "unit": "ns/op",
+            "extra": "samples: 211325, rme: ±4.66%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > Preact Signals",
+            "value": 93.95,
+            "unit": "ns/op",
+            "extra": "samples: 5322084, rme: ±0.10%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > XState",
+            "value": 1980.36,
+            "unit": "ns/op",
+            "extra": "samples: 252480, rme: ±0.69%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > Directive",
+            "value": 10202.41,
+            "unit": "ns/op",
+            "extra": "samples: 49009, rme: ±0.54%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > Zustand",
+            "value": 3202.47,
+            "unit": "ns/op",
+            "extra": "samples: 156185, rme: ±1.27%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > Redux Toolkit",
+            "value": 47291.17,
+            "unit": "ns/op",
+            "extra": "samples: 10573, rme: ±1.11%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > MobX",
+            "value": 7794.58,
+            "unit": "ns/op",
+            "extra": "samples: 64148, rme: ±0.80%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > Jotai",
+            "value": 34718.65,
+            "unit": "ns/op",
+            "extra": "samples: 14402, rme: ±1.47%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > Preact Signals",
+            "value": 709.09,
+            "unit": "ns/op",
+            "extra": "samples: 705133, rme: ±0.75%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > XState",
+            "value": 92118.36,
+            "unit": "ns/op",
+            "extra": "samples: 5428, rme: ±0.63%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Subscribe + Notify (create store, 10 subs, 1 write) > Directive",
+            "value": 97174.43,
+            "unit": "ns/op",
+            "extra": "samples: 5146, rme: ±12.53%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Subscribe + Notify (create store, 10 subs, 1 write) > Zustand",
+            "value": 661.71,
+            "unit": "ns/op",
+            "extra": "samples: 755614, rme: ±0.64%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Subscribe + Notify (create store, 10 subs, 1 write) > MobX",
+            "value": 165595.35,
+            "unit": "ns/op",
+            "extra": "samples: 3020, rme: ±2.44%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Subscribe + Notify (create store, 10 subs, 1 write) > Preact Signals",
+            "value": 1112.34,
+            "unit": "ns/op",
+            "extra": "samples: 449502, rme: ±0.67%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > Directive",
+            "value": 87142.37,
+            "unit": "ns/op",
+            "extra": "samples: 5775, rme: ±9.71%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > Zustand",
+            "value": 68.29,
+            "unit": "ns/op",
+            "extra": "samples: 7321695, rme: ±0.18%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > Redux Toolkit",
+            "value": 9670.81,
+            "unit": "ns/op",
+            "extra": "samples: 51702, rme: ±5.26%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > MobX",
+            "value": 3044.43,
+            "unit": "ns/op",
+            "extra": "samples: 164235, rme: ±1.35%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > Jotai",
+            "value": 1223.09,
+            "unit": "ns/op",
+            "extra": "samples: 408801, rme: ±9.64%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > Preact Signals",
+            "value": 50.99,
+            "unit": "ns/op",
+            "extra": "samples: 9805628, rme: ±0.09%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > XState",
+            "value": 11233.44,
+            "unit": "ns/op",
+            "extra": "samples: 44510, rme: ±20.73%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Read 10 Keys > Directive",
+            "value": 907.62,
+            "unit": "ns/op",
+            "extra": "samples: 550890, rme: ±0.09%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Read 10 Keys > Zustand",
+            "value": 388.07,
+            "unit": "ns/op",
+            "extra": "samples: 1288421, rme: ±0.10%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Read 10 Keys > MobX",
+            "value": 717.33,
+            "unit": "ns/op",
+            "extra": "samples: 697033, rme: ±0.09%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Read 10 Keys > Preact Signals",
+            "value": 74.52,
+            "unit": "ns/op",
+            "extra": "samples: 6709488, rme: ±0.10%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Read 10 Keys > Jotai",
+            "value": 985.77,
+            "unit": "ns/op",
+            "extra": "samples: 507217, rme: ±0.69%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > Directive",
+            "value": 1949796.6,
+            "unit": "ns/op",
+            "extra": "samples: 257, rme: ±0.64%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > Zustand",
+            "value": 605769.84,
+            "unit": "ns/op",
+            "extra": "samples: 826, rme: ±0.76%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > Redux Toolkit",
+            "value": 9667478.27,
+            "unit": "ns/op",
+            "extra": "samples: 52, rme: ±0.59%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > MobX",
+            "value": 1596861.51,
+            "unit": "ns/op",
+            "extra": "samples: 314, rme: ±0.66%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > Jotai",
+            "value": 7021322.5,
+            "unit": "ns/op",
+            "extra": "samples: 72, rme: ±7.45%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > Preact Signals",
+            "value": 170222.52,
+            "unit": "ns/op",
+            "extra": "samples: 2938, rme: ±0.75%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > XState",
+            "value": 19053982.81,
+            "unit": "ns/op",
+            "extra": "samples: 27, rme: ±0.33%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > Directive",
+            "value": 23873.33,
+            "unit": "ns/op",
+            "extra": "samples: 20944, rme: ±0.47%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > Zustand",
+            "value": 6792.56,
+            "unit": "ns/op",
+            "extra": "samples: 73610, rme: ±0.70%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > Redux Toolkit",
+            "value": 95883.35,
+            "unit": "ns/op",
+            "extra": "samples: 5215, rme: ±0.74%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > MobX",
+            "value": 19834.59,
+            "unit": "ns/op",
+            "extra": "samples: 25209, rme: ±0.46%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > Jotai",
+            "value": 84218.05,
+            "unit": "ns/op",
+            "extra": "samples: 5937, rme: ±1.82%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > Preact Signals",
+            "value": 2316.32,
+            "unit": "ns/op",
+            "extra": "samples: 215860, rme: ±0.66%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > XState",
+            "value": 193984.12,
+            "unit": "ns/op",
+            "extra": "samples: 2578, rme: ±0.75%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 3 Derived Values from 1 Source > Directive",
+            "value": 2804.2,
+            "unit": "ns/op",
+            "extra": "samples: 178305, rme: ±0.21%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 3 Derived Values from 1 Source > MobX",
+            "value": 805.05,
+            "unit": "ns/op",
+            "extra": "samples: 621078, rme: ±0.65%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 3 Derived Values from 1 Source > Preact Signals",
+            "value": 142.27,
+            "unit": "ns/op",
+            "extra": "samples: 3514328, rme: ±0.09%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 3 Derived Values from 1 Source > Jotai",
+            "value": 5345.21,
+            "unit": "ns/op",
+            "extra": "samples: 93542, rme: ±7.04%"
+          },
+          {
+            "name": "core.bench.ts > Fact Mutations > single fact set",
+            "value": 530.85,
+            "unit": "ns/op",
+            "extra": "samples: 941971, rme: ±0.79%"
+          },
+          {
+            "name": "core.bench.ts > Fact Mutations > single fact read",
+            "value": 119.92,
+            "unit": "ns/op",
+            "extra": "samples: 4169617, rme: ±0.10%"
+          },
+          {
+            "name": "core.bench.ts > Fact Mutations – Batch > 100 facts batched",
+            "value": 11314.1,
+            "unit": "ns/op",
+            "extra": "samples: 44193, rme: ±0.33%"
+          },
+          {
+            "name": "core.bench.ts > Fact Mutations – Batch > 100 fact reads via proxy",
+            "value": 8929.15,
+            "unit": "ns/op",
+            "extra": "samples: 55997, rme: ±0.34%"
+          },
+          {
+            "name": "core.bench.ts > Derivations > simple derivation (read after invalidate)",
+            "value": 1455.08,
+            "unit": "ns/op",
+            "extra": "samples: 343624, rme: ±0.78%"
+          },
+          {
+            "name": "core.bench.ts > Derivations > 10 chained derivations (read after invalidate)",
+            "value": 7600.5,
+            "unit": "ns/op",
+            "extra": "samples: 65786, rme: ±1.18%"
+          },
+          {
+            "name": "core.bench.ts > Derivations > 50 chained derivations (read after invalidate)",
+            "value": 34161.78,
+            "unit": "ns/op",
+            "extra": "samples: 14637, rme: ±0.96%"
+          },
+          {
+            "name": "core.bench.ts > Derivation Invalidation > invalidate 20 derivations (1 fact change)",
+            "value": 2501.57,
+            "unit": "ns/op",
+            "extra": "samples: 199875, rme: ±0.99%"
+          },
+          {
+            "name": "core.bench.ts > Derivation Invalidation – graph nothing reads back > chain of 20, unread",
+            "value": 652.28,
+            "unit": "ns/op",
+            "extra": "samples: 766541, rme: ±0.21%"
+          },
+          {
+            "name": "core.bench.ts > Derivation Invalidation – graph nothing reads back > chain of 500, unread",
+            "value": 662.63,
+            "unit": "ns/op",
+            "extra": "samples: 754564, rme: ±0.12%"
+          },
+          {
+            "name": "core.bench.ts > Derivation Invalidation – graph nothing reads back > 500 nodes / ~15k edges, unread",
+            "value": 646.54,
+            "unit": "ns/op",
+            "extra": "samples: 773347, rme: ±0.16%"
+          },
+          {
+            "name": "core.bench.ts > Constraints > single constraint eval + reconcile",
+            "value": 135006.5,
+            "unit": "ns/op",
+            "extra": "samples: 3704, rme: ±11.02%"
+          },
+          {
+            "name": "core.bench.ts > Constraints > 10 constraints, 1 triggers",
+            "value": 172211.18,
+            "unit": "ns/op",
+            "extra": "samples: 2904, rme: ±6.21%"
+          },
+          {
+            "name": "core.bench.ts > Sync vs Async Resolvers > sync resolver (no Promise)",
+            "value": 150699.35,
+            "unit": "ns/op",
+            "extra": "samples: 3319, rme: ±8.92%"
+          },
+          {
+            "name": "core.bench.ts > Sync vs Async Resolvers > async resolver (returns Promise)",
+            "value": 131110.37,
+            "unit": "ns/op",
+            "extra": "samples: 3814, rme: ±7.59%"
+          },
+          {
+            "name": "core.bench.ts > Reconciliation > no-op reconcile (nothing changed)",
+            "value": 90548.7,
+            "unit": "ns/op",
+            "extra": "samples: 5524, rme: ±9.35%"
+          },
+          {
+            "name": "core.bench.ts > Reconciliation > minimal cycle (1 fact → 1 constraint → 1 resolver)",
+            "value": 150286.61,
+            "unit": "ns/op",
+            "extra": "samples: 3327, rme: ±8.58%"
+          },
+          {
+            "name": "core.bench.ts > Reconciliation > medium system (5 facts → 3 constraints → 3 resolvers → 5 derivations)",
+            "value": 194366.3,
+            "unit": "ns/op",
+            "extra": "samples: 2573, rme: ±7.40%"
+          },
+          {
+            "name": "core.bench.ts > Real-World: Traffic Light > full cycle: red → green → yellow → red",
+            "value": 189369.46,
+            "unit": "ns/op",
+            "extra": "samples: 2641, rme: ±5.71%"
+          },
+          {
+            "name": "core.bench.ts > Real-World: Auth Flow > login → token → profile chain",
+            "value": 164089.7,
+            "unit": "ns/op",
+            "extra": "samples: 3059, rme: ±8.05%"
+          },
+          {
+            "name": "frame-loop.bench.ts > Frame loop – crossModuleDeps reader > 60 frames, independent reader",
+            "value": 842551.01,
+            "unit": "ns/op",
+            "extra": "samples: 594, rme: ±6.92%"
+          },
+          {
+            "name": "frame-loop.bench.ts > Frame loop – crossModuleDeps reader > 60 frames, reader declares crossModuleDeps",
+            "value": 685511.83,
+            "unit": "ns/op",
+            "extra": "samples: 730, rme: ±6.66%"
           }
         ]
       }
