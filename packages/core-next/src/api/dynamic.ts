@@ -100,8 +100,18 @@ const emitter =
  * (L11). Installed with the part, so every createSystem system has it; the
  * bare createSystemCore (no 1.35 counterpart) goes without.
  */
+/** Whether `deps` holds a key `old` lacks (sizes already equal); no allocation per compute. */
+const changed = (old: Set<string>, deps: Set<string>) => {
+  for (const k of deps) {
+    if (!old.has(k)) {
+      return true;
+    }
+  }
+
+  return false;
+};
 const relink = (node: any, old: Set<string> | undefined, deps: Set<string>) => {
-  if (old?.size !== deps.size || [...deps].some((k) => !old!.has(k))) {
+  if (old?.size !== deps.size || changed(old!, deps)) {
     const end = node.cursor;
     for (let l = end && node.deps; l; l = l === end ? null : l.nextDep) {
       const source = l.source;
