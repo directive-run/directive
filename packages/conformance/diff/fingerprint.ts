@@ -69,6 +69,8 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
   resolver: (v) => typeof v === "string" && /^([a-z]::)?r\d+$/.test(v),
   /** A constraint id: `c0`, `a::c0`. */
   constraint: (v) => typeof v === "string" && /^([a-z]::)?c\d+$/.test(v),
+  /** A derivation id, own or namespaced: `d0`, `a::d0`. */
+  derivation: (v) => typeof v === "string" && /^([a-z]::)?d\d+$/.test(v),
   /** A requirement type: `A0`. */
   requirementType: (v) => typeof v === "string" && /^[A-Z]\d+$/.test(v),
   /** A requirement id: `A0:{}`. */
@@ -127,6 +129,11 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
    * Never a class `generalize` picks: an entry names it by hand, so a
    * call of distinct items stays outside it.
    */
+  /** A batch call's items: one or more batch items (`0.1`), repeats allowed. */
+  batchItems: (v) =>
+    Array.isArray(v) &&
+    v.length > 0 &&
+    v.every((x) => typeof x === "string" && /^\d+\.\d+$/.test(x)),
   batchItemsRepeated: (v) =>
     Array.isArray(v) &&
     v.every((x) => typeof x === "string" && /^\d+\.\d+$/.test(x)) &&
@@ -177,6 +184,58 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
       typeof trigger === "string" &&
       /^facts-changed:([a-z]::)?(f\d+|when)(,([a-z]::)?(f\d+|when)){0,4}(\+\d+more)?$/.test(
         trigger,
+      )
+    );
+  },
+  /**
+   * A settled trace run that started a resolver: what row (bi) makes 2.0
+   * report when 1.35 pushed the run out of its ring while that resolver ran
+   * (L9). Hand-named, as `snapshot` is, because a run has 15 keys and lists
+   * of any length: exactly a trace run's keys (`anomalies` only when it has
+   * one, as 1.35 writes it), `status` "settled", a non-empty
+   * `resolversStarted` whose rows name a resolver and a requirement, and the
+   * other lists as lists. A run that started no resolver settles at once
+   * and reports on both engines, so it is outside the class.
+   */
+  traceRunWithResolvers: (v) => {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      return false;
+    }
+    const run = v as Record<string, Json>;
+    const keys = Object.keys(run)
+      .filter((k) => k !== "anomalies")
+      .sort()
+      .join();
+    const lists = [
+      "constraintsHit",
+      "derivationsRecomputed",
+      "effectErrors",
+      "effectsRun",
+      "factChanges",
+      "requirementsAdded",
+      "requirementsRemoved",
+      "resolversCompleted",
+      "resolversErrored",
+    ];
+    const started = run.resolversStarted;
+
+    return (
+      keys ===
+        "causalChain,constraintsHit,derivationsRecomputed,duration,effectErrors,effectsRun,factChanges,id,requirementsAdded,requirementsRemoved,resolversCompleted,resolversErrored,resolversStarted,status,timestamp" &&
+      (run.anomalies === undefined ||
+        (Array.isArray(run.anomalies) && run.anomalies.length > 0)) &&
+      run.status === "settled" &&
+      typeof run.causalChain === "string" &&
+      lists.every((k) => Array.isArray(run[k])) &&
+      Array.isArray(started) &&
+      started.length > 0 &&
+      started.every(
+        (row) =>
+          row !== null &&
+          typeof row === "object" &&
+          !Array.isArray(row) &&
+          typeof (row as Record<string, Json>).resolver === "string" &&
+          typeof (row as Record<string, Json>).requirementId === "string",
       )
     );
   },

@@ -1020,7 +1020,9 @@ describe("the batch triggers and classes (L7) name only the batched resolver's f
     retry: 0,
     timeout: null,
     writes: 0,
-    value: 0,
+    // At the source's bar, so the handler's write keeps its item (a lower
+    // value is batchWriteRetracts, below).
+    value: 1,
   };
   const triggersOf = (batch: FuzzBatch | null): string[] =>
     specTriggers({
@@ -1052,6 +1054,11 @@ describe("the batch triggers and classes (L7) name only the batched resolver's f
   });
 
   it("each trigger is the spec feature its row needs, and no wider", () => {
+    // Row t's batch path: the handler writes below its source's bar.
+    expect(triggersOf({ ...base, value: 0 })).toEqual([
+      "batched",
+      "batchWriteRetracts",
+    ]);
     expect(triggersOf({ ...base, handler: "results" })).toEqual([
       "batched",
       "batchWithResults",

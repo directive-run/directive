@@ -447,8 +447,8 @@
       "a function-form when in production (U15, U16) > has no whenSpec key, no whenExplain key and no Predicate clauses section": "L9"
     },
     "tests/core/l9-trace-pins-oracle.test.ts": {
-      "system.trace hands every reader the same array and the live entries (U1; row bh) > two reads are one array, and an item pushed onto one read is in the next": "L9",
-      "system.trace hands every reader the same array and the live entries (U1; row bh) > an edit to an entry shows in system.trace and in inspect().trace": "L9",
+      "system.trace hands every reader the same array and the live entries (U1; row bh) > two reads are one array": "L9",
+      "system.trace hands every reader the same array and the live entries (U1; row bh) > inspect().trace holds what system.trace holds": "L9",
       "system.trace hands every reader the same array and the live entries (U1; row bh) > inspect().trace is a copy: an edit to it changes nothing": "L9",
       "carriesTag answers undefined where it has no answer (U5) > for an unknown kind, __proto__, an unknown id and a derivation whose body throws": "L9",
       "a caller's tags array is copied when the system is built (U6) > emptying it, or adding to it, afterwards changes no answer": "L9",
@@ -458,7 +458,7 @@
       "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > a plugin that re-emits from its own hook is called four times, for either member": "L9",
       "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > guardrailBlocked and clobberLoopDetected share one cap": "L9",
       "notify has four members, and the clobber-loop pair share the depth-4 cap (U11) > after destroy(), a clobber-loop call reaches no plugin": "L9",
-      "a plugin that edits the entry onTraceComplete hands it changes the trace (U12; row bh) > the edit shows in system.trace and in inspect().trace": "L9",
+      "a plugin's onTraceComplete is handed the trace's own entry (U12; row bh) > the entry it is handed is the run system.trace ends with": "L9",
       "a function-form when has no data-form introspection (U15) > inspect() gives the constraint no whenSpec key": "L9",
       "a function-form when has no data-form introspection (U15) > explain() of its unmet requirement has no Predicate clauses section": "L9",
       "the observer's constraint.evaluate event has no whenExplain key (U16) > absent, not undefined, on every evaluation of a function-form when": "L9"

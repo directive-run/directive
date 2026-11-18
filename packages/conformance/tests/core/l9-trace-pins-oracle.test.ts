@@ -7,9 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Black-box pins of 1.35's trace and introspection behaviour that no other
 // test states (the L9 RFC, "Untested behaviours" U1, U5 to U7, U9, U11, U12,
 // U15 and U16). Each pins what 1.35 does today. Where an approved row of the
-// RFC changes it ((bh) for U1 and U12), the case keeps 1.35's side and names
-// the row; the signed entry that shows the difference is added with the row
-// (L9b). Row (bj) was declined, so U7 is 1.35's for good. Public API only.
+// RFC changes it ((bh) for U1 and U12), the case keeps what both engines
+// share and names the row (the L9 gate, as at L6 to L8); core-next's
+// l9b-trace tests pin 2.0's side. Row (bj) was declined, so U7 is 1.35's for good. Public API only.
 
 beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -76,25 +76,27 @@ async function begin(config: Record<string, unknown> = {}) {
 }
 
 describe("system.trace hands every reader the same array and the live entries (U1; row bh)", () => {
-  it("two reads are one array, and an item pushed onto one read is in the next", async () => {
+  // Row (bh), approved (the L9 RFC rev 2; "I approve you for to do
+  // everything", 2026-11-15): 2.0 freezes the array and each settled entry,
+  // so 1.35's push onto a read and its edit of an entry are 1.35's side
+  // only. These two keep what both engines share; 2.0's side is pinned by
+  // core-next's l9b-trace "(bh) a read cannot edit the trace".
+  it("two reads are one array", async () => {
     const system = await begin({ trace: true });
     const first = system.trace;
-    const length = first.length;
 
     expect(system.trace).toBe(first);
-    first.push("pushed");
-    expect(system.trace).toHaveLength(length + 1);
-    expect(system.trace[length]).toBe("pushed");
-    first.pop();
+    expect(first.length).toBeGreaterThan(0);
     system.destroy();
   });
 
-  it("an edit to an entry shows in system.trace and in inspect().trace", async () => {
+  it("inspect().trace holds what system.trace holds", async () => {
     const system = await begin({ trace: true });
-    system.trace[0].causalChain = "edited";
 
-    expect(system.trace[0].causalChain).toBe("edited");
-    expect(system.inspect().trace[0].causalChain).toBe("edited");
+    expect(system.inspect().trace[0].causalChain).toBe(
+      system.trace[0].causalChain,
+    );
+    expect(system.inspect().trace[0].id).toBe(system.trace[0].id);
     system.destroy();
   });
 
@@ -299,26 +301,29 @@ describe("notify has four members, and the clobber-loop pair share the depth-4 c
   });
 });
 
-describe("a plugin that edits the entry onTraceComplete hands it changes the trace (U12; row bh)", () => {
-  it("the edit shows in system.trace and in inspect().trace", async () => {
-    const annotate = {
-      name: "annotate",
+describe("a plugin's onTraceComplete is handed the trace's own entry (U12; row bh)", () => {
+  // Row (bh), approved (as above): on 1.35 a plugin's edit of that entry
+  // shows in system.trace and inspect().trace; on 2.0 the settled entry is
+  // frozen and the edit throws. This case keeps what both engines share;
+  // 2.0's side is pinned by core-next's l9b-trace "(bh) a read cannot edit
+  // the trace > a plugin that edits the entry it is handed throws, and the
+  // error is logged".
+  it("the entry it is handed is the run system.trace ends with", async () => {
+    const handed: any[] = [];
+    const watch = {
+      name: "watch",
       onTraceComplete: (entry: any) => {
-        entry.causalChain = `annotated ${entry.id}`;
-        entry.anomalies = ["annotated"];
+        handed.push(entry);
       },
     };
-    const system = await begin({ trace: true, plugins: [annotate] });
+    const system = await begin({ trace: true, plugins: [watch] });
     system.facts.seats = 3;
     await system.settle();
     const last = system.trace[system.trace.length - 1];
 
-    expect(last.causalChain).toBe(`annotated ${last.id}`);
-    expect(last.anomalies).toEqual(["annotated"]);
+    expect(handed[handed.length - 1]).toBe(last);
     const inspected = system.inspect().trace;
-    expect(inspected[inspected.length - 1].causalChain).toBe(
-      `annotated ${last.id}`,
-    );
+    expect(inspected[inspected.length - 1].causalChain).toBe(last.causalChain);
     system.destroy();
   });
 });

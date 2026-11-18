@@ -8,6 +8,7 @@
  * its signed entry is added with the row.
  */
 
+import { traceRunContract } from "../compare.js";
 import {
   type AnySystem,
   type BuildContext,
@@ -18,7 +19,7 @@ import {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** The trace's length, and each run's status and contents, without times. */
+/** The trace's length, and each run's status and contents, without times (a duration anomaly included). */
 const look = (label: string): Step => ({
   op: "run",
   label,
@@ -34,7 +35,9 @@ const look = (label: string): Step => ({
             added: run.requirementsAdded.map((r: any) => r.type ?? r.id),
             started: run.resolversStarted.map((r: any) => r.resolver),
             errored: run.resolversErrored.map((r: any) => r.error),
-            anomalies: run.anomalies ?? null,
+            // As the comparison projects a run (diff/compare.ts
+            // traceRunContract): a duration anomaly depends on time.
+            anomalies: (traceRunContract(run) as any).anomalies ?? null,
           })),
     ]),
 });

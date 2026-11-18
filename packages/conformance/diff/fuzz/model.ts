@@ -1552,6 +1552,24 @@ const TRIGGERS = {
    * a's conditions read only module a's, so no other path reaches across
    * modules in one step.
    */
+  /**
+   * Row t's error shape through the `disable` strategy (deep fuzz case
+   * 1:all#4038): `onResolverError` is "disable", and some single resolver
+   * with a timeout can reject (it throws on its first `fails` attempts, or
+   * its timeout is no longer than its wait). The error disables the
+   * resolver's constraint, so the next pass retracts its requirement: 1.35
+   * then reports a cancel for the run after its error, 2.0 the error only.
+   * A resolver with no timeout leaves flight before that pass on both
+   * engines, so it is outside the trigger. `writeRetracts` reads only
+   * writes, so it never names this.
+   */
+  disableRetracts: (spec, boundary) =>
+    strategy(boundary?.onResolverError) === "disable" &&
+    spec.modules.some((m) =>
+      m.constraints.some(
+        (c) => c.timeout !== null && (c.fails > 0 || c.timeout <= c.delay),
+      ),
+    ),
   writeRetracts: (spec) =>
     spec.modules.some((m) =>
       m.constraints.some(
@@ -1624,6 +1642,49 @@ const TRIGGERS = {
    */
   batchMaxSize: (spec) => spec.batch != null && spec.batch.maxSize !== null,
   /**
+   * Row t's batch path (B-4; deep fuzz case 24301:all#3397): the batched
+   * resolver's own write retracts every requirement of a source that feeds
+   * it, so the write lands while its call still owns them. The batch lives
+   * in module a (`build`); a source's condition reads fact `fact` (mod the
+   * module's facts) at or above `atLeast`, and the handler writes `value` to
+   * fact `writes` (the same mod), so the write retracts that source's items
+   * when it is to the fact the source reads and below `atLeast`, the lowest
+   * item's bar. `writeRetracts` reads only the single resolvers' writes, so
+   * it never names this.
+   */
+  /**
+   * Row (ap) through a clobber (fuzz case 18:all#156): a source that feeds
+   * the batch has `abortOn`, which names the fact the batched handler writes
+   * (`writes`, mod module a's facts), and a single resolver of module a
+   * writes that fact too, so another run's write clobbers the bound
+   * requirement while it waits and each reconcile pass raises it again.
+   * 1.35 restarts its window on every add; 2.0 with (ap) does not, so its
+   * call starts a pass earlier.
+   */
+  batchClobbered: (spec) => {
+    const b = spec.batch;
+    const m = spec.modules[0];
+    if (b == null || m === undefined || m.facts === 0) {
+      return false;
+    }
+
+    return (
+      b.sources.some((src) => src.abortOn) &&
+      m.constraints.some((c) => c.writes % m.facts === b.writes % m.facts)
+    );
+  },
+  batchWriteRetracts: (spec) => {
+    const b = spec.batch;
+    const n = spec.modules[0]?.facts ?? 0;
+    if (b == null || n === 0) {
+      return false;
+    }
+
+    return b.sources.some(
+      (src) => src.fact % n === b.writes % n && b.value < src.atLeast,
+    );
+  },
+  /**
    * The case has history on and a step that restores a snapshot into the
    * facts (L8): `back`, `forward`, `goTo`, `replay`, or `roundtrip`, whose
    * import restores the current snapshot.
@@ -1666,6 +1727,15 @@ const TRIGGERS = {
    * case has it, and every timeout or batched case has it at L8 too.
    */
   ignoresAbort: (spec) => spec.respectsAbort !== true,
+  /**
+   * Row (bi), every run reports `onTraceComplete` once (L9): the trace is on
+   * with a ring of 1 or 3 runs (`maxRuns`), which a fuzz case can fill, so
+   * a run that started a resolver can be pushed out while it is in flight.
+   * With the default ring of 100 no fuzz case makes enough runs. The spec
+   * says the ring can drop a run, not that one was dropped: the entry's
+   * bound (`traceRunWithResolvers`) carries the rest.
+   */
+  traceRing: (spec) => spec.trace && (spec.maxRuns === 1 || spec.maxRuns === 3),
   /**
    * Row (ay), a navigation keeps a pause: some navigation runs while a
    * `pause` step's pause is set, with no `resume` step since it. A
