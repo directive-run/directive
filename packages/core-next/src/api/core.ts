@@ -327,6 +327,8 @@ export interface DefHooks {
   remove_(id: string, def?: unknown): void;
   /** Absent on the resolver's: dynamic.ts calls the resolve itself. */
   call_?(id: string, props?: any): unknown;
+  /** Resolvers: drops a definition's key function (1.35's removeRequirementKey). */
+  unkey_?(def: unknown): void;
   /** L10b, resolvers: what an unregister waits for. */
   waits_?(ids: string[]): unknown[];
   /** Row (cd), resolvers: the module's runs may not write its keys again. */

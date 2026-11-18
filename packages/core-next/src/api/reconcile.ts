@@ -863,14 +863,19 @@ const build = (context: SystemContext) => {
         constraints.depsOf(id)?.has(key),
       ),
   };
+  /** A keyed definition's key function goes (1.35's removeRequirementKey). */
+  const unkey = (def: unknown) => {
+    const req = (def as ResolverDef | undefined)?.requirement;
+    if ((def as ResolverDef | undefined)?.key && typeof req === "string") {
+      delete keys[req];
+    }
+  };
   context.kinds_.resolver = {
     add_: resolver,
     replace_: resolver,
+    unkey_: unkey,
     remove_(id, def) {
-      const req = (def as ResolverDef | undefined)?.requirement;
-      if ((def as ResolverDef | undefined)?.key && typeof req === "string") {
-        delete keys[req];
-      }
+      unkey(def);
       resolvers.drop_(id);
     },
     waits_: resolvers.waits_,
