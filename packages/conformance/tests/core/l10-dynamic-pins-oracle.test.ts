@@ -6,10 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Black-box pins of 1.35's dynamic-definition behaviour that no other test
 // states (the L10 RFC, "Untested behaviours" U1, U4, U6 to U8, U10, U13 and
-// U22). Each pins what 1.35 does today. Row (bl) is approved for L10a, so U1
-// shows it: L10a keeps what both engines share and pins 2.0's side in
-// core-next. Rows (bn) and (bo) were declined, so U4 and U22 are 1.35's for
-// good. Public API only.
+// U22). Each pins what 1.35 does today. Row (bl) is approved and built in
+// L10a, so U1 keeps what both engines share and names the row (the L10 gate,
+// as at L6 to L9); core-next's l10a-dynamic "(bl): assign with { compute,
+// meta } keeps the derivation readable, with the new meta" pins 2.0's side.
+// Rows (bn) and (bo) were declined, so U4 and U22 are 1.35's for good.
+// Public API only.
 
 beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -55,11 +57,16 @@ function begin(options: Record<string, unknown> = {}) {
   return system;
 }
 
-describe("derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl)", () => {
-  // Row (bl), approved for L10a (the L10 RFC rev 2; "I approve you for to
-  // do everything", 2026-11-15): 2.0 unwraps the object on assign as on
-  // register. 1.35 writes the raw object back over the unwrapped compute.
-  it("on a registered derivation: the assign returns, then every read, call and meta.derivation throws until a function is assigned", () => {
+describe("derive.assign with { compute, meta } (U1; row bl)", () => {
+  // Row (bl), approved (the L10 RFC rev 2; "I approve you for to do
+  // everything", 2026-11-15): 2.0 unwraps the object on assign as on
+  // register, so it stays readable with the new compute; 1.35 writes the raw
+  // object back over the unwrapped compute, and every read, call and
+  // meta.derivation throws "is not a function" until a function is assigned.
+  // That is 1.35's side only, so these keep what both engines share; 2.0's
+  // side is pinned by core-next's l10a-dynamic "(bl): assign with { compute,
+  // meta } keeps the derivation readable, with the new meta".
+  it("on a registered derivation: the assign returns, and a function assigned after it is read", () => {
     const system = begin();
     system.derive.register("tripled", (facts: any) => facts.a * 3);
 
@@ -70,17 +77,10 @@ describe("derive.assign with { compute, meta } leaves the derivation throwing (U
         meta: { label: "X" },
       }),
     ).not.toThrow();
-    expect(() => system.read("tripled")).toThrow(TypeError);
-    expect(() => system.read("tripled")).toThrow("is not a function");
-    expect(() => system.derive.call("tripled")).toThrow("is not a function");
-    expect(() => system.meta.derivation("tripled")).toThrow(
-      "is not a function",
-    );
     system.facts.a = 2;
-    expect(() => system.read("tripled")).toThrow("is not a function");
-
     system.derive.assign("tripled", (facts: any) => facts.a * 6);
     expect(system.read("tripled")).toBe(12);
+    expect(system.derive.call("tripled")).toBe(12);
     system.destroy();
   });
 
@@ -93,7 +93,6 @@ describe("derive.assign with { compute, meta } leaves the derivation throwing (U
         meta: { label: "Y" },
       }),
     ).not.toThrow();
-    expect(() => system.read("double")).toThrow("is not a function");
     system.derive.assign("double", (facts: any) => facts.a * 7);
     expect(system.read("double")).toBe(7);
     system.destroy();

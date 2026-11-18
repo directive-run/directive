@@ -3456,5 +3456,606 @@
       "respectsAbort": false,
       "maxRuns": 1
     }
+  },
+  {
+    "group": "row-bl",
+    "why": "Fuzz seed 10, case 75 up to L10 (L10 gate, run 3): row (bl), a derivation assigned { compute, meta } stays readable on 2.0 where 1.35 throws \"is not a function\" (l10b-fuzz-bl-hook-onError-missing-def-is-not-a-function). After main merged L11 and L13 work, the census seed draws no (bl) case of its own.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [1, 0],
+              "derived": [],
+              "threshold": 2,
+              "throwsAt": 6
+            }
+          ],
+          "events": [
+            {
+              "target": 1,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": -1,
+              "delay": 5,
+              "fails": 2,
+              "retry": 2,
+              "timeout": 10
+            }
+          ],
+          "effects": [
+            {
+              "reads": [1, 0],
+              "explicitDeps": false,
+              "cleanup": false,
+              "throwsAt": null,
+              "onNavigate": "skip"
+            }
+          ],
+          "source": {
+            "gated": false
+          },
+          "snapshotEvents": []
+        }
+      ],
+      "boundary": "skip",
+      "history": true,
+      "trace": false,
+      "steps": [
+        {
+          "op": "define",
+          "action": "call",
+          "kind": "constraints",
+          "id": 1,
+          "variant": 0,
+          "deferred": false
+        },
+        {
+          "op": "inflight",
+          "bound": true,
+          "at": 5
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1,
+          "value": 3
+        },
+        {
+          "op": "define",
+          "action": "assign",
+          "kind": "derive",
+          "id": 0,
+          "variant": 3,
+          "deferred": false
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 2147483637,
+          "value": 4
+        },
+        {
+          "op": "advance",
+          "ms": 200
+        },
+        {
+          "op": "advance",
+          "ms": 1
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": true
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": null,
+        "delay": 0,
+        "fails": 2,
+        "retry": 1,
+        "timeout": null,
+        "writes": 0,
+        "value": 2
+      },
+      "maxSnapshots": 3,
+      "respectsAbort": false,
+      "dynamic": {
+        "readers": true
+      }
+    }
+  },
+  {
+    "group": "row-bm",
+    "why": "Fuzz seed 14, case 44 up to L10 (L10 gate, run 3): row (bm), a reader of a name registered later is invalidated when it arrives on 2.0 (l10b-fuzz-bm-hook-onDerivationInvalidate-extra-zin). The census seed no longer draws one.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": -1,
+              "throwsAt": 6
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 4,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 5,
+              "delay": 5,
+              "fails": 0,
+              "retry": 0,
+              "timeout": 3
+            },
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 0,
+              "value": -1,
+              "delay": 20,
+              "fails": 0,
+              "retry": 2,
+              "timeout": 50
+            }
+          ],
+          "effects": [],
+          "source": {
+            "gated": false
+          }
+        }
+      ],
+      "boundary": "skip",
+      "history": true,
+      "trace": true,
+      "steps": [
+        {
+          "op": "inflight",
+          "bound": false,
+          "at": 5
+        },
+        {
+          "op": "forward",
+          "steps": 1
+        },
+        {
+          "op": "module",
+          "action": "register",
+          "variant": 2
+        },
+        {
+          "op": "define",
+          "action": "register",
+          "kind": "derive",
+          "id": 0,
+          "variant": 2,
+          "deferred": true
+        },
+        {
+          "op": "define",
+          "action": "assign",
+          "kind": "effects",
+          "id": 2,
+          "variant": 0,
+          "deferred": true
+        },
+        {
+          "op": "advance",
+          "ms": 25
+        },
+        {
+          "op": "end"
+        },
+        {
+          "op": "goTo",
+          "position": 1
+        },
+        {
+          "op": "date",
+          "module": 0,
+          "ms": 3
+        },
+        {
+          "op": "define",
+          "action": "register",
+          "kind": "derive",
+          "id": 2,
+          "variant": 0,
+          "deferred": false
+        },
+        {
+          "op": "back",
+          "steps": 1
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 2,
+            "atLeast": 2,
+            "items": 1,
+            "abortOn": true
+          }
+        ],
+        "handler": "results",
+        "failing": "some",
+        "windowMs": 1,
+        "maxSize": null,
+        "delay": 5,
+        "fails": 1,
+        "retry": 2,
+        "timeout": 3,
+        "writes": 2,
+        "value": 5
+      },
+      "maxSnapshots": 5,
+      "respectsAbort": false,
+      "maxRuns": 1,
+      "dynamic": {
+        "readers": true
+      }
+    }
+  },
+  {
+    "group": "row-bm",
+    "why": "Deep seed 24301, case 483 up to L10 (L10 gate, run 3): row (bm) through modules, a reader of a name that a module takes away and a define registers again (l10-fuzz-bm-hook-onDerivationInvalidate-extra-name-returns). The census seed no longer draws one.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [1],
+              "derived": [],
+              "threshold": -1,
+              "throwsAt": null
+            },
+            {
+              "facts": [0, 1],
+              "derived": [0],
+              "threshold": -1,
+              "throwsAt": 7
+            },
+            {
+              "facts": [1, 0],
+              "derived": [0],
+              "threshold": -1,
+              "throwsAt": null
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [
+            {
+              "reads": [1, 0],
+              "explicitDeps": true,
+              "cleanup": false,
+              "throwsAt": 5
+            }
+          ],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "module",
+          "action": "register",
+          "variant": 3
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "define",
+          "action": "unregister",
+          "kind": "constraints",
+          "id": 2,
+          "variant": 1,
+          "deferred": true
+        },
+        {
+          "op": "module",
+          "action": "unregister",
+          "variant": 2
+        },
+        {
+          "op": "module",
+          "action": "unregister",
+          "variant": 3
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1927237545,
+          "value": 3
+        },
+        {
+          "op": "date",
+          "module": 0,
+          "ms": 2
+        },
+        {
+          "op": "define",
+          "action": "register",
+          "kind": "effects",
+          "id": 0,
+          "variant": 2,
+          "deferred": true
+        },
+        {
+          "op": "module",
+          "action": "register",
+          "variant": 3
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 998165494,
+          "value": -1
+        },
+        {
+          "op": "advance",
+          "ms": 200
+        }
+      ],
+      "batch": null,
+      "dynamic": {
+        "readers": true
+      }
+    }
+  },
+  {
+    "group": "row-be",
+    "why": "Deep seed 2, run 2 of the L10 gate (specs/deep2r2): row (be), a back over a changeset counts it as one step, so 2.0 lands earlier and its restore batch writes other facts (l10-fuzz-be-hook-onFactsBatch-changed-back). No PR seed draws one.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [1, 0],
+              "derived": [],
+              "threshold": 1,
+              "throwsAt": 3
+            },
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": null,
+              "throwsAt": 6
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 1,
+              "add": false
+            },
+            {
+              "target": 1,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 1,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 1,
+              "value": 0,
+              "delay": 20,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 10
+            },
+            {
+              "fact": 1,
+              "atLeast": 3,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 1,
+              "value": -2,
+              "delay": 5,
+              "fails": 1,
+              "retry": 1,
+              "timeout": 50
+            }
+          ],
+          "effects": [
+            {
+              "reads": [1],
+              "explicitDeps": true,
+              "cleanup": false,
+              "throwsAt": null
+            }
+          ],
+          "source": {
+            "gated": true
+          }
+        },
+        {
+          "facts": 3,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [1, 0],
+              "derived": [],
+              "threshold": 1,
+              "throwsAt": 5
+            },
+            {
+              "facts": [2, 1, 0],
+              "derived": [0],
+              "threshold": 1,
+              "throwsAt": 5
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 1,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 2,
+              "value": -2,
+              "delay": 0,
+              "fails": 2,
+              "retry": 1,
+              "timeout": 50
+            },
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 2,
+              "value": -1,
+              "delay": 1,
+              "fails": 2,
+              "retry": 2,
+              "timeout": 10
+            },
+            {
+              "fact": 2,
+              "atLeast": 0,
+              "crossAtLeast": 1,
+              "priority": 2,
+              "writes": 1,
+              "value": 0,
+              "delay": 20,
+              "fails": 2,
+              "retry": 1,
+              "timeout": 3
+            }
+          ],
+          "effects": [],
+          "source": {
+            "gated": true
+          }
+        }
+      ],
+      "boundary": null,
+      "history": true,
+      "trace": true,
+      "steps": [
+        {
+          "op": "define",
+          "action": "register",
+          "kind": "derive",
+          "id": 0,
+          "variant": 0,
+          "deferred": false
+        },
+        {
+          "op": "define",
+          "action": "register",
+          "kind": "derive",
+          "id": 0,
+          "variant": 0,
+          "deferred": true
+        },
+        {
+          "op": "begin"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 254620941,
+          "value": 4
+        },
+        {
+          "op": "advance",
+          "ms": 1
+        },
+        {
+          "op": "end"
+        },
+        {
+          "op": "back",
+          "steps": 3
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1548448171,
+          "value": -2
+        },
+        {
+          "op": "resume"
+        },
+        {
+          "op": "advance",
+          "ms": 200
+        },
+        {
+          "op": "stop"
+        }
+      ],
+      "batch": null,
+      "maxSnapshots": 3,
+      "respectsAbort": false,
+      "maxRuns": 3,
+      "dynamic": {
+        "readers": false
+      }
+    }
   }
 ]

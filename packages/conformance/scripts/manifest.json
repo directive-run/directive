@@ -65,6 +65,8 @@
   "tests/core/l10-dynamic-gate-debt-oracle.test.ts": "packages/core/src/core/__tests__/l10-dynamic-gate-debt-oracle.test.ts",
   "tests/core/l10-dynamic-pins-oracle-production.test.ts": "packages/core/src/core/__tests__/l10-dynamic-pins-oracle-production.test.ts",
   "tests/core/l10-dynamic-pins-oracle.test.ts": "packages/core/src/core/__tests__/l10-dynamic-pins-oracle.test.ts",
+  "tests/core/l10-gate-pins-oracle-production.test.ts": "packages/core/src/core/__tests__/l10-gate-pins-oracle-production.test.ts",
+  "tests/core/l10-gate-pins-oracle.test.ts": "packages/core/src/core/__tests__/l10-gate-pins-oracle.test.ts",
   "tests/core/l2-constraints-oracle-production.test.ts": "packages/core/src/core/__tests__/l2-constraints-oracle-production.test.ts",
   "tests/core/l2-constraints-oracle-state.test.ts": "packages/core/src/core/__tests__/l2-constraints-oracle-state.test.ts",
   "tests/core/l2-constraints-oracle.test.ts": "packages/core/src/core/__tests__/l2-constraints-oracle.test.ts",

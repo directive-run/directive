@@ -214,7 +214,7 @@ describe("system core", () => {
         },
       },
     });
-    createSystemCore({ module: mod }, [
+    const system = createSystemCore({ module: mod }, [
       ({ kernel }) => {
         kernel.hooks.on((e: KernelEvent) => {
           if (e.at === "error") {
@@ -222,7 +222,9 @@ describe("system core", () => {
           }
         });
       },
-    ]).start();
+    ]);
+    // 1.35's eager compute is unguarded (engine.ts:3292–3297): reported, then thrown.
+    expect(() => system.start()).toThrow("nope");
     const error = seen[0] as Record<string, unknown>;
     expect(error).toBeInstanceOf(Error);
     expect(Object.keys(error)).toEqual([
