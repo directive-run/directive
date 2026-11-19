@@ -75,6 +75,17 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
   requirementType: (v) => typeof v === "string" && /^[A-Z]\d+$/.test(v),
   /** A requirement id: `A0:{}`. */
   requirementId: (v) => typeof v === "string" && /^[A-Z]\d+:\{\}$/.test(v),
+  /**
+   * A keyed resolver's requirement id (L11): the key's answer for a fuzz
+   * requirement, its bare type, plain or JSON-quoted (`A0`, `"A0"`), quotes
+   * paired. Quirk b's keyed twins name it for `id` and `requirementId`, where
+   * the originals name `requirementId`; any other id shape (`A0:{}`, `a0`,
+   * `"A0`) is outside it. Added on the owner's instruction (2026-11-18:
+   * "Approve; you sign them (Recommended)") under quirk b's approval.
+   * Hand-named: `generalize` never picks it.
+   */
+  keyedRequirementId: (v) =>
+    typeof v === "string" && /^("?)[A-Z]\d+\1$/.test(v),
   /** A resolver's record tag: `a.r0`. */
   resolverTag: (v) => typeof v === "string" && /^[a-z]\.r\d+$/.test(v),
   /** An effect's record tag: `a.x0`. */
@@ -159,7 +170,9 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
    * at or after the engine's previous snapshot (diff/record.ts, rule 4);
    * `trigger` is 1.35's pass label,
    * `facts-changed:` and up to five keys, then `+<n>more` past five
-   * (utils/history.ts). The facts are what a seed wrote, so an entry for a
+   * (utils/history.ts). Fact keys include `tx`, the L11 fuzz's string fact
+   * (diff/fuzz/model.ts), on the owner's instruction (2026-11-18: "Approve;
+   * you sign them (Recommended)") under row (ay)'s approval. The facts are what a seed wrote, so an entry for a
    * snapshot that moved or went missing (rows (as), (ay), (bb)) names this
    * class, never a seed's values. Hand-named: `generalize` never picks it.
    */
@@ -167,7 +180,7 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     if (v === null || typeof v !== "object" || Array.isArray(v)) {
       return false;
     }
-    const key = /^([a-z]::)?(f\d+|when)$/;
+    const key = /^([a-z]::)?(f\d+|when|tx)$/;
     const keys = Object.keys(v).sort();
     const { facts, id, ordered, trigger } = v as Record<string, Json>;
 
@@ -182,7 +195,7 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
       id > 0 &&
       ordered === true &&
       typeof trigger === "string" &&
-      /^facts-changed:([a-z]::)?(f\d+|when)(,([a-z]::)?(f\d+|when)){0,4}(\+\d+more)?$/.test(
+      /^facts-changed:([a-z]::)?(f\d+|when|tx)(,([a-z]::)?(f\d+|when|tx)){0,4}(\+\d+more)?$/.test(
         trigger,
       )
     );
@@ -203,7 +216,7 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
     if (v === null || typeof v !== "object" || Array.isArray(v)) {
       return false;
     }
-    const name = "(f\\d+|when|zf|zw|g0|g1)";
+    const name = "(f\\d+|when|tx|zf|zw|g0|g1)";
     const key = new RegExp(`^([a-z]::)?${name}$`);
     const added = /^([a-z]::)?(zf|zw|g0|g1)$/;
     const keys = Object.keys(v).sort();

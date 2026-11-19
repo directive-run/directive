@@ -4215,5 +4215,108 @@
         "inserted": []
       }
     }
+  },
+  {
+    "group": "quirk-t-batch-pairing",
+    "why": "PR seed 14 at L11, run 2 of the L11 gate (specs/q14): row t's third path with a batched resolver. r1's own write retracts c1 after r1 reported complete and also retracts batch source b0; 1.35 cancels r1 and the batch requirement, 2.0 only the batch requirement, and the comparison pairs 1.35's r1 cancel with 2.0's batch cancel (the l11-cand-t-batch-* entries, signed in run 3 on the owner's instruction). The census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 1,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 1,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            },
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": -1,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null,
+          "factTags": [[], []],
+          "boundaries": []
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "inflight",
+          "bound": false,
+          "at": 1
+        },
+        {
+          "op": "meta"
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 0,
+          "value": 0
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 0,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": null,
+        "delay": 0,
+        "fails": 0,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": 0
+      },
+      "dynamic": {
+        "readers": false
+      },
+      "predicates": {
+        "modules": [
+          {
+            "when": [null, null],
+            "on": [],
+            "compute": [],
+            "patch": [null],
+            "key": [null, null]
+          }
+        ],
+        "inserted": []
+      }
+    }
   }
 ]

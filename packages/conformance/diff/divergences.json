@@ -47426,7 +47426,7 @@
                     "$like": "constraint"
                   },
                   "id": {
-                    "$like": "requirementType"
+                    "$like": "keyedRequirementId"
                   },
                   "requirement": {
                     "at": {
@@ -47448,7 +47448,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-hook-onError-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-hook-onError-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Its `id`/`requirementId` name `keyedRequirementId` (diff/fingerprint.ts: the bare type, plain or JSON-quoted, as a keyed requirement's id is), not `requirementType`; that change signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-18"
   },
@@ -47479,7 +47479,7 @@
                     "$like": "constraint"
                   },
                   "id": {
-                    "$like": "requirementType"
+                    "$like": "keyedRequirementId"
                   },
                   "requirement": {
                     "at": {
@@ -47515,7 +47515,7 @@
                     "$like": "constraint"
                   },
                   "id": {
-                    "$like": "requirementType"
+                    "$like": "keyedRequirementId"
                   },
                   "requirement": {
                     "at": {
@@ -47551,7 +47551,7 @@
                     "$like": "constraint"
                   },
                   "id": {
-                    "$like": "requirementType"
+                    "$like": "keyedRequirementId"
                   },
                   "requirement": {
                     "at": {
@@ -47587,7 +47587,7 @@
                     "$like": "constraint"
                   },
                   "id": {
-                    "$like": "requirementType"
+                    "$like": "keyedRequirementId"
                   },
                   "requirement": {
                     "at": {
@@ -47623,7 +47623,7 @@
                     "$like": "constraint"
                   },
                   "id": {
-                    "$like": "requirementType"
+                    "$like": "keyedRequirementId"
                   },
                   "requirement": {
                     "at": {
@@ -47646,7 +47646,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-hook-onErrorRecovery-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-hook-onErrorRecovery-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Its `id`/`requirementId` name `keyedRequirementId` (diff/fingerprint.ts: the bare type, plain or JSON-quoted, as a keyed requirement's id is), not `requirementType`; that change signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-18"
   },
@@ -47674,7 +47674,7 @@
                 "$like": "constraint"
               },
               "id": {
-                "$like": "requirementType"
+                "$like": "keyedRequirementId"
               },
               "requirement": {
                 "at": {
@@ -47697,7 +47697,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-hook-onResolverError-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-hook-onResolverError-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Its `id`/`requirementId` name `keyedRequirementId` (diff/fingerprint.ts: the bare type, plain or JSON-quoted, as a keyed requirement's id is), not `requirementType`; that change signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-18"
   },
@@ -47725,7 +47725,7 @@
               }
             },
             "requirementId": {
-              "$like": "requirementType"
+              "$like": "keyedRequirementId"
             },
             "resolver": {
               "$like": "resolver"
@@ -47735,7 +47735,401 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-observe-resolver-error-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-observe-resolver-error-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Its `id`/`requirementId` name `keyedRequirementId` (diff/fingerprint.ts: the bare type, plain or JSON-quoted, as a keyed requirement's id is), not `requirementType`; that change signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside the row's approval above.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-quirk-b-keyed-console-warn-missing",
+    "scenario": "fuzz",
+    "stream": "console",
+    "kind": "warn",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["resolverRejects", "resolverKey"],
+    "group": "quirk-b-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "console",
+          "level": "warn",
+          "args": [
+            {
+              "$text": "resolverThrew"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): in 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. 1.35's extra error also spends the once-per-source development warning (`$text: resolverThrew`, diff/fingerprint.ts `TEXT`: `[Directive] resolver \"a::r0\" threw: … The default error strategy skips it silently. …`), so with a keyed resolver (diff/fuzz/model.ts, \"L11, keyed\") that warning is missing on 2.0. The bound names only that warning's wording; `when` is the keyed twins' (`resolverRejects`, `resolverKey`); no `ends`, since a warning is printed once per source and is not a run's last record; `op: missing` keeps an extra warning on 2.0 unexcused; the group is the keyed twins' own, `quirk-b-keyed`. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside quirk b's approval (GATE-1; \"If all are better or non user facing they are all approved\", 2026-11-01).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-hook-onResolverCancel-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "path": "args[*]",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "batchResolver"
+          }
+        },
+        {
+          "path": "args[*].fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "batchConstraint"
+          }
+        },
+        {
+          "path": "args[*].id",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        },
+        {
+          "path": "args[*].requirement.item",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "args[*].requirement.type",
+          "from": {
+            "$like": "requirementType"
+          },
+          "to": {
+            "$like": "batchRequirementType"
+          }
+        }
+      ]
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the onResolverCancel hook call where 1.35's single-run record is paired with 2.0's batch record: `from` names only the single classes and `to` only the batch classes (the requirement's `item` absent on 1.35's side), so a change between two single runs or two batch requirements stays outside it; `when` is row t's `writeRetracts` with `batched`. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-hook-onResolverCancel-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "hook",
+      "kind": "onResolverCancel",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "args[*]",
+            "from": {
+              "$like": "resolver"
+            },
+            "to": {
+              "$like": "batchResolver"
+            }
+          },
+          {
+            "path": "args[*].fromConstraint",
+            "from": {
+              "$like": "constraint"
+            },
+            "to": {
+              "$like": "batchConstraint"
+            }
+          },
+          {
+            "path": "args[*].id",
+            "from": {
+              "$like": "requirementId"
+            },
+            "to": {
+              "$like": "batchRequirementId"
+            }
+          },
+          {
+            "path": "args[*].requirement.item",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "$like": "batchItem"
+            }
+          },
+          {
+            "path": "args[*].requirement.type",
+            "from": {
+              "$like": "requirementType"
+            },
+            "to": {
+              "$like": "batchRequirementType"
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the batch onResolverCancel hook call left unpaired on 1.35's side, and only where the case's 2.0 differences hold, at or before it, the single-to-batch change of `l11-cand-t-batch-hook-onResolverCancel-changed` (`requires`, with that entry's bound): the batch cancel 2.0 does report was paired with 1.35's single-run cancel, so a batch cancel 2.0 really lacks, with no such pairing, stays unexcused. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-hook-onRequirementCanceled-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0]",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "batchConstraint"
+          }
+        },
+        {
+          "path": "args[0].id",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        },
+        {
+          "path": "args[0].requirement.item",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "args[0].requirement.type",
+          "from": {
+            "$like": "requirementType"
+          },
+          "to": {
+            "$like": "batchRequirementType"
+          }
+        }
+      ]
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the onRequirementCanceled hook call where 1.35's single-run record is paired with 2.0's batch record: `from` names only the single classes and `to` only the batch classes (the requirement's `item` absent on 1.35's side), so a change between two single runs or two batch requirements stays outside it; `when` is row t's `writeRetracts` with `batched`. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-hook-onRequirementCanceled-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "hook",
+      "kind": "onRequirementCanceled",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "args[0].fromConstraint",
+            "from": {
+              "$like": "constraint"
+            },
+            "to": {
+              "$like": "batchConstraint"
+            }
+          },
+          {
+            "path": "args[0].id",
+            "from": {
+              "$like": "requirementId"
+            },
+            "to": {
+              "$like": "batchRequirementId"
+            }
+          },
+          {
+            "path": "args[0].requirement.item",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "$like": "batchItem"
+            }
+          },
+          {
+            "path": "args[0].requirement.type",
+            "from": {
+              "$like": "requirementType"
+            },
+            "to": {
+              "$like": "batchRequirementType"
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the batch onRequirementCanceled hook call left unpaired on 1.35's side, and only where the case's 2.0 differences hold, at or before it, the single-to-batch change of `l11-cand-t-batch-hook-onRequirementCanceled-changed` (`requires`, with that entry's bound): the batch cancel 2.0 does report was paired with 1.35's single-run cancel, so a batch cancel 2.0 really lacks, with no such pairing, stays unexcused. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-observe-requirement-canceled-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event.id",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "path": "event.id",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        }
+      ]
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the requirement.canceled observe event where 1.35's single-run record is paired with 2.0's batch record: `from` names only the single classes and `to` only the batch classes (the requirement's `item` absent on 1.35's side), so a change between two single runs or two batch requirements stays outside it; `when` is row t's `writeRetracts` with `batched`. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-observe-requirement-canceled-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "requires": {
+      "stream": "observe",
+      "kind": "requirement.canceled",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "event.id",
+            "from": {
+              "$like": "requirementId"
+            },
+            "to": {
+              "$like": "batchRequirementId"
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the batch requirement.canceled observe event left unpaired on 1.35's side, and only where the case's 2.0 differences hold, at or before it, the single-to-batch change of `l11-cand-t-batch-observe-requirement-canceled-changed` (`requires`, with that entry's bound): the batch cancel 2.0 does report was paired with 1.35's single-run cancel, so a batch cancel 2.0 really lacks, with no such pairing, stays unexcused. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
     "approvedBy": "Jason Comes",
     "date": "2026-11-18"
   },
