@@ -6,6 +6,10 @@
 // - `tx`: the L11 fuzz's string fact, added to `snapshot`'s and
 //   `snapshotDynamic`'s fact keys and labels under row (ay). Any other fact
 //   name still fails.
+// Run 4 (2026-11-18: "Allow a run 4 and sign both (Recommended)"):
+// - Quirk k's fuzz entries name the clobbered fact through the `fact` class
+//   (PR seed 19, deep seed 1: `f2`), not the literal `f0`/`f1`.
+// - Row t's plain fuzz path admits a keyed single run (PR seed 14 at L11).
 // - Row t's batch-pairing twin (`l11-cand-t-batch-*`, PR seed 14): 1.35's
 //   extra cancel of a completed single run, paired against 2.0's batch
 //   cancel. A batch cancel 2.0 lacks with no such pairing, or an extra on
@@ -51,7 +55,7 @@ describe("keyedRequirementId: a keyed requirement's id, and no other shape", () 
     expect(generalizeValue("A0")).toEqual({ $like: "requirementType" });
   });
 
-  it("only quirk b's keyed twins and row t's batch-pairing twin name it", () => {
+  it("only quirk b's keyed twins and row t's batch-pairing and plain fuzz entries name it", () => {
     const naming = readDivergences()
       .filter((e) => JSON.stringify(e).includes('"keyedRequirementId"'))
       .map((e) => e.id)
@@ -67,6 +71,9 @@ describe("keyedRequirementId: a keyed requirement's id, and no other shape", () 
       "l11-quirk-b-keyed-hook-onErrorRecovery-missing",
       "l11-quirk-b-keyed-hook-onResolverError-missing",
       "l11-quirk-b-keyed-observe-resolver-error-missing",
+      "l3-cand-t-fuzz-hook-onRequirementCanceled-missing",
+      "l3-cand-t-fuzz-hook-onResolverCancel-missing",
+      "l3-cand-t-fuzz-observe-requirement-canceled-missing",
     ]);
   });
 });
@@ -233,5 +240,160 @@ describe("row t's batch-pairing twin excuses only 1.35's extra single-run cancel
       expect(left([rb], [rb, rb], T), kind).toEqual([`extra ${kind}`]);
       expect(left([rb], [r1, rb], T), kind).not.toEqual([]);
     });
+  });
+});
+
+const stepped = (records: TraceEntry[]): TraceEntry[] => [
+  { k: "step", i: 0, step: "step 0" },
+  ...records,
+  { k: "async", i: 0 },
+];
+const leftWith = (
+  entries: ReturnType<typeof readDivergences>,
+  reference: TraceEntry[],
+  candidate: TraceEntry[],
+  triggers: string[],
+): string[] =>
+  explain(
+    FUZZ_SCENARIO,
+    compareContract(stepped(reference), stepped(candidate), "v2"),
+    entries,
+    triggers,
+  ).unexplained.map((d) => `${d.op} ${d.kind}`);
+const RUN4 = '"Allow a run 4 and sign both (Recommended)"';
+
+describe("run 4: quirk k names any fuzz fact, and nothing else", () => {
+  const ids = [
+    "l7-fuzz-k-hook-onResolverWriteRejected-extra",
+    "l7-fuzz-k-observe-resolver.write.rejected-extra",
+    "l7-fuzz-k-hook-onFactSet-missing",
+    "l7-fuzz-k-after-hook-onFactSet-extra",
+  ];
+  const k = readDivergences().filter((e) => e.group === "quirk-k");
+  const K = ["batchMixed", "batchAbortOn"];
+  const rejected = (fact: Json, reason = "clobbered"): TraceEntry[] => [
+    {
+      k: "hook",
+      hook: "onResolverWriteRejected",
+      args: [
+        {
+          actual: 1,
+          expected: 0,
+          fact,
+          kind: "rejection",
+          reason,
+          req: {
+            fromConstraint: "b0",
+            id: 'AB:{"item":"0.0"}',
+            requirement: { item: "0.0", type: "AB" },
+          },
+          resolver: "rb",
+        },
+      ],
+    },
+    {
+      k: "observe",
+      event: {
+        actual: 1,
+        expected: 0,
+        fact,
+        kind: "rejection",
+        reason,
+        requirementId: 'AB:{"item":"0.0"}',
+        resolver: "rb",
+        type: "resolver.write.rejected",
+      },
+    },
+  ];
+  const factSet = (fact: Json): TraceEntry => ({
+    k: "hook",
+    hook: "onFactSet",
+    args: [fact, 1, 0],
+  });
+
+  it("the four widened entries are signed for run 4 and name no literal fact", () => {
+    for (const id of ids) {
+      const e = k.find((x) => x.id === id);
+      expect(e?.reason, id).toContain(RUN4);
+      expect(JSON.stringify(e?.bound), id).not.toMatch(/"(\w::)?f\d+"/);
+    }
+  });
+
+  it("excuses f2, own or namespaced (PR seed 19, deep seed 1)", () => {
+    for (const f of ["f2", "a::f2", "f0", "b::f11"]) {
+      for (const r of rejected(f)) {
+        expect(leftWith(k, [], [r], K), f).toEqual([]);
+      }
+      expect(leftWith(k, [factSet(f)], [], K), f).toEqual([]);
+      expect(leftWith(k, [], [factSet(f)], K), f).toEqual([]);
+    }
+  });
+
+  it("a name that is not a fuzz fact fails", () => {
+    for (const f of ["tx", "zf", "g0", "d0", "F2", "f", "a::d0", "f2x"]) {
+      for (const r of rejected(f)) {
+        expect(leftWith(k, [], [r], K), f).not.toEqual([]);
+      }
+      expect(leftWith(k, [factSet(f)], [], K), f).not.toEqual([]);
+    }
+  });
+
+  it("another shape still fails: another reason, or outside a mixed abortOn batch", () => {
+    for (const r of rejected("f2", "validation")) {
+      expect(leftWith(k, [], [r], K)).not.toEqual([]);
+    }
+    for (const r of rejected("f2")) {
+      expect(leftWith(k, [], [r], ["batchMixed"])).not.toEqual([]);
+      expect(leftWith(k, [], [r], ["batchAbortOn"])).not.toEqual([]);
+    }
+  });
+});
+
+describe("run 4: row t's plain fuzz path admits a keyed single run", () => {
+  const t = readDivergences().filter((e) => e.group === "quirk-t");
+  const cancels = (r: Json, by = "r1"): TraceEntry[] => [
+    { k: "hook", hook: "onResolverCancel", args: [by, r] },
+    { k: "hook", hook: "onRequirementCanceled", args: [r] },
+    {
+      k: "observe",
+      event: { id: (r as { id: string }).id, type: "requirement.canceled" },
+    },
+  ];
+  const keyed = {
+    fromConstraint: "c1",
+    id: "A1",
+    requirement: { at: 0, type: "A1" },
+  };
+
+  it("the three missing entries are signed for run 4", () => {
+    for (const e of t.filter(
+      (x) => x.id.startsWith("l3-cand-t-fuzz-") && x.op === "missing",
+    )) {
+      expect(e.reason, e.id).toContain(RUN4);
+    }
+  });
+
+  it("1.35's cancel of a keyed completed run is excused under writeRetracts (PR seed 14)", () => {
+    expect(leftWith(t, cancels(keyed), [], ["writeRetracts"])).toEqual([]);
+  });
+
+  it("outside writeRetracts, or extra on 2.0, it fails", () => {
+    expect(leftWith(t, cancels(keyed), [], [])).toHaveLength(3);
+    expect(leftWith(t, [], cancels(keyed), ["writeRetracts"])).toHaveLength(3);
+  });
+
+  it("another id or requirement shape fails", () => {
+    for (const r of [
+      { ...keyed, id: 'AB:{"item":"0.0"}' },
+      { ...keyed, id: "a1" },
+      { ...keyed, requirement: { at: "0", type: "A1" } },
+      { ...keyed, requirement: { at: 0, item: "0.0", type: "A1" } },
+      { ...keyed, requirement: { type: "A1" } },
+    ]) {
+      expect(
+        leftWith(t, cancels(r), [], ["writeRetracts"]),
+        JSON.stringify(r),
+      ).not.toEqual([]);
+    }
   });
 });

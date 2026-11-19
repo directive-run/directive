@@ -11895,10 +11895,35 @@
               }
             }
           ]
+        },
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "keyedRequirementId"
+              },
+              "requirement": {
+                "at": {
+                  "$like": "integer"
+                },
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onResolverCancel hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onResolverCancel hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Run 4 adds the keyed alternative: a single run whose resolver has a function `key` (L11) has the bare-type id (`keyedRequirementId`) and its requirement carries `at` (`integer`); PR seed 14 at L11 cancels such a run with no batch beside it (GATE-11 run 4). Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-12"
   },
@@ -11931,10 +11956,32 @@
               }
             }
           ]
+        },
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "keyedRequirementId"
+              },
+              "requirement": {
+                "at": {
+                  "$like": "integer"
+                },
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onRequirementCanceled hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onRequirementCanceled hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Run 4 adds the keyed alternative: a single run whose resolver has a function `key` (L11) has the bare-type id (`keyedRequirementId`) and its requirement carries `at` (`integer`); PR seed 14 at L11 cancels such a run with no batch beside it (GATE-11 run 4). Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-12"
   },
@@ -11957,10 +12004,19 @@
             },
             "type": "requirement.canceled"
           }
+        },
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "keyedRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the requirement.canceled observe event only 1.35 emits. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the requirement.canceled observe event only 1.35 emits. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Run 4 adds the keyed alternative: a single run whose resolver has a function `key` (L11) has the bare-type id (`keyedRequirementId`) and its requirement carries `at` (`integer`); PR seed 14 at L11 cancels such a run with no batch beside it (GATE-11 run 4). Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-12"
   },
@@ -35375,115 +35431,9 @@
               "expected": {
                 "$like": "integer"
               },
-              "fact": "a::f0",
-              "kind": "rejection",
-              "reason": "clobbered",
-              "req": {
-                "fromConstraint": {
-                  "$like": "batchConstraint"
-                },
-                "id": {
-                  "$like": "batchRequirementId"
-                },
-                "requirement": {
-                  "item": {
-                    "$like": "batchItem"
-                  },
-                  "type": {
-                    "$like": "batchRequirementType"
-                  }
-                }
+              "fact": {
+                "$like": "fact"
               },
-              "resolver": {
-                "$like": "batchResolver"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverWriteRejected",
-          "args": [
-            {
-              "actual": {
-                "$like": "integer"
-              },
-              "expected": {
-                "$like": "integer"
-              },
-              "fact": "f0",
-              "kind": "rejection",
-              "reason": "clobbered",
-              "req": {
-                "fromConstraint": {
-                  "$like": "batchConstraint"
-                },
-                "id": {
-                  "$like": "batchRequirementId"
-                },
-                "requirement": {
-                  "item": {
-                    "$like": "batchItem"
-                  },
-                  "type": {
-                    "$like": "batchRequirementType"
-                  }
-                }
-              },
-              "resolver": {
-                "$like": "batchResolver"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverWriteRejected",
-          "args": [
-            {
-              "actual": {
-                "$like": "integer"
-              },
-              "expected": {
-                "$like": "integer"
-              },
-              "fact": "f1",
-              "kind": "rejection",
-              "reason": "clobbered",
-              "req": {
-                "fromConstraint": {
-                  "$like": "batchConstraint"
-                },
-                "id": {
-                  "$like": "batchRequirementId"
-                },
-                "requirement": {
-                  "item": {
-                    "$like": "batchItem"
-                  },
-                  "type": {
-                    "$like": "batchRequirementType"
-                  }
-                }
-              },
-              "resolver": {
-                "$like": "batchResolver"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverWriteRejected",
-          "args": [
-            {
-              "actual": {
-                "$like": "integer"
-              },
-              "expected": {
-                "$like": "integer"
-              },
-              "fact": "a::f1",
               "kind": "rejection",
               "reason": "clobbered",
               "req": {
@@ -35510,7 +35460,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the onResolverWriteRejected call 2.0 makes when the clobbered write of a mixed batch is dropped. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the onResolverWriteRejected call 2.0 makes when the clobbered write of a mixed batch is dropped. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Run 4 names the fact through the `fact` class (a fuzz fact key, `f<n>`, own or namespaced; GATE-11 run 4), not the literal `f0`/`f1` the seeds first showed: PR seed 19 and deep seed 1 at L11 clobber `f2`. Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-08"
   },
@@ -35535,70 +35485,9 @@
             "expected": {
               "$like": "integer"
             },
-            "fact": "f0",
-            "kind": "rejection",
-            "reason": "clobbered",
-            "requirementId": {
-              "$like": "batchRequirementId"
+            "fact": {
+              "$like": "fact"
             },
-            "resolver": {
-              "$like": "batchResolver"
-            },
-            "type": "resolver.write.rejected"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "actual": {
-              "$like": "integer"
-            },
-            "expected": {
-              "$like": "integer"
-            },
-            "fact": "a::f0",
-            "kind": "rejection",
-            "reason": "clobbered",
-            "requirementId": {
-              "$like": "batchRequirementId"
-            },
-            "resolver": {
-              "$like": "batchResolver"
-            },
-            "type": "resolver.write.rejected"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "actual": {
-              "$like": "integer"
-            },
-            "expected": {
-              "$like": "integer"
-            },
-            "fact": "f1",
-            "kind": "rejection",
-            "reason": "clobbered",
-            "requirementId": {
-              "$like": "batchRequirementId"
-            },
-            "resolver": {
-              "$like": "batchResolver"
-            },
-            "type": "resolver.write.rejected"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "actual": {
-              "$like": "integer"
-            },
-            "expected": {
-              "$like": "integer"
-            },
-            "fact": "a::f1",
             "kind": "rejection",
             "reason": "clobbered",
             "requirementId": {
@@ -35612,7 +35501,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the observe \"resolver.write.rejected\" record 2.0 makes for it. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the observe \"resolver.write.rejected\" record 2.0 makes for it. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Run 4 names the fact through the `fact` class (a fuzz fact key, `f<n>`, own or namespaced; GATE-11 run 4), not the literal `f0`/`f1` the seeds first showed: PR seed 19 and deep seed 1 at L11 clobber `f2`. Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-08"
   },
@@ -35754,20 +35643,9 @@
           "k": "hook",
           "hook": "onFactSet",
           "args": [
-            "f0",
             {
-              "$like": "integer"
+              "$like": "fact"
             },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "a::f0",
             {
               "$like": "integer"
             },
@@ -35778,7 +35656,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the batch's write that 1.35 lets land over the clobber. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the batch's write that 1.35 lets land over the clobber. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Run 4 names the fact through the `fact` class (a fuzz fact key, `f<n>`, own or namespaced; GATE-11 run 4), not the literal `f0`/`f1` the seeds first showed: PR seed 19 and deep seed 1 at L11 clobber `f2`. Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-08"
   },
@@ -40639,111 +40517,9 @@
           "k": "hook",
           "hook": "onFactSet",
           "args": [
-            "f0",
             {
-              "$like": "integer"
+              "$like": "fact"
             },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "a::f0",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "a::f2",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "f1",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "a::f1",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "f2",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "b::f0",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "b::f1",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "b::f2",
             {
               "$like": "integer"
             },
@@ -40754,7 +40530,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Run 4 names the fact through the `fact` class (a fuzz fact key, `f<n>`, own or namespaced; GATE-11 run 4), not the literal `f0`/`f1` the seeds first showed: PR seed 19 and deep seed 1 at L11 clobber `f2`. Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-08"
   },
