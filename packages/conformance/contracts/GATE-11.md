@@ -7,7 +7,8 @@ Claude took the recommended option for rows (bp), (bq), (br) and (bs). On
 2026-11-17 Jason answered the gate's open questions with "Approve all as
 recommended (Recommended)". Claude signs the entries for approved rows on
 his behalf, as at the earlier gates (GATE-2.md, rule 1). This record covers
-gate runs 1, 2 and 3, of at most 3.
+gate runs 1, 2 and 3, of at most 3, and run 4, which Jason allowed in chat
+on 2026-11-18: "Allow a run 4 and sign both (Recommended)".
 
 ## What the L11 gate does
 
@@ -35,6 +36,15 @@ Jason answered in chat on 2026-11-18: "Approve; you sign them
 alongside its row's original approval (below). Seeds 7, 18 and 19 still fail,
 as does one deep case per shape, on two shapes no signed change covers
 (Stops).
+
+**Run 4 is not green.** Jason allowed it in chat on 2026-11-18: "Allow a
+run 4 and sign both (Recommended)". It merges main at 6951d88b (#430: an
+effect rerun skips its data-form `on` gate, as 1.35), which closes run 3's
+seed 7 and seed 18 shape. It signs the two widenings those words name
+(below), each proved by a replay and a self-test, and converts 13 of the 14
+L11 feature-layer mutants. 20 of the 21 PR seeds pass. Seed 7 fails on a
+new batch shape that matches no approved row (Stops), and one mutant is
+still NoCoverage.
 
 ## The L11 decisions
 
@@ -94,6 +104,20 @@ Each is signed "on the owner's instruction", quoting "Approve; you sign them
 
 Self-tests: `diff/self/l11-gate-classes.test.ts` (13).
 
+## The signed changes (run 4)
+
+Each is signed "on the owner's instruction", quoting "Allow a run 4 and
+sign both (Recommended)" (Jason, in chat, 2026-11-18), next to the row's
+original approval, which each entry's reason keeps.
+
+| Row | Change | Proof |
+| --- | --- | --- |
+| Quirk k (GATE-1; L7 entries signed 2026-11-08) | The 4 `l7-fuzz-k-*` entries whose bounds named the fact literally (`f0`, `a::f0`, `f1`, `a::f1`): `hook-onResolverWriteRejected-extra`, `observe-resolver.write.rejected-extra`, `hook-onFactSet-missing`, `after-hook-onFactSet-extra`. The fact is now the existing `fact` class, `/^([a-z]::)?f\d+$/` (a fuzz fact key, own or namespaced), and the duplicate alternatives fold into one | PR seed 19 (t19) and deep 1:#235 (k1-6, d1c233) replay with 0 unexplained, on `f2`. Self-test: `tx`, `zf`, `g0`, `d0`, `F2`, `f`, `a::d0`, `f2x` fail; a `validation` rejection, and a case without both `batchMixed` and `batchAbortOn`, fail |
+| Row t (2026-11-01; fuzz entries signed 2026-11-12) | The 3 `l3-cand-t-fuzz-*-missing` entries gain a keyed alternative: id `keyedRequirementId`, requirement `{ at: integer, type }` | PR seed 14's L11 case (u14) and deep 24301:#1486 (k24301-6) replay with 0 unexplained. Self-test: outside `writeRetracts`, an extra on 2.0, a batch id, `a1`, a string `at`, an `item`, or a missing `at` all fail |
+
+Self-tests: `diff/self/l11-gate-classes.test.ts`, now 21. Run 3's
+specs t7, t18, t14 and q14 also replay with 0 unexplained after the merge.
+
 ## The pins (run 1)
 
 U1, U2 and U3 in `l11-predicate-pins-oracle` (and U1 in its production
@@ -107,7 +131,22 @@ core-next's `src/__tests__/l11a-predicates.test.ts` pins 2.0's side:
 
 ## The mutation conversion
 
-**Not done.** The gate=L11 run 44259509948 (mutation-nightly.yml on main)
+**Run 4: 13 of 14 converted.** The gate=L11 run 44431606561
+(mutation-nightly.yml on p11/l11-gate at 1493a624, the explain() pin;
+concluded `failure` on the score step) records 13 of the 14 L11
+`feature-layer` entries in `engine.ts` Killed by the run 3 pins
+`l11-explain-combinators-oracle` (10) and its production twin (3). Each is
+now `later-layer`, and its note names the killer from that run.
+`packages/core/src` is unchanged since 1493a624, so the triaged lines hold.
+
+One is left: **3950:15**, the `"undefined"` string a leaf clause renders
+when its fact is unset. Stryker reports it NoCoverage: no test explains a
+data-form leaf whose actual is `undefined`. It stays `feature-layer`, so
+`conformance:checks` still fails on "no feature-layer entry is for a built
+layer". It needs one more pin (a leaf on an unset fact) and a gate=L11
+mutation run.
+
+**Runs 1 to 3: not done.** The gate=L11 run 44259509948 (mutation-nightly.yml on main)
 concluded `failure`. Every mutate shard passed; "Per-shard scores" failed.
 The 14 L11 `feature-layer` entries are all in `engine.ts`, lines 3920 to
 3950. They are `system.explain()`'s per-clause breakdown of a data-form
@@ -122,6 +161,40 @@ Run 3 needs an oracle pin first: an `explain()` of a requirement from a
 constraint whose `when` is `{ $all: [...] }`, `{ $any: [...] }` and
 `{ $not: ... }`, with a passing and a failing child, placed at L11, in
 `packages/core` and ported. Then a gate=L11 mutation run names the killers.
+
+## Results (run 4)
+
+Each exit code is the command's own, read from its file ($G/r4, $G/r4pr-*,
+$G/r4slow-*, $G/deep-r4dead).
+
+| Check | Exit | Result |
+| --- | --- | --- |
+| The 21 PR seeds at L11 (120 s; 1,800 s for 7, 9 and 11, nohup) | 0 for 20; 1 for seed 7 | Seed 7 fails on a new batch shape (Stops) |
+| `check:expects` | 0 | 203 files, 7,889 assertions, identical to a fresh port |
+| diff self-tests (`diff/self`) | 0 | 61 files, 554 tests |
+| Root biome, error level | 0 | 1,531 files |
+| `conformance:checks` | 1 | 244 passed, 2 failed: the feature-layer check (3950:15) and the harness lock, which waits on `oracle:update` |
+| `pnpm -r --filter './packages/*' typecheck` | 1 (`--no-bail`) | Only `ai-harness`, `cli` and `mcp`, the known local build gap. conformance passes after the self-test's type fix |
+| Deep seed 2 (report mode, 8 GB) | 0 | 6 batched cases reported |
+| Deep seed 24301 | 1 | 5 batched cases reported; fails on a keyed, unbatched data-form case (Stops) |
+| Deep seed 1 | still running when this was written | |
+| `pnpm census`, `oracle:update`, `ratchet --update` | not run | Not run while a deep fuzz run was in flight; left for the next session |
+
+**Deep triage.** Run 3's deep cases on the merged tree:
+
+| Case | Spec | Unexplained | Triage |
+| --- | --- | --- | --- |
+| 1:#235 | k1-6, d1c233 | 13, now 0 | quirk k on `f2` (run 4's widening) |
+| 24301:#1486 | k24301-6 | 3, now 0 | row t, keyed (run 4's widening) |
+| 1:#1306 | k1-7 | 96 | Batched. 1.35 runs one more reconcile pass after `rb` completes, before the L10 unregister of `zm`/`zme`; 2.0 unregisters first. Every later record shifts; the end states match. No entry covers it; a report-mode follow-up (batched) |
+| 1:#1970 | k1-8 | 1 | Batched: a batch call with a repeated item (`["0.0","0.0"]`) writes on 1.35, not on 2.0. L7 batch shape, report-mode follow-up |
+| 1:data-forms #102 | k1-9 | 1 | Batched: a batch start missing on 2.0 at a settle step, as GATE-8's 24301:#1917. L7 batch shape, follow-up |
+| 24301:#1067 | k24301-5 | 2 | Batched: `onReconcileEnd` with the batch items canceled on 2.0 in another pass. L7 batch shape, follow-up |
+
+New run 4 deep cases at L11 (batched, reported): 2:#1612 (a batch start
+missing at step 12, then `startedAt` shifts), 2:data-forms #721 (a keyed
+resolver's `onResolverRetry` moved), 2:data-forms #801 (a batch start and
+write against an abort). Not replayed: follow-ups.
 
 ## Results (run 2)
 
@@ -186,6 +259,24 @@ None new. Every run 2 failure is an approved row's shape.
 
 ## Stops
 
+- **Run 4, PR seed 7 (a stop).** Spec `$G/specs/u7.json`; replay
+  `$G/replay/r20-u7.json`, traces `r20-u7.v1.jsonl` and `r20-u7.v2.jsonl`.
+  Two modules; a batched resolver `a::rb` with `maxSize` 2, `windowMs` 5,
+  `delay` 5, fed by two sources (2 and 3 items); no data forms. When a flush
+  holds three items, 2.0 starts the overflow call `[1.2]` at once, beside
+  `[0.0, 0.1]` (v2 lines 57 and 60). 1.35 starts it one window later, as the
+  first call writes (v1 line 105). So 1.35 makes one more reconcile pass (6
+  against 5), and 16 records are missing on 2.0 in step 1. The end states
+  match. No approved row covers this. Row (av) needs a repeated item, which
+  this case has none of. Owner row decision, or a 2.0 fix.
+- **Run 4, deep seed 24301, data-form phase (a stop).** Spec
+  `$G/specs/u24301.json`, log `$G/deep-r4dead/seed-24301.log`. In step 16 a
+  keyed resolver's requirement (`A1`, `{ at: 2 }`) stays unmet on 1.35, and
+  2.0 starts `r1` for it. The difference is `onReconcileEnd`'s `inflight[2]`
+  and `unmet[0]`. It is unbatched, so report mode does not excuse it. It was
+  not replayed in run 4 because the deep seed 1 run was still in flight. No
+  signed entry covers it.
+
 - **Run 1's three stops are closed by #429.** These are `onDefinitionAssign`'s
   old value (seeds 3, 10), `unregisterModule` after `stop()` (seed 1), and
   the keyed id after a refused unregister (seeds 8, 14). Run 1's specs s1,
@@ -204,8 +295,9 @@ None new. Every run 2 failure is an approved row's shape.
 
 ## Follow-ups
 
-- The 14 NoCoverage `explain()` lines (above) need a pin before the
-  conversion.
+- 3950:15 (a leaf on an unset fact) needs a pin and a gate=L11 mutation run.
+- Run 4 was not finished: census, `oracle:update`, `ratchet --update` and
+  deep seed 1's result.
 - 1:up to L11#233 (deep, batched): replay it.
 - The keyed twins' `at` is `{ $like: integer }`. The model can draw
   `at: null`, which the twins do not admit. No case shows it yet.
