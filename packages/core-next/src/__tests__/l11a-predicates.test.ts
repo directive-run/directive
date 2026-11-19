@@ -265,6 +265,35 @@ describe("the other data forms (D1–D4)", () => {
     system.destroy();
   });
 
+  it('"retry" retries a throwing on-gated effect 3 times, as 1.35 does', async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const runs: number[] = [];
+    const system: Any = createSystem({
+      module: light({
+        effects: {
+          e: {
+            on: { n: { $changed: true } },
+            run: (f: Any) => {
+              runs.push(f.n);
+              if (f.n > 0) {
+                throw new Error("boom");
+              }
+            },
+          },
+        },
+      }),
+      errorBoundary: { onEffectError: "retry" },
+    });
+    system.start();
+    await wait();
+    system.facts.n = 1;
+    await wait();
+    // The run the write wakes, then 3 retries though n has not changed since.
+    expect(runs).toEqual([0, 1, 1, 1, 1]);
+    system.destroy();
+  });
+
   it("compute as a predicate and a template; patch; list key", async () => {
     const runs: unknown[] = [];
     const system: Any = createSystem({

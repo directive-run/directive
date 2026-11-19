@@ -614,13 +614,16 @@ export function createEffectsManager<S extends Schema>(
       // Main's test, and only a navigation's pass asks more (navWakes).
       if (
         state.enabled &&
-        (state.hit_ === now ||
-          reruns.has(state.id) ||
-          (nav
-            ? navWakes(state, back, changed)
-            : !state.explicit && !state.deps?.size)) &&
-        // D1: after the dependency pre-filter, the gate over a snapshot.
-        (!state.gate_ || state.gate_(store.toObject(), previous ?? undefined))
+        // One asked to run again skips the gate, as 1.35's requestRerun skips
+        // shouldRun (effects.ts:1323): "retry" retries an `on` effect too.
+        (reruns.has(state.id) ||
+          ((state.hit_ === now ||
+            (nav
+              ? navWakes(state, back, changed)
+              : !state.explicit && !state.deps?.size)) &&
+            // D1: after the dependency pre-filter, the gate over a snapshot.
+            (!state.gate_ ||
+              state.gate_(store.toObject(), previous ?? undefined))))
       ) {
         out.push(state);
       }
