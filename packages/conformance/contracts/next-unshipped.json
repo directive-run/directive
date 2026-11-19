@@ -5,6 +5,5 @@
   ". createStatusHook": "L12",
   ". createSystemWithStatus": "L12",
   ". memorySink": "L12",
-  ". signSnapshot": "L12",
   "./internals safeStringify": "L13"
 }

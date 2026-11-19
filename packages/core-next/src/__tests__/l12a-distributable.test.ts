@@ -181,11 +181,12 @@ describe("the observer channel (H4)", () => {
 });
 
 describe("the snapshot tools (G1 to G6)", () => {
-  it("five are root exports; signSnapshot waits on the surface gate's stock name", () => {
+  it("all six are root exports", () => {
     for (const name of [
       "diffSnapshots",
       "isSignedSnapshot",
       "isSnapshotExpired",
+      "signSnapshot",
       "validateSnapshot",
       "verifySnapshotSignature",
     ]) {
@@ -193,7 +194,6 @@ describe("the snapshot tools (G1 to G6)", () => {
         "function",
       );
     }
-    expect((root as Record<string, unknown>).signSnapshot).toBeUndefined();
   });
 
   it("(bu): a plain JSON snapshot signs to 1.35's bytes, either way", async () => {
