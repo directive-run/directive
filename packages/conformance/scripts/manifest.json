@@ -69,6 +69,8 @@
   "tests/core/l10-gate-pins-oracle.test.ts": "packages/core/src/core/__tests__/l10-gate-pins-oracle.test.ts",
   "tests/core/l11-explain-combinators-oracle-production.test.ts": "packages/core/src/core/__tests__/l11-explain-combinators-oracle-production.test.ts",
   "tests/core/l11-explain-combinators-oracle.test.ts": "packages/core/src/core/__tests__/l11-explain-combinators-oracle.test.ts",
+  "tests/core/l11-explain-unset-fact-oracle-production.test.ts": "packages/core/src/core/__tests__/l11-explain-unset-fact-oracle-production.test.ts",
+  "tests/core/l11-explain-unset-fact-oracle.test.ts": "packages/core/src/core/__tests__/l11-explain-unset-fact-oracle.test.ts",
   "tests/core/l11-predicate-describe-oracle.test.ts": "packages/core/src/core/__tests__/l11-predicate-describe-oracle.test.ts",
   "tests/core/l11-predicate-oracle.test.ts": "packages/core/src/core/__tests__/l11-predicate-oracle.test.ts",
   "tests/core/l11-predicate-pins-oracle-production.test.ts": "packages/core/src/core/__tests__/l11-predicate-pins-oracle-production.test.ts",

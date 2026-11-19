@@ -671,6 +671,24 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l11-explain-unset-fact-oracle-production.test.ts",
+    "category": "black-box",
+    "cases": 1,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l11-explain-unset-fact-oracle.test.ts",
+    "category": "black-box",
+    "cases": 1,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l11-predicate-describe-oracle.test.ts",
     "category": "black-box",
     "cases": 52,

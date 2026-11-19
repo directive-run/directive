@@ -796,6 +796,14 @@
       "rule": "L11",
       "pin": true
     },
+    "tests/core/l11-explain-unset-fact-oracle.test.ts": {
+      "rule": "L11",
+      "pin": true
+    },
+    "tests/core/l11-explain-unset-fact-oracle-production.test.ts": {
+      "rule": "L11",
+      "pin": true
+    },
     "tests/core/predict.test.ts": {
       "rule": "L11"
     },

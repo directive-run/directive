@@ -7116,6 +7116,28 @@
         }
       }
     },
+    "tests/core/l11-explain-unset-fact-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "explain() — a data-form leaf on an unset fact (production) > renders the unset fact's actual as undefined": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        }
+      }
+    },
+    "tests/core/l11-explain-unset-fact-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "explain() — a data-form leaf on an unset fact > renders the unset fact's actual as undefined": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        }
+      }
+    },
     "tests/core/l11-predicate-describe-oracle.test.ts": {
       "category": "black-box",
       "rule": "L11",
