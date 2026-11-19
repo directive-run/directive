@@ -4,12 +4,6 @@
   ". createRequirementStatusPlugin": "L12",
   ". createStatusHook": "L12",
   ". createSystemWithStatus": "L12",
-  ". diffSnapshots": "L12",
-  ". isSignedSnapshot": "L12",
-  ". isSnapshotExpired": "L12",
   ". memorySink": "L12",
-  ". signSnapshot": "L12",
-  ". validateSnapshot": "L12",
-  ". verifySnapshotSignature": "L12",
   "./internals safeStringify": "L13"
 }

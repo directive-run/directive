@@ -158,6 +158,12 @@ export function toObservations(event: KernelEvent): ObservationEvent[] {
 
       return [{ type, plugin, screenedCount, screenedDigest, reason }];
     }
+    // L12a (H4): 1.35 hands notify's event object itself to every observer,
+    // with or without a `type` (engine.ts:3227–3236); the audit ledger reads
+    // the pair here.
+    case "clobber.loop.detected":
+    case "clobber.loop.resolved":
+      return [event.event as ObservationEvent];
     // L5: sources.ts, with 1.35's localId; the rest in the order emitted.
     case "module.registered":
     case "module.unregistered":

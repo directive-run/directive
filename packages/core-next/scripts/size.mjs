@@ -106,7 +106,7 @@ const NEEDLE_MIN = 20;
 // gate was removed) or been deleted; `--check` also fails when it finds more,
 // so the count rises with the dev text and a later removal is caught. Set it to
 // the count the guard prints, in the commit that adds or deletes dev text.
-const DEV_STRINGS_MIN = 178;
+const DEV_STRINGS_MIN = 181;
 const RUN_SPLIT = /[^\x20-\x7e]|["'`\\]/;
 const sourcesIn = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -548,12 +548,13 @@ const BETA_OMITTED = [
   "withRestore",
   "withInspect",
   "withObserve",
-  "withMissing",
   "withMeta",
   // L10a: register, assign, unregister and call (at the beta, as an import).
   "withDynamic",
   // L11a: the data forms (at the beta, `predicates()`); the seam stays.
   "withPredicates",
+  // L12a: the distributable snapshot calls (at the beta, an import).
+  "withDistributable",
 ];
 // The parts wired as a call, with the file each is imported from.
 const BETA_CALLED = [
@@ -623,7 +624,7 @@ if (betaApplied) {
   );
 } else {
   const message =
-    "fixture minimal, beta wiring skipped: api/system.ts no longer lists withBatch, withSources, withRestore, withInspect, withObserve, withMissing, withMeta, withDynamic and withPredicates as one import and one `parts` entry each, and withHistory and withTrace as one import and one call entry each; update BETA_OMITTED / BETA_CALLED / betaWiringSource in scripts/size.mjs";
+    "fixture minimal, beta wiring skipped: api/system.ts no longer lists withBatch, withSources, withRestore, withInspect, withObserve, withMeta, withDynamic, withPredicates and withDistributable as one import and one `parts` entry each, and withHistory and withTrace as one import and one call entry each; update BETA_OMITTED / BETA_CALLED / betaWiringSource in scripts/size.mjs";
   // Not a budget, but under --check (CI) a skipped line fails, so it cannot
   // vanish from the report unnoticed.
   if (process.argv.includes("--check")) {

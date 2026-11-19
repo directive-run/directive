@@ -1,20 +1,15 @@
 /**
- * What 2.0 has not built yet says so (slice P3-F3). Two cases:
- * - A member 1.35 always provides that 2.0 has not built throws
- *   `featureMissing` when called, in development (`withMissing`). Production
- *   leaves it out: the member names alone cost about 150 B gzip in the
- *   minimal app, past its 28,800 B ceiling, so there a call is the
- *   platform's TypeError, as before. `history` and `onHistoryChange` are the
- *   history part's (history.ts, L8), with the option on or off.
- * - A `/plugins` or `/testing` export 2.0 has not built is a stub with 1.35's
- *   name and signature that throws `featureMissing` when called.
+ * What 2.0 has not built yet says so (slice P3-F3): a `/plugins` or
+ * `/testing` export 2.0 has not built is a stub with 1.35's name and
+ * signature that throws `featureMissing` when called. (The members 1.35
+ * always provides are all built: L12a built the last two, the distributable
+ * snapshot calls, and with them went the development-only `withMissing`.)
  *
  * The error's `code` is stable: assert it, not the wording. The full text is
  * development only; production carries the code and the member's name.
  */
 
 import isDevelopment from "#is-development";
-import type { SystemPart } from "./core.js";
 
 /** The `code` of every error `featureMissing` throws. */
 export const FEATURE_MISSING = "E_FEATURE_MISSING";
@@ -33,29 +28,4 @@ export const featureMissing = (name: string, layer: number): never => {
     ),
     { code: FEATURE_MISSING, feature: name, layer },
   );
-};
-
-/**
- * In development, puts 1.35's always-present members that 2.0 has not built
- * on the system, each throwing `featureMissing` when called; a member a built
- * part already defined is left alone. Runs after every other part except the
- * plugins, so a plugin's onInit sees the whole surface.
- */
-export const withMissing: SystemPart = ({ system }) => {
-  const s = system as Record<string, any>;
-  // A dead-code `if`, not an early return: esbuild drops the block before
-  // it counts uses, so production keeps neither featureMissing nor the names.
-  if (isDevelopment) {
-    const stub = (
-      target: Record<string, unknown>,
-      prefix: string,
-      names: string,
-      layer: number,
-    ) => {
-      for (const name of names.split(" ")) {
-        target[name] ??= () => featureMissing(prefix + name, layer);
-      }
-    };
-    stub(s, "", "getDistributableSnapshot watchDistributableSnapshot", 12);
-  }
 };

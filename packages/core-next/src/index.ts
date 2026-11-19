@@ -85,6 +85,16 @@ export { describePredicate } from "./api/predicate-describe.js";
 export { predicateToSQL, predicateToWhere } from "./api/predicate-to-sql.js";
 export { predicateToMongo } from "./api/predicate-to-mongo.js";
 export { predicateToPostgrest } from "./api/predicate-to-pgrest.js";
+// The snapshot tools (L12a): root exports only, so a system that does not
+// call them bundles none.
+export {
+  diffSnapshots,
+  isSignedSnapshot,
+  isSnapshotExpired,
+  signSnapshot,
+  validateSnapshot,
+  verifySnapshotSignature,
+} from "./utils/snapshot.js";
 export type {
   Branded,
   ChainableArrayType,
