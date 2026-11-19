@@ -18,6 +18,8 @@
     "tests/core/l11-predicate-pins-oracle-production.test.ts",
     "tests/core/l11-predicate-pins-oracle.test.ts",
     "tests/core/l11-sweep-under-oracle.test.ts",
+    "tests/core/l12-plugins-pins-oracle-production.test.ts",
+    "tests/core/l12-plugins-pins-oracle.test.ts",
     "tests/core/l2-constraints-oracle-state.test.ts",
     "tests/core/l2-requirements-oracle.test.ts",
     "tests/core/l2-resolvers-oracle.test.ts",
@@ -62,6 +64,8 @@
     "tests/core/l11-predicate-pins-oracle-production.test.ts": [],
     "tests/core/l11-predicate-pins-oracle.test.ts": [],
     "tests/core/l11-sweep-under-oracle.test.ts": [],
+    "tests/core/l12-plugins-pins-oracle-production.test.ts": [],
+    "tests/core/l12-plugins-pins-oracle.test.ts": [],
     "tests/core/l2-constraints-oracle-state.test.ts": [
       "member .inspect",
       "option plugins"
@@ -114,6 +118,8 @@
     "tests/core/l11-predicate-pins-oracle-production.test.ts": [],
     "tests/core/l11-predicate-pins-oracle.test.ts": [],
     "tests/core/l11-sweep-under-oracle.test.ts": [],
+    "tests/core/l12-plugins-pins-oracle-production.test.ts": [],
+    "tests/core/l12-plugins-pins-oracle.test.ts": [],
     "tests/core/l2-constraints-oracle-state.test.ts": [],
     "tests/core/l2-requirements-oracle.test.ts": [],
     "tests/core/l2-resolvers-oracle.test.ts": [],
@@ -506,6 +512,36 @@
       "sweepUnder — template substitution > treats non-hole `$`-keyed objects as predicate operators": "L11",
       "sweepUnder — API shape > exposes the expected SweepReport shape": "L11",
       "sweepUnder — API shape > exports MAX_SWEEP_POINTS as a public constant": "L11"
+    },
+    "tests/core/l12-plugins-pins-oracle-production.test.ts": {
+      "L12 probe pins (production) > U3: a watch with nothing to watch returns a no-op, never calls and is silent": "L12",
+      "L12 probe pins (production) > U4: unknown keys are ignored silently": "L12",
+      "L12 probe pins (production) > U4: a throwing derivation is left out silently": "L12",
+      "L12 probe pins (production) > U4: namespaced keys nest under their module": "L12"
+    },
+    "tests/core/l12-plugins-pins-oracle.test.ts": {
+      "L12 probe pins (development) > U3: a watch with nothing to watch warns, returns a no-op and never calls (D5)": "L12",
+      "L12 probe pins (development) > U4: unknown keys are ignored with a warning naming what is available (D2)": "L12",
+      "L12 probe pins (development) > U4: a throwing derivation is left out with a warning (D3)": "L12",
+      "L12 probe pins (development) > U4: with no options every derivation is in and no fact (D1b)": "L12",
+      "L12 probe pins (development) > U4: namespaced keys nest under their module (D7)": "L12",
+      "L12 probe pins (development) > U5: a snapshot holding undefined verifies in place and fails after JSON (S2)": "L12",
+      "L12 probe pins (development) > U5: a snapshot holding a Date verifies in place and fails after JSON (S3)": "L12",
+      "L12 probe pins (development) > U5: plain JSON data verifies in place and after JSON (S1)": "L12",
+      "L12 probe pins (development) > U6: a change below 50 levels still verifies (S5)": "L12",
+      "L12 probe pins (development) > U6: a change at a shallow level does not verify": "L12",
+      "L12 probe pins (development) > U6: \"[function]\" verifies for a function (S6)": "L12",
+      "L12 probe pins (development) > U7: an empty secret throws (S4)": "L12",
+      "L12 probe pins (development) > U8: verify is true at exactly expiresAt and false after (S7)": "L12",
+      "L12 probe pins (development) > U8: metadata and an added expiresAt are covered by the signature (S8)": "L12",
+      "L12 probe pins (development) > U9: the clobber-loop events reach an observer as the object given, with no type added (C1)": "L12",
+      "L12 probe pins (development) > U9: with no hook for the event, the observers alone hear it (C2)": "L12",
+      "L12 probe pins (development) > U9: after the observer leaves and with no plugin, a notify reaches no one and does not throw": "L9",
+      "L12 probe pins (development) > U10: verify({ strong: true }) throws 1.35's \"reserved for v2\"; entries are djb2-1, chained by hex hashes of at most 8 characters (A1)": "L12",
+      "L12 probe pins (development) > U13: the status plugin tracks a requirement from pending to settled": "L12",
+      "L12 probe pins (development) > U13: the status plugin records a failed requirement's error": "L12",
+      "L12 probe pins (development) > U13: createSystemWithStatus wires the status plugin into the system": "L12",
+      "L12 probe pins (development) > U17: registerModule and unregisterModule reach an observer as { type, id }": "L10"
     },
     "tests/core/l2-constraints-oracle-state.test.ts": {
       "a disabled constraint is not asked while it is waiting on another > is not asked when the constraint it follows finishes and the finishing write wakes a pass": "L2",

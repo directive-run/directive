@@ -240,7 +240,13 @@ export default defineConfig({
           root: here,
           environment: "node",
           include: ["diff/**/*.test.ts"],
-          testTimeout: 120_000,
+          // The fuzz test (diff/fuzz/fuzz.test.ts) is the long one: on CI's
+          // census, seed 24301 took 96 s of the old 120 s on main (L11, three
+          // phases, 356 cases), and with L12's plugin phase (425 cases, 1.14x
+          // main's local time) it passed 120 s. Its case count is the floor,
+          // so the time, not the cases, gives: 240 s leaves about 2x margin.
+          // The nightly passes its own --testTimeout, which overrides this.
+          testTimeout: 240_000,
           // Transform the published package instead of letting Node load it,
           // so vi.resetModules() gives every run a fresh instance of it too.
           server: {

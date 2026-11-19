@@ -12,9 +12,9 @@
  * and path to replay it; the error also carries the shrunk spec and the
  * first divergence.
  *
- * A run has three phases of exact size (so the count is a guarantee, not a
+ * A run has four phases of exact size (so the count is a guarantee, not a
  * probability) and the same replay: the seed and run count reproduce all
- * three.
+ * four.
  *
  * - RUNS cases are generated across every layer up to model.ts
  *   `BASE_CEILING` (L10), the cases a run always had: v1 and the workspace
@@ -31,6 +31,12 @@
  *   case the first two phases draw, so the quirks those cases reach (and the
  *   census's stale check over them) stay as they were before L11-pre
  *   (diff/self/fuzz-streams.test.ts).
+ * - Then pluginCases(RUNS) cases (a third of RUNS, rounded up) that each
+ *   draw plugins (the audit ledger, logging, performance, clobber alert and
+ *   loop), a watch or distributable snapshots (L12, model.ts
+ *   `pluginArbitrary`), from their own seed, for the same reason: the three
+ *   phases above draw what they drew before L12-pre
+ *   (diff/self/l12-plugins.test.ts).
  *
  * Every engine run has a timer-callback budget (diff/scenario.ts
  * RUN_BUDGET). A case whose reference run passes it never settles on 1.35
@@ -106,6 +112,7 @@ import {
   type FuzzSpec,
   baseArbitrary,
   dataFormArbitrary,
+  pluginArbitrary,
   specArbitrary,
   specTriggers,
   toScenario,
@@ -138,6 +145,12 @@ const DATA_FORM_SEED = (SEED ^ 0x1d4b2e67) | 0;
 
 /** How many data-form cases a run of `runs` adds: a third, rounded up. */
 const dataFormCases = (runs: number) => Math.ceil(runs / 3);
+
+/** The plugin phase's seed (L12), derived from the first the same way. */
+const PLUGIN_SEED = (SEED ^ 0x3c6ef372) | 0;
+
+/** How many plugin cases a run of `runs` adds: a third, rounded up. */
+const pluginCases = (runs: number) => Math.ceil(runs / 3);
 
 /** Report mode: the nightly's deep runs only (lib/fuzz.ts `batchReportMode`). */
 const REPORT_MODE = batchReportMode();
@@ -241,6 +254,14 @@ describe("differential fuzz", () => {
         runs: dataFormCases(RUNS),
         seed: DATA_FORM_SEED,
         arbitrary: dataFormArbitrary(),
+        examples: [] as [FuzzSpec][],
+      },
+      {
+        label:
+          "with plugins and distributable snapshots (L12), on their own seed",
+        runs: pluginCases(RUNS),
+        seed: PLUGIN_SEED,
+        arbitrary: pluginArbitrary(),
         examples: [] as [FuzzSpec][],
       },
     ];

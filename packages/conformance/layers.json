@@ -8118,6 +8118,159 @@
         }
       }
     },
+    "tests/core/l12-debt-observe-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L8",
+      "tests": {
+        "mutation debt owed to L8: history navigation through observe() and hooks > each fact.change over writes, an effect's copy, goBack, goForward and a restore, with the snapshot and navigation hooks": {
+          "layer": "L8",
+          "by": [
+            "member .goBack",
+            "member .goForward",
+            "member .history",
+            "option history"
+          ],
+          "pulledDown": ["member .observe (L9)"]
+        },
+        "mutation debt owed to L9: fact tags through meta, beside observe() > meta reports each fact's tags, untagged facts as carrying none, and observe() sees the same writes": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"],
+          "pulledDown": ["member .observe (L9)"]
+        },
+        "mutation debt owed to L11: a data-form when through observe() and inspect() > constraint.evaluate carries active and whenExplain, and inspect() the whenSpec, beside a function when": {
+          "layer": "L11",
+          "by": ["option predicate data form"],
+          "pulledDown": ["member .observe (L9)"]
+        }
+      }
+    },
+    "tests/core/l12-plugins-pins-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L12",
+      "pin": true,
+      "tests": {
+        "L12 probe pins (production) > U3: a watch with nothing to watch returns a no-op, never calls and is silent": {
+          "layer": "L12",
+          "by": ["member .watchDistributableSnapshot"]
+        },
+        "L12 probe pins (production) > U4: unknown keys are ignored silently": {
+          "layer": "L12",
+          "by": ["member .getDistributableSnapshot"]
+        },
+        "L12 probe pins (production) > U4: a throwing derivation is left out silently": {
+          "layer": "L12",
+          "by": ["member .getDistributableSnapshot"]
+        },
+        "L12 probe pins (production) > U4: namespaced keys nest under their module": {
+          "layer": "L12",
+          "by": ["member .getDistributableSnapshot"]
+        }
+      }
+    },
+    "tests/core/l12-plugins-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L12",
+      "pin": true,
+      "tests": {
+        "L12 probe pins (development) > U3: a watch with nothing to watch warns, returns a no-op and never calls (D5)": {
+          "layer": "L12",
+          "by": ["member .watchDistributableSnapshot"]
+        },
+        "L12 probe pins (development) > U4: unknown keys are ignored with a warning naming what is available (D2)": {
+          "layer": "L12",
+          "by": ["member .getDistributableSnapshot"]
+        },
+        "L12 probe pins (development) > U4: a throwing derivation is left out with a warning (D3)": {
+          "layer": "L12",
+          "by": ["member .getDistributableSnapshot"]
+        },
+        "L12 probe pins (development) > U4: with no options every derivation is in and no fact (D1b)": {
+          "layer": "L12",
+          "by": ["member .getDistributableSnapshot"]
+        },
+        "L12 probe pins (development) > U4: namespaced keys nest under their module (D7)": {
+          "layer": "L12",
+          "by": ["member .getDistributableSnapshot"]
+        },
+        "L12 probe pins (development) > U5: a snapshot holding undefined verifies in place and fails after JSON (S2)": {
+          "layer": "L12",
+          "by": [
+            "import signSnapshot",
+            "import verifySnapshotSignature",
+            "member .getDistributableSnapshot"
+          ]
+        },
+        "L12 probe pins (development) > U5: a snapshot holding a Date verifies in place and fails after JSON (S3)": {
+          "layer": "L12",
+          "by": ["import signSnapshot", "import verifySnapshotSignature"]
+        },
+        "L12 probe pins (development) > U5: plain JSON data verifies in place and after JSON (S1)": {
+          "layer": "L12",
+          "by": ["import signSnapshot", "import verifySnapshotSignature"]
+        },
+        "L12 probe pins (development) > U6: a change below 50 levels still verifies (S5)": {
+          "layer": "L12",
+          "by": ["import signSnapshot", "import verifySnapshotSignature"]
+        },
+        "L12 probe pins (development) > U6: a change at a shallow level does not verify": {
+          "layer": "L12",
+          "by": ["import signSnapshot", "import verifySnapshotSignature"]
+        },
+        "L12 probe pins (development) > U6: \"[function]\" verifies for a function (S6)": {
+          "layer": "L12",
+          "by": ["import signSnapshot", "import verifySnapshotSignature"]
+        },
+        "L12 probe pins (development) > U7: an empty secret throws (S4)": {
+          "layer": "L12",
+          "by": ["import signSnapshot"]
+        },
+        "L12 probe pins (development) > U8: verify is true at exactly expiresAt and false after (S7)": {
+          "layer": "L12",
+          "by": [
+            "import isSnapshotExpired",
+            "import signSnapshot",
+            "import validateSnapshot",
+            "import verifySnapshotSignature"
+          ]
+        },
+        "L12 probe pins (development) > U8: metadata and an added expiresAt are covered by the signature (S8)": {
+          "layer": "L12",
+          "by": ["import signSnapshot", "import verifySnapshotSignature"]
+        },
+        "L12 probe pins (development) > U9: the clobber-loop events reach an observer as the object given, with no type added (C1)": {
+          "layer": "L12",
+          "by": ["import createAuditLedger"]
+        },
+        "L12 probe pins (development) > U9: with no hook for the event, the observers alone hear it (C2)": {
+          "layer": "L12",
+          "by": ["import createAuditLedger"]
+        },
+        "L12 probe pins (development) > U9: after the observer leaves and with no plugin, a notify reaches no one and does not throw": {
+          "layer": "L9",
+          "by": ["member .clobberLoopDetected", "member .observe"]
+        },
+        "L12 probe pins (development) > U10: verify({ strong: true }) throws 1.35's \"reserved for v2\"; entries are djb2-1, chained by hex hashes of at most 8 characters (A1)": {
+          "layer": "L12",
+          "by": ["import createAuditLedger"]
+        },
+        "L12 probe pins (development) > U13: the status plugin tracks a requirement from pending to settled": {
+          "layer": "L12",
+          "by": ["import createRequirementStatusPlugin"]
+        },
+        "L12 probe pins (development) > U13: the status plugin records a failed requirement's error": {
+          "layer": "L12",
+          "by": ["import createRequirementStatusPlugin"]
+        },
+        "L12 probe pins (development) > U13: createSystemWithStatus wires the status plugin into the system": {
+          "layer": "L12",
+          "by": ["import createSystemWithStatus"]
+        },
+        "L12 probe pins (development) > U17: registerModule and unregisterModule reach an observer as { type, id }": {
+          "layer": "L10",
+          "by": ["member .registerModule", "member .unregisterModule"]
+        }
+      }
+    },
     "tests/core/l2-constraints-oracle-production.test.ts": {
       "category": "black-box",
       "rule": "L2",
@@ -17411,7 +17564,7 @@
           "layer": "L12",
           "by": ["import createAuditLedger", "import memorySink"]
         },
-        "createAuditLedger — per-subject erase() > verify() detects tamper of the entry just before a tombstone": {
+        "createAuditLedger — per-subject erase() > verify() misses a tamper of the entry just before a tombstone (known gap, pinned)": {
           "layer": "L12",
           "by": ["import createAuditLedger", "import memorySink"]
         },
@@ -17839,20 +17992,24 @@
       "rule": "L12",
       "tests": {
         "clobberAlertPlugin > fires onAlert when a clobber lands on an irreversible-tagged fact": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": ["import clobberAlertPlugin"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberAlertPlugin > does NOT fire when the clobbered fact has no overlapping tags": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": ["import clobberAlertPlugin"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberAlertPlugin > does NOT fire when the clobbered fact carries no tags at all": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": ["import clobberAlertPlugin"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberAlertPlugin > respects a custom irreversibleTags list": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": ["import clobberAlertPlugin"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberAlertPlugin > cooldownMs suppresses a second alert on the same fact within the window": {
           "layer": "L12",
@@ -17863,16 +18020,19 @@
           "by": ["import clobberAlertPlugin"]
         },
         "clobberAlertPlugin > irreversibleResolvers fires alerts even when fact has no matching tags": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": ["import clobberAlertPlugin"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberAlertPlugin > isolates a throwing onAlert callback from the dispatch path": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": ["import clobberAlertPlugin"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberAlertPlugin > default onAlert routes to console.error": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": ["import clobberAlertPlugin"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberAlertPlugin > matchedBy discriminator reports tag, resolver, or both": {
           "layer": "L12",
@@ -17909,76 +18069,158 @@
       "rule": "L12",
       "tests": {
         "clobberLoopPlugin — detector core > 1. fires once when two resolvers exceed threshold on one fact": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — detector core > 2. fires ONE event for a three-way loop (A→B→C→A)": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — detector core > 3. does NOT fire when one resolver clobbers itself": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — detector core > 4. does NOT fire below threshold": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — detector core > 5. does NOT fire when a window rollover splits the rejections": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — detector core > 6. LRU evicts the oldest fact when maxTrackedFacts is exceeded": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — detector core > 7. cooldown suppresses re-fire within the cooldown window": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — detector core > 8. retry-storm on same requirementId counts as ONE distinct rejection": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — detector core > 9. system.destroy() clears state and a fresh harness has no cross-bleed": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — detector core > 10. observer counts exactly ONE emit per real loop (no recursive amplification)": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — predicate-overlap proof > 11. emits function-form-opaque verdict when whenSpec cannot be reached": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — SRE / lifecycle > 12. resolved event fires after the quiet window elapses": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — SRE / lifecycle > 13. global rate-limit caps emissions per second": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — SRE / lifecycle > 14. handle.disable() stops emission; enable() resumes without warm-up drift": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — SRE / lifecycle > 15. severity escalates to 'error' when fact carries pii tag": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "clobberLoopPlugin — audit-ledger integration > 16. audit-ledger captures resolver.clobber.loop.detected entries": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L12",
+          "by": [
+            "import clobberLoopPlugin",
+            "import createAuditLedger",
+            "import memorySink"
+          ],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "RetryPolicy.shouldRetry — reason-aware context > 17. two-arg shouldRetry continues to work unchanged (back-compat)": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         },
         "RetryPolicy.shouldRetry — reason-aware context > 18. three-arg shouldRetry receives ShouldRetryContext with reason='error' on a sync throw": {
-          "layer": "L13",
-          "by": ["import flushMicrotasks"]
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["import flushMicrotasks (L13)"]
         }
       }
     },

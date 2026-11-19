@@ -140,7 +140,45 @@ export type FuzzStep =
    * `describePredicate`, `predicateHash`, `predict` and
    * `doctor.checkAgainst` over the case's own data forms and facts.
    */
-  | { op: "tools" };
+  | { op: "tools" }
+  | PluginStep;
+
+/**
+ * L12 (the L12 RFC's B1): a `distributable` step records
+ * `getDistributableSnapshot` with drawn options (each derivation and fact
+ * by index into the first module; `include: null` asks for every
+ * derivation), and a `ledger` step records the audit ledger's `verify()` and
+ * its entries (`ledgerRecord`).
+ */
+export type PluginStep =
+  | {
+      op: "distributable";
+      include: number[] | null;
+      exclude: number[];
+      facts: number[];
+      ttl: boolean;
+      version: boolean;
+    }
+  | { op: "ledger" };
+
+/**
+ * The plugins and the watch an L12 case draws (`pluginDraws`). Every plugin
+ * goes in before the recorder, so the recorder still sees every hook.
+ * `clobber` (clobber alert, and with `loop` the clobber-loop plugin) is
+ * drawn only in a case whose batched resolver has an `abortOn` source, so
+ * clobbers happen. `watch` installs `watchDistributableSnapshot` on the
+ * first module just after the start and records each callback.
+ * `inserted` lists, by index into `steps`, the steps the L12 draws put in,
+ * so `withoutPlugins` can take them out again.
+ */
+export interface FuzzPlugins {
+  ledger: boolean;
+  logging: boolean;
+  performance: boolean;
+  clobber: { loop: boolean } | null;
+  watch: { include: number[] | null; facts: number[] } | null;
+  inserted: number[];
+}
 
 /**
  * The data forms an L11 case draws (the L11 RFC's "The fuzz, designed in up
@@ -446,6 +484,12 @@ export interface FuzzSpec {
    * definition is a function.
    */
   predicates?: FuzzPredicates;
+  /**
+   * L12, plugin cases only (the L12 RFC's B1): the plugins and watch drawn
+   * (`pluginDraws`). Absent (a spec written before L12-pre), the recorder
+   * is the only plugin and no distributable snapshot is taken.
+   */
+  plugins?: FuzzPlugins;
 }
 
 /**
@@ -505,6 +549,14 @@ export const FEATURE_LAYERS = {
    * the one L10-pre drew.
    */
   predicates: 11,
+  /**
+   * Plugins and distributable snapshots (L12): the `plugins` spec field
+   * (the audit ledger, logging, performance, clobber alert and loop, a
+   * watch) and the `distributable` and `ledger` steps. Drawn after
+   * everything else (`pluginDraws`), so a case below L12 is the one
+   * L11-pre drew.
+   */
+  plugins: 12,
 } as const;
 
 type Feature = keyof typeof FEATURE_LAYERS;
@@ -531,6 +583,8 @@ const STEP_FEATURES = {
   inflight: "dynamic",
   module: "dynamic",
   tools: "predicates",
+  distributable: "plugins",
+  ledger: "plugins",
 } as const satisfies Partial<Record<FuzzStep["op"], Feature>>;
 
 const layerNumber = (layer: string) => Number(layer.slice(1));
@@ -796,9 +850,16 @@ export function specArbitrary(
   // At L11 the data forms are drawn last (`predicateDraws`), so below L11 a
   // case is the one L10-pre drew, digest for digest
   // (diff/self/abort-draw.test.ts).
-  return allows("predicates")
+  const withPredicates = allows("predicates")
     ? withDynamic.chain((spec) => predicateDraws(spec))
     : withDynamic;
+
+  // At L12 the plugins are drawn last (`pluginDraws`), so below L12 a case
+  // is the one L11-pre drew, digest for digest
+  // (diff/self/abort-draw.test.ts).
+  return allows("plugins")
+    ? withPredicates.chain((spec) => pluginDraws(spec))
+    : withPredicates;
 }
 
 /**
@@ -822,6 +883,115 @@ export function baseArbitrary(): fc.Arbitrary<FuzzSpec> {
  */
 export function dataFormArbitrary(): fc.Arbitrary<FuzzSpec> {
   return baseArbitrary().chain((spec) => predicateDraws(spec, true));
+}
+
+/**
+ * A base case (`baseArbitrary`) that always draws plugins (`pluginDraws`),
+ * so every case it draws sits at L12. Its own phase and seed in the fuzz
+ * (diff/fuzz/fuzz.test.ts), so the draws of the other phases do not move.
+ */
+export function pluginArbitrary(): fc.Arbitrary<FuzzSpec> {
+  return baseArbitrary().chain((spec) => pluginDraws(spec, true));
+}
+
+/** Indexes into a list of `n`, each at most once, in draw order. */
+const someOf = (n: number, maxLength = 3) =>
+  n === 0
+    ? fc.constant<number[]>([])
+    : fc.uniqueArray(fc.nat({ max: n - 1 }), { maxLength });
+
+/** Does the case's batched resolver bind a source with `abortOn`? */
+export function clobbers(spec: FuzzSpec): boolean {
+  return (spec.batch?.sources ?? []).some((source) => source.abortOn);
+}
+
+function pluginDraws(spec: FuzzSpec, always = false): fc.Arbitrary<FuzzSpec> {
+  const first = spec.modules[0] as FuzzModule;
+  const derivations = first.derivations.length;
+  const distributable: fc.Arbitrary<PluginStep> = fc.record({
+    op: fc.constant("distributable" as const),
+    include: fc.option(someOf(derivations), { nil: null, freq: 3 }),
+    exclude: someOf(derivations, 1),
+    facts: someOf(first.facts),
+    ttl: fc.boolean(),
+    version: fc.boolean(),
+  });
+  const drawn = fc.record({
+    ledger: fc.boolean(),
+    logging: fc.boolean(),
+    performance: fc.boolean(),
+    clobber: clobbers(spec)
+      ? fc.option(fc.record({ loop: fc.boolean() }), { nil: null, freq: 3 })
+      : fc.constant(null),
+    watch: fc.option(
+      fc.record({
+        include: fc.option(someOf(derivations), { nil: null, freq: 3 }),
+        facts: someOf(first.facts),
+      }),
+      { nil: null, freq: 2 },
+    ),
+    distributable: fc.array(fc.tuple(fc.nat(), distributable), {
+      maxLength: 2,
+    }),
+    ledgerAt: fc.array(fc.nat(), { maxLength: 2 }),
+  });
+
+  const withPlugins = drawn.map((d): FuzzSpec => {
+    const steps: FuzzStep[] = [...spec.steps];
+    const added = new Set<FuzzStep>();
+    const put = (at: number, step: FuzzStep) => {
+      steps.splice(at % (steps.length + 1), 0, step);
+      added.add(step);
+    };
+    for (const [at, step] of d.distributable) {
+      put(at, step);
+    }
+    if (d.ledger) {
+      for (const at of d.ledgerAt) {
+        put(at, { op: "ledger" });
+      }
+      // The last step always records the ledger, so it compares everything
+      // the ledger saw.
+      const last: FuzzStep = { op: "ledger" };
+      steps.push(last);
+      added.add(last);
+    }
+
+    return {
+      ...spec,
+      steps,
+      plugins: {
+        ledger: d.ledger,
+        logging: d.logging,
+        performance: d.performance,
+        clobber: d.clobber,
+        watch: d.watch,
+        inserted: steps.flatMap((s, i) => (added.has(s) ? [i] : [])),
+      },
+    };
+  });
+
+  return always
+    ? withPlugins
+    : fc.oneof(
+        { weight: 2, arbitrary: fc.constant(spec) },
+        { weight: 1, arbitrary: withPlugins },
+      );
+}
+
+/**
+ * A drawn spec with no plugins: the `plugins` field and the steps it put in
+ * taken out, so what is left is the case as drawn before L12-pre
+ * (diff/self/abort-draw.test.ts, diff/self/l12-plugins.test.ts).
+ */
+export function withoutPlugins(spec: FuzzSpec): FuzzSpec {
+  const { plugins, ...rest } = spec;
+  if (plugins === undefined) {
+    return spec;
+  }
+  const inserted = new Set(plugins.inserted);
+
+  return { ...rest, steps: spec.steps.filter((_, i) => !inserted.has(i)) };
 }
 
 const gateArbitrary: fc.Arbitrary<FuzzGate> = fc.record({
@@ -1330,6 +1500,9 @@ export function specLayer(spec: FuzzSpec): string {
   }
   if (spec.predicates !== undefined) {
     use("predicates");
+  }
+  if (spec.plugins !== undefined) {
+    use("plugins");
   }
 
   return `L${n}`;
@@ -2516,6 +2689,22 @@ const TRIGGERS = {
   /** L11: a `tools` step. */
   predicateTools: (spec) =>
     spec.predicates !== undefined && spec.steps.some((s) => s.op === "tools"),
+  /** L12: a `distributable` step. */
+  distributable: (spec) =>
+    spec.plugins !== undefined &&
+    spec.steps.some((s) => s.op === "distributable"),
+  /** L12: a watched distributable snapshot. */
+  distributableWatch: (spec) => (spec.plugins?.watch ?? null) !== null,
+  /** L12: the audit ledger, recorded by its `ledger` steps. */
+  auditLedger: (spec) => spec.plugins?.ledger === true,
+  /** L12: the logging plugin. */
+  loggingPlugin: (spec) => spec.plugins?.logging === true,
+  /** L12: the performance plugin. */
+  performancePlugin: (spec) => spec.plugins?.performance === true,
+  /** L12: clobber alert, on a case that clobbers. */
+  clobberAlert: (spec) => (spec.plugins?.clobber ?? null) !== null,
+  /** L12: the clobber-loop plugin beside clobber alert. */
+  clobberLoop: (spec) => spec.plugins?.clobber?.loop === true,
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
@@ -2680,10 +2869,143 @@ function build(spec: FuzzSpec) {
         : { modules: { a: more[0], b: more[1] }, ...options(spec) };
     };
 
+    const plugins = pluginsOf(spec, ctx);
+
     return defs.length === 1
-      ? { module: defs[0], ...options(spec) }
-      : { modules: { a: defs[0], b: defs[1] }, ...options(spec) };
+      ? { module: defs[0], ...options(spec), ...plugins }
+      : { modules: { a: defs[0], b: defs[1] }, ...options(spec), ...plugins };
   };
+}
+
+/**
+ * The plugins an L12 case draws, built from the engine's own `/plugins`
+ * entry. The scenario appends the recorder after them. Logging's lines are
+ * recorded as external events, its message only, as the "logging and
+ * performance plugins on a clobbered charge" scenario does; clobber alert's
+ * and the clobber loop's events as they come.
+ */
+function pluginsOf(spec: FuzzSpec, ctx: BuildContext): { plugins?: unknown[] } {
+  const p = spec.plugins;
+  if (p === undefined) {
+    return {};
+  }
+  const out: unknown[] = [];
+  if (p.ledger) {
+    const ledger = ctx.plugins.createAuditLedger();
+    ctx.handles.ledger = ledger;
+    out.push(ledger.plugin);
+  }
+  if (p.logging) {
+    const line =
+      (level: string) =>
+      (...args: unknown[]) =>
+        ctx.external(["log", level, args[0]]);
+    out.push(
+      ctx.plugins.loggingPlugin({
+        level: "debug",
+        logger: {
+          debug: line("debug"),
+          info: line("info"),
+          warn: line("warn"),
+          error: line("error"),
+          group: () => {},
+          groupEnd: () => {},
+        },
+      }),
+    );
+  }
+  if (p.performance) {
+    const perf = ctx.plugins.performancePlugin({});
+    ctx.handles.performance = perf;
+    out.push(perf);
+  }
+  if (p.clobber !== null) {
+    out.push(
+      ctx.plugins.clobberAlertPlugin({
+        onAlert: (event: unknown) => ctx.external(["clobber alert", event]),
+      }),
+    );
+    if (p.clobber.loop) {
+      out.push(
+        ctx.plugins.clobberLoopPlugin({
+          threshold: 2,
+          windowMs: 1000,
+          onLoop: (event: unknown) => ctx.external(["clobber loop", event]),
+          onResolved: (event: unknown) =>
+            ctx.external(["clobber loop resolved", event]),
+        }).plugin,
+      );
+    }
+  }
+
+  return out.length === 0 ? {} : { plugins: out };
+}
+
+/** A key of the first module, namespaced in a case with two modules. */
+const firstKey = (spec: FuzzSpec, key: string) =>
+  spec.modules.length > 1 ? `a.${key}` : key;
+
+/** `getDistributableSnapshot`'s options for a step or a watch. */
+function distributableOptions(
+  spec: FuzzSpec,
+  d: {
+    include: number[] | null;
+    exclude?: number[];
+    facts: number[];
+    ttl?: boolean;
+    version?: boolean;
+  },
+): Record<string, unknown> {
+  const derivation = (i: number) => firstKey(spec, `d${i}`);
+
+  return {
+    ...(d.include === null
+      ? {}
+      : { includeDerivations: d.include.map(derivation) }),
+    ...(d.exclude === undefined || d.exclude.length === 0
+      ? {}
+      : { excludeDerivations: d.exclude.map(derivation) }),
+    ...(d.facts.length === 0
+      ? {}
+      : { includeFacts: d.facts.map((i) => firstKey(spec, f(i))) }),
+    ...(d.ttl ? { ttlSeconds: 60 } : {}),
+    ...(d.version ? { includeVersion: true } : {}),
+  };
+}
+
+/**
+ * The harness's rule 1 for L12 (the L12 RFC): the performance plugin's
+ * durations and clock readings are compared by contract, a finite number at
+ * or above 0, and its counts exactly.
+ */
+export function performanceByContract(value: unknown, key = ""): unknown {
+  if (typeof value === "number") {
+    return /DurationMs$|At$|^uptime$/.test(key)
+      ? Number.isFinite(value) && value >= 0
+        ? "<time>"
+        : value
+      : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => performanceByContract(v));
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, performanceByContract(v, k)]),
+    );
+  }
+
+  return value;
+}
+
+/** The audit ledger's `verify()` and its entries, as a `ledger` step records them. */
+function ledgerRecord(ctx: BuildContext, label: string): void {
+  const ledger = ctx.handles.ledger;
+  if (!ledger) {
+    return;
+  }
+  ctx.external([label, attempt(() => ledger.verify())]);
+  ctx.external([label, "entries", attempt(() => ledger.query({}))]);
 }
 
 function steps(spec: FuzzSpec): Step[] {
@@ -2722,9 +3044,47 @@ function steps(spec: FuzzSpec): Step[] {
       },
     });
   }
+  // An L12 case with a watch installs it just after the start, on the first
+  // module, and records each callback.
+  const watch = spec.plugins?.watch ?? null;
+  if (watch !== null) {
+    out.push({
+      op: "run",
+      label: "watch a distributable snapshot",
+      fn: (system, ctx) => {
+        ctx.handles.unwatch = attempt(() =>
+          system.watchDistributableSnapshot(
+            distributableOptions(spec, watch),
+            (snapshot: unknown) => ctx.external(["watch", snapshot]),
+          ),
+        );
+      },
+    });
+  }
   for (const s of spec.steps) {
     const label = JSON.stringify(s);
     switch (s.op) {
+      case "distributable":
+        out.push({
+          op: "run",
+          label,
+          fn: (system, ctx) => {
+            ctx.external([
+              label,
+              attempt(() =>
+                system.getDistributableSnapshot(distributableOptions(spec, s)),
+              ),
+            ]);
+          },
+        });
+        break;
+      case "ledger":
+        out.push({
+          op: "run",
+          label,
+          fn: (_system, ctx) => ledgerRecord(ctx, label),
+        });
+        break;
       case "dispatch": {
         const m = mod(s.module);
         const name = `e${s.event % m.events.length}`;
@@ -2935,6 +3295,22 @@ function steps(spec: FuzzSpec): Step[] {
     }
   }
   out.push({ op: "settle" });
+  // An L12 case with the performance plugin records its numbers at the end,
+  // the durations by contract (rule 1).
+  if (spec.plugins?.performance) {
+    out.push({
+      op: "run",
+      label: "performance at the end",
+      fn: (_system, ctx) => {
+        ctx.external([
+          "performance",
+          performanceByContract(
+            attempt(() => ctx.handles.performance?.getSnapshot()),
+          ),
+        ]);
+      },
+    });
+  }
 
   return out;
 }

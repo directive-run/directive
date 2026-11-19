@@ -110,6 +110,15 @@ export const FUZZ_TRIGGERS = [
   "eventPatch",
   "resolverKey",
   "predicateTools",
+  // L12 (the L12 RFC's B1): the plugins and steps a case draws
+  // (diff/fuzz/model.ts `FuzzPlugins`, `PluginStep`).
+  "distributable",
+  "distributableWatch",
+  "auditLedger",
+  "loggingPlugin",
+  "performancePlugin",
+  "clobberAlert",
+  "clobberLoop",
 ] as const;
 
 export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];

@@ -118,6 +118,9 @@ describe("fuzz generator ceiling", () => {
         steps("define", "inflight", "module"),
       predicates:
         specs.some((s) => s.predicates !== undefined) && steps("tools"),
+      plugins:
+        specs.some((s) => s.plugins !== undefined) &&
+        steps("distributable", "ledger"),
     };
 
     expect(Object.keys(used).sort()).toEqual(

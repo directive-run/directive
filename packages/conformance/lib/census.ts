@@ -408,7 +408,8 @@ export function checkConfig(
           root: conformanceRoot,
           environment: "node",
           include: ["diff/**/*.test.ts"],
-          testTimeout: 120_000,
+          // vitest.config.ts says why: the fuzz test's CI time on the census.
+          testTimeout: 240_000,
           server: {
             deps: {
               inline: [/[\\/]directive-v1[\\/]/, /@directive-run\+core@/],

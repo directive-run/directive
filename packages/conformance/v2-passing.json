@@ -2789,9 +2789,6 @@
         "published declarations > keeps the type through every chainable builder",
         "published declarations > types a plain fact"
       ],
-      "tests/plugins/audit-ledger.test.ts": [
-        "createAuditLedger — per-subject erase() > verify() detects tamper of the entry just before a tombstone"
-      ],
       "tests/plugins/clobber-loop.test.ts": [
         "RetryPolicy.shouldRetry — reason-aware context > 17. two-arg shouldRetry continues to work unchanged (back-compat)",
         "RetryPolicy.shouldRetry — reason-aware context > 18. three-arg shouldRetry receives ShouldRetryContext with reason='error' on a sync throw"
@@ -3057,6 +3054,12 @@
       "file": "tests/core/l10-dynamic-pins-oracle.test.ts",
       "test": "derive.assign with { compute, meta } leaves the derivation throwing (U1; row bl) > register with the same object form works",
       "reason": "L10 gate, row (bl): the U1 describe was retitled \"derive.assign with { compute, meta } (U1; row bl)\" when U1 was trimmed to what both engines share (GATE-9.md, The pins). The same case, unchanged, is listed under its new name, \"derive.assign with { compute, meta } (U1; row bl) > register with the same object form works\", and passes."
+    },
+    {
+      "project": "conformance:v2",
+      "file": "tests/plugins/audit-ledger.test.ts",
+      "test": "createAuditLedger — per-subject erase() > verify() detects tamper of the entry just before a tombstone",
+      "reason": "L12-pre (U11): the test was it.fails, which passed on v2 only because memorySink is missing (any throw satisfied it). It is now a plain test, renamed \"verify() misses a tamper of the entry just before a tombstone (known gap, pinned)\", asserting 1.35's outcome; it fails on v2 until L12c builds the audit ledger, where row (by) turns it round with a signed entry."
     }
   ]
 }
