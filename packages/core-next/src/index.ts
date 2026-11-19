@@ -85,6 +85,17 @@ export { describePredicate } from "./api/predicate-describe.js";
 export { predicateToSQL, predicateToWhere } from "./api/predicate-to-sql.js";
 export { predicateToMongo } from "./api/predicate-to-mongo.js";
 export { predicateToPostgrest } from "./api/predicate-to-pgrest.js";
+// The snapshot tools (L12a): root exports only, so a system that does not
+// call them bundles none. signSnapshot is built in utils/snapshot.ts but not
+// exported yet: the surface gate's self-test holds it as its stock unshipped
+// L12 name, an oracle file this slice may not change.
+export {
+  diffSnapshots,
+  isSignedSnapshot,
+  isSnapshotExpired,
+  validateSnapshot,
+  verifySnapshotSignature,
+} from "./utils/snapshot.js";
 export type {
   Branded,
   ChainableArrayType,
