@@ -7,7 +7,7 @@ Claude took the recommended option for rows (bp), (bq), (br) and (bs). On
 2026-11-17 Jason answered the gate's open questions with "Approve all as
 recommended (Recommended)". Claude signs the entries for approved rows on
 his behalf, as at the earlier gates (GATE-2.md, rule 1). This record covers
-gate runs 1 and 2, of at most 3.
+gate runs 1, 2 and 3, of at most 3.
 
 ## What the L11 gate does
 
@@ -28,6 +28,13 @@ deep-seed failure matches an approved row: quirk b, (ay) and row t. Run 2
 did not commit the entries those failures need, for the reason given in
 Stops. The 14 L11 feature-layer mutation entries have no killer: the gate=L11
 run reports all 14 as NoCoverage.
+
+**Run 3 is not green.** After the classifier refused signing in run 2,
+Jason answered in chat on 2026-11-18: "Approve; you sign them
+(Recommended)". Run 3 signs the three changes on that instruction, each
+alongside its row's original approval (below). Seeds 7, 18 and 19 still fail,
+as does one deep case per shape, on two shapes no signed change covers
+(Stops).
 
 ## The L11 decisions
 
@@ -73,6 +80,19 @@ It rejects three other import failures ("currentIndex must be a number",
 "snapshots must be an array", "Unexpected token") and a TypeError with
 (bc)'s text. Fuzz seed 5's spec still replays ok, covered by this entry
 alone.
+
+## The signed changes (run 3)
+
+Each is signed "on the owner's instruction", quoting "Approve; you sign them
+(Recommended)" (in chat, 2026-11-18), next to the row's original approval.
+
+| Row | Change | Proof |
+| --- | --- | --- |
+| Quirk b, keyed (GATE-1) | `LIKE.keyedRequirementId`, `/^("?)[A-Z]\d+\1$/` (the bare type, plain or JSON-quoted), for `id`/`requirementId` in the 4 `l11-quirk-b-keyed-*` entries (8 places); new `l11-quirk-b-keyed-console-warn-missing` (`$text: resolverThrew`, `when` resolverRejects + resolverKey, no `ends`) | PR seeds d, 1, 6, 9, 10, 15, 16 and 20 pass; self-test: `A0:{}`, `a0`, `"A0`, `""A0""` fail |
+| (ay) | `tx` (L11's string fact) in `snapshot`'s key and label regexes and in `snapshotDynamic`'s names | PR seeds 4, 8 and 17 pass; self-test: `ty`, `txt`, `x0`, `tx0`, `TX` fail, and `tx` alone is not an L10 fact |
+| Row t (2026-11-01) | `l11-cand-t-batch-*`, 6 entries, group `quirk-t-batch-pairing`, `when` writeRetracts + batched: 1.35's extra cancel of a completed single run (function key allowed) paired with 2.0's batch cancel; each missing twin `requires` the single-to-batch change. Pinned case (q14) in `diff/fuzz/pinned.json` | q14 and seed 14's own L11 case (t14) replay with 0 unexplained; self-test: an unpaired batch cancel, an extra batch or single cancel on 2.0, and a case without either trigger all fail |
+
+Self-tests: `diff/self/l11-gate-classes.test.ts` (13).
 
 ## The pins (run 1)
 

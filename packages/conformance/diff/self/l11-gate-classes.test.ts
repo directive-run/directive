@@ -51,12 +51,18 @@ describe("keyedRequirementId: a keyed requirement's id, and no other shape", () 
     expect(generalizeValue("A0")).toEqual({ $like: "requirementType" });
   });
 
-  it("only quirk b's keyed twins name it", () => {
+  it("only quirk b's keyed twins and row t's batch-pairing twin name it", () => {
     const naming = readDivergences()
       .filter((e) => JSON.stringify(e).includes('"keyedRequirementId"'))
       .map((e) => e.id)
       .sort();
     expect(naming).toEqual([
+      "l11-cand-t-batch-hook-onRequirementCanceled-changed",
+      "l11-cand-t-batch-hook-onRequirementCanceled-missing",
+      "l11-cand-t-batch-hook-onResolverCancel-changed",
+      "l11-cand-t-batch-hook-onResolverCancel-missing",
+      "l11-cand-t-batch-observe-requirement-canceled-changed",
+      "l11-cand-t-batch-observe-requirement-canceled-missing",
       "l11-quirk-b-keyed-hook-onError-missing",
       "l11-quirk-b-keyed-hook-onErrorRecovery-missing",
       "l11-quirk-b-keyed-hook-onResolverError-missing",
@@ -206,6 +212,20 @@ describe("row t's batch-pairing twin excuses only 1.35's extra single-run cancel
     each((kind, _r1, rb) =>
       expect(left([rb], [], T), kind).toEqual([`missing ${kind}`]),
     );
+  });
+
+  it("a keyed single run (PR seed 14 at L11) is excused the same way, and its extra on 2.0 still fails", () => {
+    const keyed = {
+      fromConstraint: "c1",
+      id: "A1",
+      requirement: { at: 0, type: "A1" },
+    };
+    for (const [kind, make] of kinds) {
+      const r1 = make(keyed, "r1");
+      const rb = make(batch, "rb");
+      expect(left([r1, rb], [rb], T), kind).toEqual([]);
+      expect(left([rb], [r1, rb], T), kind).not.toEqual([]);
+    }
   });
 
   it("a real extra on 2.0 fails", () => {
