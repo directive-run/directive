@@ -75,15 +75,13 @@ describe.each(["single", "namespaced"])("production, %s system", (form) => {
     system.destroy();
   });
 
-  it("an unbuilt member is left out: calling it is a TypeError", () => {
+  it("no member is left unbuilt: L12a built the distributable snapshot calls", () => {
     const system = build();
     // L10b built registerModule and unregisterModule.
-    for (const call of [
-      () => system.getDistributableSnapshot(),
-      () => system.watchDistributableSnapshot({}, () => {}),
-    ]) {
-      expect(call).toThrow(TypeError);
-    }
+    expect(typeof system.getDistributableSnapshot()).toBe("object");
+    expect(typeof system.watchDistributableSnapshot({}, () => {})).toBe(
+      "function",
+    );
     system.destroy();
   });
 });

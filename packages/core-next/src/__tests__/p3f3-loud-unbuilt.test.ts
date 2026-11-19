@@ -103,23 +103,13 @@ describe.each(["single", "namespaced"])("%s system", (form) => {
     }
   });
 
-  it("an unbuilt member throws featureMissing with its code, feature and layer", () => {
+  it("no member is left unbuilt: L12a built the distributable snapshot calls", () => {
     const system = build({}, form);
-    const cases: [() => unknown, string, number][] = [
-      // L10b built registerModule and unregisterModule.
-      [() => system.getDistributableSnapshot(), "getDistributableSnapshot", 12],
-      [
-        () => system.watchDistributableSnapshot({}, () => {}),
-        "watchDistributableSnapshot",
-        12,
-      ],
-    ];
-    for (const [call, feature, layer] of cases) {
-      const error = thrown(call);
-      expect(error).toBeInstanceOf(Error);
-      expect(error).toMatchObject({ code: FEATURE_MISSING, feature, layer });
-      expect(error.message).toContain(feature);
-    }
+    // L10b built registerModule and unregisterModule.
+    expect(typeof system.getDistributableSnapshot()).toBe("object");
+    expect(typeof system.watchDistributableSnapshot({}, () => {})).toBe(
+      "function",
+    );
     system.destroy();
   });
 });

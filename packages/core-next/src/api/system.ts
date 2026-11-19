@@ -22,13 +22,13 @@ import {
   createSystemCore,
 } from "./core.js";
 import { withDefaults } from "./defaults.js";
+import { withDistributable } from "./distributable.js";
 import { withDynamic } from "./dynamic.js";
 import { withEffects } from "./effects.js";
 import { type ErrorBoundaryConfig, withErrorBoundary } from "./errors.js";
 import { withHistory } from "./history.js";
 import { withInspect } from "./inspect.js";
 import { withMeta } from "./meta.js";
-import { withMissing } from "./missing.js";
 import { createNamespacedSystem } from "./namespaced.js";
 import { withObserve } from "./observe.js";
 import { withPlugins } from "./plugins.js";
@@ -48,10 +48,6 @@ export type { ErrorSource };
  * The public signatures are 1.35's two overloads, on 1.35's types (src/types/,
  * copied from 1.35): `{ module }` gives a SingleModuleSystem, `{ modules }` a
  * NamespacedSystem (`system.facts.auth.token`).
- *
- * Declared with 1.35's types but not built yet: the dynamic `constraints`/`resolvers`/`effects` controls,
- * `registerModule`/`unregisterModule` and the distributable snapshot calls
- * throw `featureMissing` (api/missing.ts, slice P3-F3).
  */
 export function createSystem<S extends ModuleSchema135>(
   options: CreateSystemOptionsSingle<S>,
@@ -102,8 +98,9 @@ export function createSystem<
     // L10a: register, assign, unregister and call on the four kinds; every
     // 1.35 system has them.
     withDynamic,
-    // 1.35 members 2.0 has not built: they throw featureMissing (P3-F3).
-    withMissing,
+    // L12a: getDistributableSnapshot and watchDistributableSnapshot; every
+    // 1.35 system has them (A1, O1).
+    withDistributable,
     // Its onInit pass starts once the system is complete.
     withPlugins(options.plugins),
     // L9b: after the plugins, so `onTraceComplete` follows the hook that
