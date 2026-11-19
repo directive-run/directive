@@ -25,6 +25,7 @@ import {
   specArbitrary,
   specTriggers,
   withoutDynamic,
+  withoutPlugins,
   withoutPredicates,
 } from "../fuzz/model.js";
 
@@ -179,6 +180,7 @@ describe("the drawn respectsAbort (the L8 RFC's rule 9)", () => {
     expect(
       streamDigest(
         sample(undefined, 600)
+          .map(withoutPlugins)
           .map(withoutPredicates)
           .map(withoutDynamic)
           .map(withoutL9Draws),
@@ -190,17 +192,29 @@ describe("the drawn respectsAbort (the L8 RFC's rule 9)", () => {
     expect(streamDigest(sample("L9", 600))).toBe("5213d2c0f87f1598");
     expect(
       streamDigest(
-        sample(undefined, 600).map(withoutPredicates).map(withoutDynamic),
+        sample(undefined, 600)
+          .map(withoutPlugins)
+          .map(withoutPredicates)
+          .map(withoutDynamic),
       ),
     ).toBe("5213d2c0f87f1598");
     // L11-pre (the L11 RFC's B1) draws the data forms after everything
     // else: up to L10 the cases are the ones drawn before, and with the
     // data forms taken out, so are the cases with no ceiling.
     expect(streamDigest(sample("L10", 600))).toBe("cb00fa241f09b1d7");
-    expect(streamDigest(sample(undefined, 600).map(withoutPredicates))).toBe(
-      "cb00fa241f09b1d7",
+    expect(
+      streamDigest(
+        sample(undefined, 600).map(withoutPlugins).map(withoutPredicates),
+      ),
+    ).toBe("cb00fa241f09b1d7");
+    // L12-pre (the L12 RFC's B1) draws the plugins after everything else:
+    // up to L11 the cases are the ones drawn before, and with the plugin
+    // draws taken out, so are the cases with no ceiling.
+    expect(streamDigest(sample("L11", 600))).toBe("59785befa61c993f");
+    expect(streamDigest(sample(undefined, 600).map(withoutPlugins))).toBe(
+      "59785befa61c993f",
     );
-    expect(streamDigest(sample(undefined, 600))).toBe("59785befa61c993f");
+    expect(streamDigest(sample(undefined, 600))).toBe("5d94a2d0678fa9b9");
   });
 
   it("never draws it below L8 or without history, as before", () => {

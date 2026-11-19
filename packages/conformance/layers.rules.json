@@ -47,6 +47,8 @@
     "predicate validation against a schema's field kinds": "L11",
     "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)": "L11",
     "`$changed` in an effect's on fires on the first run, then on each change (U10)": "L11",
+    "a watch misses an included fact's change until a derivation changes (U1)": "L12",
+    "a watch calls back in the write, once per batch, with a version (U2, U16)": "L12",
     "logging and performance plugins on a clobbered charge": "L12",
     "clobber alert and clobber loop plugins": "L12",
     "the audit ledger chains entries and verifies": "L12",
@@ -804,6 +806,18 @@
       "rule": "L11",
       "pin": true
     },
+    "tests/core/l12-debt-observe-oracle.test.ts": {
+      "rule": "L8",
+      "instruments": ["member .observe"]
+    },
+    "tests/core/l12-plugins-pins-oracle.test.ts": {
+      "rule": "L12",
+      "pin": true
+    },
+    "tests/core/l12-plugins-pins-oracle-production.test.ts": {
+      "rule": "L12",
+      "pin": true
+    },
     "tests/core/predict.test.ts": {
       "rule": "L11"
     },
@@ -838,10 +852,12 @@
       "rule": "L12"
     },
     "tests/plugins/clobber-alert.test.ts": {
-      "rule": "L12"
+      "rule": "L12",
+      "instruments": ["import flushMicrotasks"]
     },
     "tests/plugins/clobber-loop.test.ts": {
-      "rule": "L12"
+      "rule": "L12",
+      "instruments": ["import flushMicrotasks"]
     },
     "tests/plugins/devtools.test.ts": {
       "rule": "L12"

@@ -734,6 +734,33 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l12-debt-observe-oracle.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l12-plugins-pins-oracle-production.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l12-plugins-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 23,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l2-constraints-oracle-production.test.ts",
     "category": "black-box",
     "cases": 5,

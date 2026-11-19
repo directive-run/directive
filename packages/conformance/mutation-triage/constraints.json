@@ -117,8 +117,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L12",
-    "note": "data-form `when` and its $changed guard (L11) \u2014 killed in the full run by \"devtools whenExplain panel renders the clause tree for a data-form `when` constraint\" (tests/plugins/devtools-when-explain.test.ts)"
+    "layer": "L11",
+    "note": "data-form `when` and its $changed guard (L11) \u2014 killed in the full run by \"devtools whenExplain panel renders the clause tree for a data-form `when` constraint\" (tests/plugins/devtools-when-explain.test.ts) L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L11, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L11: a data-form when through observe() and inspect()\", which a gate: L11 run must report Killed."
   },
   {
     "line": 446,
@@ -1461,8 +1461,8 @@
     "mutator": "BooleanLiteral",
     "replacement": "spec",
     "reason": "later-layer",
-    "layer": "L12",
-    "note": "explainWhen for a data-form `when` \u2014 killed in the full run by \"devtoolsPlugin event tracing records whenExplain on data-form constraint.evaluate events\" (tests/plugins/devtools.test.ts) Killer: data-forms.test.ts."
+    "layer": "L11",
+    "note": "explainWhen for a data-form `when` \u2014 killed in the full run by \"devtoolsPlugin event tracing records whenExplain on data-form constraint.evaluate events\" (tests/plugins/devtools.test.ts) Killer: data-forms.test.ts. L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L11, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L11: a data-form when through observe() and inspect()\", which a gate: L11 run must report Killed."
   },
   {
     "line": 1811,
@@ -1470,8 +1470,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "layer": "L12",
-    "note": "explainWhen for a data-form `when` \u2014 killed in the full run by \"devtools whenExplain panel renders a function-form note when `when` is a function\" (tests/plugins/devtools-when-explain.test.ts) Killer: devtools.test.ts."
+    "layer": "L11",
+    "note": "explainWhen for a data-form `when` \u2014 killed in the full run by \"devtools whenExplain panel renders a function-form note when `when` is a function\" (tests/plugins/devtools-when-explain.test.ts) Killer: devtools.test.ts. L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L11, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L11: a data-form when through observe() and inspect()\", which a gate: L11 run must report Killed."
   },
   {
     "line": 1811,
@@ -1488,8 +1488,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L12",
-    "note": "explainWhen for a data-form `when` \u2014 killed in the full run by \"devtools whenExplain panel renders a function-form note when `when` is a function\" (tests/plugins/devtools-when-explain.test.ts)"
+    "layer": "L11",
+    "note": "explainWhen for a data-form `when` \u2014 killed in the full run by \"devtools whenExplain panel renders a function-form note when `when` is a function\" (tests/plugins/devtools-when-explain.test.ts) L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L11, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L11: a data-form when through observe() and inspect()\", which a gate: L11 run must report Killed."
   },
   {
     "line": 411,
@@ -1497,8 +1497,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "layer": "L12",
-    "note": "Data-form `when` normalisation (predicate DSL, L11): with the body emptied a function `when` still works and only a data-form one breaks. Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\"."
+    "layer": "L11",
+    "note": "Data-form `when` normalisation (predicate DSL, L11): with the body emptied a function `when` still works and only a data-form one breaks. Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\". L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L11, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L11: a data-form when through observe() and inspect()\", which a gate: L11 run must report Killed."
   },
   {
     "line": 412,
@@ -1506,8 +1506,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "layer": "L12",
-    "note": "Data-form `when` guard (predicate DSL, L11): always returning early only breaks data-form specs. Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\"."
+    "layer": "L11",
+    "note": "Data-form `when` guard (predicate DSL, L11): always returning early only breaks data-form specs. Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\". L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L11, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L11: a data-form when through observe() and inspect()\", which a gate: L11 run must report Killed."
   },
   {
     "line": 412,
@@ -1515,8 +1515,8 @@
     "mutator": "BooleanLiteral",
     "replacement": "def",
     "reason": "later-layer",
-    "layer": "L12",
-    "note": "Data-form `when` guard (predicate DSL, L11): `!def` flipped to `def` returns early for every defined constraint, which only breaks data-form specs. Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\"."
+    "layer": "L11",
+    "note": "Data-form `when` guard (predicate DSL, L11): `!def` flipped to `def` returns early for every defined constraint, which only breaks data-form specs. Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\". L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L11, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L11: a data-form when through observe() and inspect()\", which a gate: L11 run must report Killed."
   },
   {
     "line": 501,
@@ -1533,8 +1533,8 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "later-layer",
-    "layer": "L12",
-    "note": "Construction-time normalisation call for data-form `when` specs (predicate DSL, L11). Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\"."
+    "layer": "L11",
+    "note": "Construction-time normalisation call for data-form `when` specs (predicate DSL, L11). Killed in the full run by \"createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain (tests/plugins/audit-ledger.test.ts)\". L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L11, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L11: a data-form when through observe() and inspect()\", which a gate: L11 run must report Killed."
   },
   {
     "line": 884,

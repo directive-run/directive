@@ -956,8 +956,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 snapshot / history.navigate lifecycle captures system.history.navigate on goBack",
-    "layer": "L12"
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 snapshot / history.navigate lifecycle captures system.history.navigate on goBack L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 841,
@@ -1114,8 +1114,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "history navigation write accounting (`navigationWrites > 0 && ordinaryWrites === 0`). Mutant `navigationWrites > 0` -> true: killed in the full run by devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack.",
-    "layer": "L12"
+    "note": "history navigation write accounting (`navigationWrites > 0 && ordinaryWrites === 0`). Mutant `navigationWrites > 0` -> true: killed in the full run by devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack. L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 896,
@@ -1123,8 +1123,8 @@
     "mutator": "EqualityOperator",
     "replacement": "navigationWrites <= 0",
     "reason": "later-layer",
-    "note": "history navigation write accounting \u2014 killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
-    "layer": "L12"
+    "note": "history navigation write accounting \u2014 killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 896,
@@ -1132,8 +1132,8 @@
     "mutator": "EqualityOperator",
     "replacement": "navigationWrites >= 0",
     "reason": "later-layer",
-    "note": "history navigation write accounting \u2014 killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
-    "layer": "L12"
+    "note": "history navigation write accounting \u2014 killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 896,
@@ -1141,8 +1141,8 @@
     "mutator": "LogicalOperator",
     "replacement": "navigationWrites > 0 || ordinaryWrites === 0",
     "reason": "later-layer",
-    "note": "history navigation write accounting \u2014 killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
-    "layer": "L12"
+    "note": "history navigation write accounting \u2014 killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 896,
@@ -2459,8 +2459,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 snapshot / history.navigate lifecycle captures system.snapshot when a snapshot is taken",
-    "layer": "L12"
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 snapshot / history.navigate lifecycle captures system.snapshot when a snapshot is taken L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 1623,
@@ -2468,8 +2468,8 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "later-layer",
-    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 snapshot / history.navigate lifecycle captures system.snapshot when a snapshot is taken",
-    "layer": "L12"
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 snapshot / history.navigate lifecycle captures system.snapshot when a snapshot is taken L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 1624,
@@ -2623,8 +2623,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "effect-phase write attribution for time travel (`effectPhaseWrites > 0 && otherPhaseWrites === 0`). Mutant `effectPhaseWrites > 0` -> true: killed in the full run by devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack.",
-    "layer": "L12"
+    "note": "effect-phase write attribution for time travel (`effectPhaseWrites > 0 && otherPhaseWrites === 0`). Mutant `effectPhaseWrites > 0` -> true: killed in the full run by devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack. L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 1732,
@@ -2632,8 +2632,8 @@
     "mutator": "LogicalOperator",
     "replacement": "effectPhaseWrites > 0 || otherPhaseWrites === 0",
     "reason": "later-layer",
-    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
-    "layer": "L12"
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 1732,
@@ -2641,8 +2641,8 @@
     "mutator": "EqualityOperator",
     "replacement": "effectPhaseWrites >= 0",
     "reason": "later-layer",
-    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
-    "layer": "L12"
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 1744,
@@ -2781,8 +2781,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "history navigation pass \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 snapshot / history.navigate lifecycle captures system.snapshot when a snapshot is taken",
-    "layer": "L12"
+    "note": "history navigation pass \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 snapshot / history.navigate lifecycle captures system.snapshot when a snapshot is taken L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 1799,
@@ -2835,8 +2835,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "true",
     "reason": "later-layer",
-    "note": "history navigation pass \u2014 killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
-    "layer": "L12"
+    "note": "history navigation pass \u2014 killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 1800,
@@ -2853,8 +2853,8 @@
     "mutator": "EqualityOperator",
     "replacement": "restoredKeys.size >= 0",
     "reason": "later-layer",
-    "note": "history navigation pass \u2014 killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack",
-    "layer": "L12"
+    "note": "history navigation pass \u2014 killed in the full run by tests/plugins/devtools.test.ts > devtoolsPlugin time-travel events records timetravel.jump events on goBack L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L8, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L8: history navigation through observe() and hooks\", which a gate: L8 run must report Killed.",
+    "layer": "L8"
   },
   {
     "line": 1803,
@@ -4230,8 +4230,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "fact tag recording \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 captures observation events captures fact.change with prior + next",
-    "layer": "L12"
+    "note": "fact tag recording \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 captures observation events captures fact.change with prior + next L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L9, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L9: fact tags through meta, beside observe()\", which a gate: L9 run must report Killed.",
+    "layer": "L9"
   },
   {
     "line": 2478,
@@ -4239,8 +4239,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "fact tag recording \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 captures observation events captures fact.change with prior + next",
-    "layer": "L12"
+    "note": "fact tag recording \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 captures observation events captures fact.change with prior + next L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L9, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L9: fact tags through meta, beside observe()\", which a gate: L9 run must report Killed.",
+    "layer": "L9"
   },
   {
     "line": 2479,
@@ -4259,8 +4259,8 @@
     "mutator": "ConditionalExpression",
     "replacement": "false",
     "reason": "later-layer",
-    "note": "fact tag recording \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 PII redaction redacts pii-tagged fact values by default",
-    "layer": "L12"
+    "note": "fact tag recording \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 PII redaction redacts pii-tagged fact values by default L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L9, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L9: fact tags through meta, beside observe()\", which a gate: L9 run must report Killed.",
+    "layer": "L9"
   },
   {
     "line": 2489,
@@ -4278,8 +4278,8 @@
     "mutator": "CallExpression",
     "replacement": ";",
     "reason": "later-layer",
-    "note": "fact tag recording \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 captures observation events captures fact.change with prior + next",
-    "layer": "L12"
+    "note": "fact tag recording \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 captures observation events captures fact.change with prior + next L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L9, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L9: fact tags through meta, beside observe()\", which a gate: L9 run must report Killed.",
+    "layer": "L9"
   },
   {
     "line": 2519,
@@ -4721,8 +4721,8 @@
     "mutator": "ObjectLiteral",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "dynamic definitions API \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 PII redaction redacts pii-tagged fact values by default",
-    "layer": "L12"
+    "note": "dynamic definitions API \u2014 killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 PII redaction redacts pii-tagged fact values by default L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L9, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L9: fact tags through meta, beside observe()\", which a gate: L9 run must report Killed.",
+    "layer": "L9"
   },
   {
     "line": 2680,
@@ -6418,8 +6418,8 @@
     "mutator": "BlockStatement",
     "replacement": "{}",
     "reason": "later-layer",
-    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain",
-    "layer": "L12"
+    "note": "later-layer behaviour (navigation, history, devtools, data forms or fact origin); killed in the full run by tests/plugins/audit-ledger.test.ts > createAuditLedger \u2014 captures observation events captures constraint.evaluate with whenSpec + whenExplain L12-pre (the L12 RFC's mutation debt): re-layered from L12 to L11, its owning layer; pinned there through observe() by l12-debt-observe-oracle \"mutation debt owed to L11: a data-form when through observe() and inspect()\", which a gate: L11 run must report Killed.",
+    "layer": "L11"
   },
   {
     "line": 3794,
