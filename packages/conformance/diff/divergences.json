@@ -48027,5 +48027,477 @@
     "reason": "Row (bc) (L8; the L8 RFC, \"an import with a bad index fails\"): 2.0 rejects a history import whose `currentIndex` is outside its snapshot list, and logs 1.35's own import failure, \"[Directive] Failed to import history data:\", with the reason \"currentIndex must be the index of a snapshot\"; 1.35 imports it. The fuzz reaches it when a `roundtrip` exports a history that holds no snapshot (`currentIndex` -1). The `importedEmpty` trigger names one way to get there (a module with `snapshotEvents`); the L11 data-form phase found another (fuzz seed 5 at L11: a module with a template compute and no `snapshotEvents`, whose history is still empty at the roundtrip on both engines). So `when` is `imported` (history on and a roundtrip), and the bound names only this record: an error whose first argument is the import-failure text word for word (`historyImportFailed`) and whose second is the error object with (bc)'s own reason word for word, \"[Directive] Invalid history data: currentIndex must be the index of a snapshot\" (`historyIndexNotASnapshot`, read before the contract's mask), so any other import failure stays unexplained. The case runs the same after it (the import changes nothing on either engine), so the entry does not end it. Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"Approve all as recommended (Recommended)\" (2026-11-10), which approved row (bc).",
     "approvedBy": "Jason Comes",
     "date": "2026-11-18"
+  },
+  {
+    "id": "l11-fuzz-as-flush-hook-onReconcileStart-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchMaxSize"],
+    "group": "row-as",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onReconcileStart",
+          "args": [
+            {
+              "get": {
+                "$fn": true
+              },
+              "has": {
+                "$fn": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (as) (L7a, #357): 2.0's `settle()` counts a running batch and waits for it, where 1.35's resolves while it runs. 1.35's own settle() runs every queue at each settled change while it waits (engine.ts:4070-4073, processBatches), and 2.0 keeps that rule (api/batch.ts `kernel.define(\"batch\")`, called from settle's onSettledChange listener). So in a settle step whose batch is still running, a requirement queued behind a `maxSize` flush (the overflow item) is started at the next settled change on 2.0, where 1.35's settle has already returned and the item waits out its window (resolvers.ts:1888-1902). 1.35 then makes one more reconcile pass than 2.0. Pinned with the public API (fix2/shrink/u7.mjs and u7-held.mjs): with an unbatched 40 ms resolver holding 1.35's settle() open as well, 1.35 starts the overflow call at once, as 2.0 does, and both make the same passes. PR seed 7 at L11 (spec u7). This covers a reconcile pass on 1.35 only and ends the case (`ends`): every later record of the step is shifted by the missing pass. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved row (as) (\"Approve (Recommended)\", 2026-11-05), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19",
+    "during": "settle"
+  },
+  {
+    "id": "l11-fuzz-as-flush-observe-reconcile.start-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "reconcile.start",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchMaxSize"],
+    "group": "row-as",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "type": "reconcile.start"
+          }
+        }
+      ]
+    },
+    "reason": "Row (as) (L7a, #357): 2.0's `settle()` counts a running batch and waits for it, where 1.35's resolves while it runs. 1.35's own settle() runs every queue at each settled change while it waits (engine.ts:4070-4073, processBatches), and 2.0 keeps that rule (api/batch.ts `kernel.define(\"batch\")`, called from settle's onSettledChange listener). So in a settle step whose batch is still running, a requirement queued behind a `maxSize` flush (the overflow item) is started at the next settled change on 2.0, where 1.35's settle has already returned and the item waits out its window (resolvers.ts:1888-1902). 1.35 then makes one more reconcile pass than 2.0. Pinned with the public API (fix2/shrink/u7.mjs and u7-held.mjs): with an unbatched 40 ms resolver holding 1.35's settle() open as well, 1.35 starts the overflow call at once, as 2.0 does, and both make the same passes. PR seed 7 at L11 (spec u7). This covers a reconcile pass on 1.35 only and ends the case (`ends`): every later record of the step is shifted by the missing pass. Observe twin of `l11-fuzz-as-flush-hook-onReconcileStart-missing`. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved row (as) (\"Approve (Recommended)\", 2026-11-05), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19",
+    "during": "settle"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onResolverStart-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverStart",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverStart",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "keyedRequirementId"
+              },
+              "requirement": {
+                "at": {
+                  "$like": "integer"
+                },
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onResolverStart-extra` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onResolverRetry-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverRetry",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "keyedRequirementId"
+              },
+              "requirement": {
+                "at": {
+                  "$like": "integer"
+                },
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            },
+            {
+              "$like": "integer"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onResolverRetry-missing` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onResolverRetry-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverRetry",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "keyedRequirementId"
+              },
+              "requirement": {
+                "at": {
+                  "$like": "integer"
+                },
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            },
+            {
+              "$like": "integer"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onResolverRetry-extra` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onReconcileEnd-changed-inflight",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].inflight",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].inflight[*]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "id": {
+              "$like": "keyedRequirementId"
+            },
+            "resolverId": {
+              "$like": "resolver"
+            },
+            "startedAt": {
+              "$like": "integer"
+            }
+          }
+        },
+        {
+          "path": "args[0].inflight[*].id",
+          "from": {
+            "$like": "keyedRequirementId"
+          },
+          "to": {
+            "$like": "keyedRequirementId"
+          }
+        },
+        {
+          "path": "args[0].inflight[*].resolverId",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "resolver"
+          }
+        },
+        {
+          "path": "args[0].inflight[*].startedAt",
+          "from": {
+            "$like": "integer"
+          },
+          "to": {
+            "$like": "integer"
+          }
+        },
+        {
+          "path": "args[0].inflight[*]",
+          "from": {
+            "id": {
+              "$like": "keyedRequirementId"
+            },
+            "resolverId": {
+              "$like": "resolver"
+            },
+            "startedAt": {
+              "$like": "integer"
+            }
+          },
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onReconcileEnd-changed-inflight` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onReconcileEnd-changed-unmet",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].unmet",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].unmet[*]",
+          "from": {
+            "fromConstraint": {
+              "$like": "constraint"
+            },
+            "id": {
+              "$like": "keyedRequirementId"
+            },
+            "requirement": {
+              "at": {
+                "$like": "integer"
+              },
+              "type": {
+                "$like": "requirementType"
+              }
+            }
+          },
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "args[0].unmet[*].fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "constraint"
+          }
+        },
+        {
+          "path": "args[0].unmet[*].id",
+          "from": {
+            "$like": "keyedRequirementId"
+          },
+          "to": {
+            "$like": "keyedRequirementId"
+          }
+        },
+        {
+          "path": "args[0].unmet[*].requirement.type",
+          "from": {
+            "$like": "requirementType"
+          },
+          "to": {
+            "$like": "requirementType"
+          }
+        },
+        {
+          "path": "args[0].unmet[*]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "fromConstraint": {
+              "$like": "constraint"
+            },
+            "id": {
+              "$like": "keyedRequirementId"
+            },
+            "requirement": {
+              "at": {
+                "$like": "integer"
+              },
+              "type": {
+                "$like": "requirementType"
+              }
+            }
+          }
+        },
+        {
+          "path": "args[0].unmet[*].requirement.at",
+          "from": {
+            "$like": "integer"
+          },
+          "to": {
+            "$like": "integer"
+          }
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onReconcileEnd-changed-unmet` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onResolverStart-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverStart",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "path": "args[*]",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "resolver"
+          }
+        },
+        {
+          "path": "args[*].fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "constraint"
+          }
+        },
+        {
+          "path": "args[*].id",
+          "from": {
+            "$like": "keyedRequirementId"
+          },
+          "to": {
+            "$like": "keyedRequirementId"
+          }
+        },
+        {
+          "path": "args[*].requirement.type",
+          "from": {
+            "$like": "requirementType"
+          },
+          "to": {
+            "$like": "requirementType"
+          }
+        },
+        {
+          "path": "args[*].requirement.at",
+          "from": {
+            "$like": "integer"
+          },
+          "to": {
+            "$like": "integer"
+          }
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onResolverStart-changed` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-observe-resolver-start-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.start",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "path": "event.requirementId",
+          "from": {
+            "$like": "keyedRequirementId"
+          },
+          "to": {
+            "$like": "keyedRequirementId"
+          }
+        },
+        {
+          "path": "event.resolver",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "resolver"
+          }
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-observe-resolver-start-changed` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
   }
 ]

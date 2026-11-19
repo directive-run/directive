@@ -14,6 +14,13 @@
 //   extra cancel of a completed single run, paired against 2.0's batch
 //   cancel. A batch cancel 2.0 lacks with no such pairing, or an extra on
 //   2.0, still fails.
+// Run 5 (2026-11-19: "Yes, run 5 (Recommended)"):
+// - Row (as)'s flush twin (`l11-fuzz-as-flush-*`, PR seed 7): 1.35's extra
+//   reconcile pass in a settle step whose batch has a maxSize. Outside
+//   settle, outside a batch with maxSize, or an extra pass on 2.0, fails.
+// - Quirk a's keyed twins (`l11-quirk-a-keyed-*`, deep 24301): 2.0's retry
+//   of a keyed requirement under "retry". Outside resolverRetry, or a plain
+//   or other id shape, fails.
 import { describe, expect, it } from "vitest";
 import { compareContract } from "../compare.js";
 import { LIKE, generalizeValue } from "../fingerprint.js";
@@ -55,7 +62,7 @@ describe("keyedRequirementId: a keyed requirement's id, and no other shape", () 
     expect(generalizeValue("A0")).toEqual({ $like: "requirementType" });
   });
 
-  it("only quirk b's keyed twins and row t's batch-pairing and plain fuzz entries name it", () => {
+  it("only quirk a's and quirk b's keyed twins and row t's batch-pairing and plain fuzz entries name it", () => {
     const naming = readDivergences()
       .filter((e) => JSON.stringify(e).includes('"keyedRequirementId"'))
       .map((e) => e.id)
@@ -67,6 +74,13 @@ describe("keyedRequirementId: a keyed requirement's id, and no other shape", () 
       "l11-cand-t-batch-hook-onResolverCancel-missing",
       "l11-cand-t-batch-observe-requirement-canceled-changed",
       "l11-cand-t-batch-observe-requirement-canceled-missing",
+      "l11-quirk-a-keyed-fuzz-hook-onReconcileEnd-changed-inflight",
+      "l11-quirk-a-keyed-fuzz-hook-onReconcileEnd-changed-unmet",
+      "l11-quirk-a-keyed-fuzz-hook-onResolverRetry-extra",
+      "l11-quirk-a-keyed-fuzz-hook-onResolverRetry-missing",
+      "l11-quirk-a-keyed-fuzz-hook-onResolverStart-changed",
+      "l11-quirk-a-keyed-fuzz-hook-onResolverStart-extra",
+      "l11-quirk-a-keyed-fuzz-observe-resolver-start-changed",
       "l11-quirk-b-keyed-hook-onError-missing",
       "l11-quirk-b-keyed-hook-onErrorRecovery-missing",
       "l11-quirk-b-keyed-hook-onResolverError-missing",
@@ -394,6 +408,127 @@ describe("run 4: row t's plain fuzz path admits a keyed single run", () => {
         leftWith(t, cancels(r), [], ["writeRetracts"]),
         JSON.stringify(r),
       ).not.toEqual([]);
+    }
+  });
+});
+
+const RUN5 = '"Yes, run 5 (Recommended)"';
+const stepsOf = (op: string): ReadonlyMap<number, string> => new Map([[0, op]]);
+const leftIn = (
+  entries: ReturnType<typeof readDivergences>,
+  reference: TraceEntry[],
+  candidate: TraceEntry[],
+  triggers: string[],
+  op: string,
+): string[] =>
+  explain(
+    FUZZ_SCENARIO,
+    compareContract(stepped(reference), stepped(candidate), "v2"),
+    entries,
+    triggers,
+    stepsOf(op),
+  ).unexplained.map((d) => `${d.op} ${d.kind}`);
+
+describe("run 5: row (as)'s flush twin excuses only 1.35's extra pass in a settle with a maxSize batch", () => {
+  const as = readDivergences().filter((e) =>
+    e.id.startsWith("l11-fuzz-as-flush-"),
+  );
+  const pass: TraceEntry[] = [
+    {
+      k: "hook",
+      hook: "onReconcileStart",
+      args: [{ get: { $fn: true }, has: { $fn: true } }] as Json[],
+    },
+    { k: "observe", event: { type: "reconcile.start" } },
+  ];
+  const T = ["batched", "batchMaxSize"];
+
+  it("has two entries, signed for run 5 beside row (as)'s approval", () => {
+    expect(as).toHaveLength(2);
+    for (const e of as) {
+      expect(e.reason, e.id).toContain(RUN5);
+      expect(e.reason, e.id).toContain('"Approve (Recommended)", 2026-11-05');
+    }
+  });
+
+  it("control: 1.35's extra pass during settle is excused", () => {
+    for (const r of pass) {
+      expect(leftIn(as, [r], [], T, "settle")).toEqual([]);
+    }
+  });
+
+  it("another shape still fails: outside settle, without maxSize, or extra on 2.0", () => {
+    for (const r of pass) {
+      expect(leftIn(as, [r], [], T, "flush")).not.toEqual([]);
+      expect(leftIn(as, [r], [], ["batched"], "settle")).not.toEqual([]);
+      expect(leftIn(as, [r], [], ["batchMaxSize"], "settle")).not.toEqual([]);
+      expect(leftIn(as, [], [r], T, "settle")).not.toEqual([]);
+    }
+  });
+
+  it("a different missing record in the same step fails", () => {
+    expect(
+      leftIn(
+        as,
+        [{ k: "hook", hook: "onReconcileEnd", args: [{ unmet: [] }] }],
+        [],
+        T,
+        "settle",
+      ),
+    ).not.toEqual([]);
+  });
+});
+
+describe("run 5: quirk a's keyed twins excuse only a keyed retry under resolverRetry", () => {
+  const qa = readDivergences().filter((e) => e.group === "quirk-a-keyed");
+  const keyed = {
+    fromConstraint: "c1",
+    id: "A1",
+    requirement: { at: 0, type: "A1" },
+  };
+  const start = (r: Json): TraceEntry => ({
+    k: "hook",
+    hook: "onResolverStart",
+    args: ["r1", r],
+  });
+  const retry = (r: Json): TraceEntry => ({
+    k: "hook",
+    hook: "onResolverRetry",
+    args: ["r1", r, 1],
+  });
+  const R = ["resolverRetry"];
+
+  it("has seven entries, signed for run 5 beside quirk a's approval", () => {
+    expect(qa).toHaveLength(7);
+    for (const e of qa) {
+      expect(e.reason, e.id).toContain(RUN5);
+      expect(e.reason, e.id).toContain(
+        '"If all are better or non user facing they are all approved", 2026-11-01',
+      );
+    }
+  });
+
+  it("control: 2.0's extra start and retry of a keyed requirement are excused (deep 24301)", () => {
+    expect(leftWith(qa, [], [start(keyed)], R)).toEqual([]);
+    expect(leftWith(qa, [], [retry(keyed)], R)).toEqual([]);
+  });
+
+  it("outside resolverRetry it fails", () => {
+    expect(leftWith(qa, [], [start(keyed)], [])).not.toEqual([]);
+    expect(leftWith(qa, [], [retry(keyed)], [])).not.toEqual([]);
+  });
+
+  it("another id or requirement shape fails", () => {
+    for (const r of [
+      { ...keyed, id: "A1:{}" },
+      { ...keyed, id: 'AB:{"item":"0.0"}' },
+      { ...keyed, id: "a1" },
+      { ...keyed, requirement: { at: "0", type: "A1" } },
+      { ...keyed, requirement: { at: 0, item: "0.0", type: "A1" } },
+    ] as Json[]) {
+      expect(leftWith(qa, [], [start(r)], R), JSON.stringify(r)).not.toEqual(
+        [],
+      );
     }
   });
 });
