@@ -389,7 +389,7 @@ describe("run 4: row t's plain fuzz path admits a keyed single run", () => {
       { ...keyed, requirement: { at: "0", type: "A1" } },
       { ...keyed, requirement: { at: 0, item: "0.0", type: "A1" } },
       { ...keyed, requirement: { type: "A1" } },
-    ]) {
+    ] as Json[]) {
       expect(
         leftWith(t, cancels(r), [], ["writeRetracts"]),
         JSON.stringify(r),
