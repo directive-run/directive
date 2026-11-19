@@ -152,9 +152,69 @@ export function isSignedSnapshot<T>(
   return "signature" in snapshot && typeof snapshot.signature === "string";
 }
 
-/** (bu): a value as JSON would carry it; `undefined` stays `undefined`. */
+const refuse = (): never => {
+  throw new Error(
+    "[Directive] signSnapshot: the snapshot's data or metadata holds a Symbol, a function inside a Map or Set, or a value with its own toJSON (other than a Date), which the signature cannot cover.",
+  );
+};
+
+/**
+ * (bu): a value as JSON would carry it (`undefined`, a function and a key
+ * holding either dropped, `NaN` and `Infinity` null, a `Date` its ISO string).
+ * A BigInt, Map, Set or RegExp has no JSON form (JSON throws or writes `{}`),
+ * so it keeps 1.35's tagged form, its contents in 1.35's form too (`json`
+ * false), and the signature covers them as 1.35's does. (bv): a Symbol, a
+ * function inside a Map or Set, and a non-Date `toJSON` would leave content
+ * uncovered, so they throw; a cycle throws as JSON's does.
+ */
+function form(v: unknown, json: boolean, seen: object[]): unknown {
+  if (typeof v === "symbol" || (!json && typeof v === "function")) {
+    refuse();
+  }
+  if (typeof v === "number") {
+    return json && !Number.isFinite(v) ? null : v;
+  }
+  if (typeof v === "function" || !v || typeof v !== "object") {
+    return typeof v === "function" ? undefined : v;
+  }
+  if (v instanceof Date) {
+    return json ? v.toJSON() : v;
+  }
+  if (v instanceof Number || v instanceof String || v instanceof Boolean) {
+    return v.valueOf();
+  }
+  if (
+    v instanceof RegExp ||
+    typeof (v as { toJSON?: unknown }).toJSON === "function"
+  ) {
+    return v instanceof RegExp ? v : refuse();
+  }
+  if (seen.includes(v)) {
+    throw new TypeError("Converting circular structure to JSON");
+  }
+  seen.push(v);
+  const inner = (x: unknown) => form(x, false, seen);
+  const out =
+    v instanceof Map
+      ? new Map(Array.from(v, ([k, x]) => [inner(k), inner(x)]))
+      : v instanceof Set
+        ? new Set(Array.from(v, inner))
+        : Array.isArray(v)
+          ? Array.from(v, (x) => form(x, json, seen) ?? (json ? null : x))
+          : Object.fromEntries(
+              Object.keys(v).flatMap((k) => {
+                const x = form((v as Record<string, unknown>)[k], json, seen);
+
+                return json && x === undefined ? [] : [[k, x]];
+              }),
+            );
+  seen.pop();
+
+  return out;
+}
+
 const asJson = (value: unknown): unknown =>
-  value === undefined ? value : JSON.parse(JSON.stringify(value) ?? "null");
+  value === undefined ? value : (form(value, true, []) ?? null);
 
 /**
  * The signed form: 1.35's envelope over `data` and `metadata` in JSON form
@@ -169,7 +229,7 @@ function payload(snapshot: DistributableSnapshotLike<unknown>): string {
     metadata: asJson(snapshot.metadata),
   };
   const signed = stableStringify(envelope);
-  // (bv): JSON form has no function or cycle left, so the only placeholder
+  // (bv): `form` leaves no function, Symbol or cycle, so the only placeholder
   // stableStringify can still write is its depth cap.
   if (signed !== stableStringify(envelope, Number.POSITIVE_INFINITY)) {
     throw new Error(

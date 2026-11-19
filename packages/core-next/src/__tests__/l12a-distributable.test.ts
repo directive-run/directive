@@ -299,6 +299,91 @@ describe("the snapshot tools (G1 to G6)", () => {
     ).rejects.toThrow(TypeError);
   });
 
+  it("(bu): a BigInt, Map, Set or RegExp has no JSON form, so it signs to 1.35's bytes and both cross-verify", async () => {
+    // Each signature was made by 1.35.0's signSnapshot (packages/core/src).
+    const cases: [object, string][] = [
+      [
+        { data: { b: 10n }, createdAt: 0, metadata: { n: 2n } },
+        "62fb26b1f4efc836b8ce30c03945ed671a4b5a37012977a843ac7e36ec22a5fb",
+      ],
+      [
+        {
+          data: {
+            m: new Map<string, unknown>([
+              ["k", 1],
+              ["j", { x: [1, null] }],
+            ]),
+          },
+          createdAt: 0,
+        },
+        "368a993d1b8988eab1135f56f6d83705096dc9ac33a144d6f08d0c93042cb5f6",
+      ],
+      [
+        { data: { s: new Set([2, 1, "a"]) }, createdAt: 0 },
+        "63b11a3dbf4a06769ddd9a1a007edee08cd26ff4fce3ab60ad50a4ad7b1b6e91",
+      ],
+      [
+        { data: { r: /ab+/gi }, createdAt: 0 },
+        "5d2c2922525cd4e7bf5c3fe0b7b900cd53c98c6dd41f5e522cfe75f5a48626d8",
+      ],
+    ];
+    for (const [snapshot, signature] of cases) {
+      expect(
+        await verifySnapshotSignature(
+          { ...snapshot, signature, algorithm: "hmac-sha256" } as never,
+          SECRET,
+        ),
+      ).toBe(true);
+      const signed = await signSnapshot(snapshot as never, SECRET);
+      expect(signed.signature).toBe(signature);
+    }
+  });
+
+  it("(bv): a Map edited in place does not verify", async () => {
+    const signed = await signSnapshot(
+      { data: { a: 1, m: new Map([["k", 1]]) }, createdAt: 0 },
+      SECRET,
+    );
+    expect(await verifySnapshotSignature(signed, SECRET)).toBe(true);
+    expect(
+      await verifySnapshotSignature(
+        { ...signed, data: { a: 1, m: new Map([["k", 999]]) } },
+        SECRET,
+      ),
+    ).toBe(false);
+    expect(
+      await verifySnapshotSignature(
+        { ...signed, data: { a: 1, m: new Set([1]) } } as never,
+        SECRET,
+      ),
+    ).toBe(false);
+  });
+
+  it("(bv): a Symbol, a function in a Map, or a non-Date toJSON is refused, never signed uncovered", async () => {
+    for (const data of [
+      { s: Symbol("x") },
+      { t: { toJSON: () => "T", hidden: 1 } },
+      { m: new Map([["f", () => 1]]) },
+    ]) {
+      await expect(
+        signSnapshot({ data, createdAt: 0 } as never, SECRET),
+      ).rejects.toThrow(
+        "[Directive] signSnapshot: the snapshot's data or metadata holds a Symbol",
+      );
+      expect(
+        await verifySnapshotSignature(
+          {
+            data,
+            createdAt: 0,
+            signature: "0".repeat(64),
+            algorithm: "hmac-sha256",
+          } as never,
+          SECRET,
+        ),
+      ).toBe(false);
+    }
+  });
+
   it("expiry, metadata and the other tools keep 1.35's rules (G2, G6)", async () => {
     const signed = await signSnapshot(
       { data: { a: 1 }, createdAt: 0, expiresAt: 1000, metadata: { m: 1 } },
