@@ -114,7 +114,7 @@
     "diff/unfired-hooks.json": "a71dc4d52152ea4205c067278d9f8c8a0141fa4f4ca195101f59226191fd27e1",
     "helpers/engine.ts": "d18e0f01d1c8d743c9ab75a9cad3ad9fd8e695657a77e3fa1a0670420b487505",
     "helpers/layer-gate.ts": "aef785345cc9be72045a21add321da9050168223128f860d7237a3d2c38d28d8",
-    "lib/census.ts": "9134937ba64ebbbda35f75af180dfc4a54a566e9533d8775ef95025fd21bf1ca",
+    "lib/census.ts": "9caab43df016daab3d911dee8d7c9c9fc08e7bc832831d10800085a8a079d529",
     "lib/check.ts": "cf2f75893454deddbb473f621ffaf92d1b359741e4d21d689a102adb2a9c5001",
     "lib/classify.ts": "c6954bf97157f5c0c759960e4fe548ef724bea28464cb0596f9095a827d7bbdc",
     "lib/core-entries.ts": "48ced00debac0727b3c88a3c5eeb1f4cba58947071b1df62e2a82c76d78e7113",
@@ -151,6 +151,6 @@
     "self/engine-identity.test.ts": "cf79d4a5fb3fe00554c1bd56d6d93b59312f55f841ab4ad6b9138cd8f65b1622",
     "tsconfig.json": "d5b4851238c86a90955cef94f62df985445f19a688116e63c61fd47d449c53b5",
     "v1-pin.json": "72d7116e4ce09d9540fb2aecdc2e4a3011ab8875c1ece7c273b81a3659c36204",
-    "vitest.config.ts": "140f948c8f62207b52aade52680c760d5946243b511eefc6aaea78bf0afdcf26"
+    "vitest.config.ts": "ee7066a5f7d5f0be3e4bf86edb563a19827f5f46aa1a2cb32113af69bda691e4"
   }
 }
