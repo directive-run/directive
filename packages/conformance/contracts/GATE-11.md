@@ -1,14 +1,15 @@
 # Phase 3 gate decisions: the L11 gate
 
-Date: 2026-11-18. Jason approved the L11 predicates-and-rule-tools RFC
+Date: 2026-11-18 to 2026-11-19. Jason approved the L11 predicates-and-rule-tools RFC
 (`rfc-l11-predicates.md`, revision 2, "Decisions for the owner") on
 2026-11-15 with "I approve you for to do everything". Under that approval
 Claude took the recommended option for rows (bp), (bq), (br) and (bs). On
 2026-11-17 Jason answered the gate's open questions with "Approve all as
 recommended (Recommended)". Claude signs the entries for approved rows on
 his behalf, as at the earlier gates (GATE-2.md, rule 1). This record covers
-gate runs 1, 2 and 3, of at most 3, and run 4, which Jason allowed in chat
-on 2026-11-18: "Allow a run 4 and sign both (Recommended)".
+gate runs 1, 2 and 3, of at most 3; run 4, which Jason allowed in chat
+on 2026-11-18: "Allow a run 4 and sign both (Recommended)"; and run 5,
+which he allowed in chat on 2026-11-19: "Yes, run 5 (Recommended)".
 
 ## What the L11 gate does
 
@@ -45,6 +46,15 @@ seed 7 and seed 18 shape. It signs the two widenings those words name
 L11 feature-layer mutants. 20 of the 21 PR seeds pass. Seed 7 fails on a
 new batch shape that matches no approved row (Stops), and one mutant is
 still NoCoverage.
+
+**Run 5 is green.** Jason allowed it in chat on 2026-11-19: "Yes, run 5
+(Recommended)". It signs two sets of twins for approved rows, which close
+run 4's two stops: row (as)'s flush twin (PR seed 7) and quirk a's keyed
+twins (deep seed 24301). It pins `explain()` on a data-form leaf with an
+unset fact, and gate=L11 mutation run 44476005404 records that pin killing
+3950:15, the last feature-layer entry. Every PR seed and every deep seed
+exits 0, and every check passes (Results (run 5)). It adds no widening
+beyond these and no entry beyond pinning the two new groups.
 
 ## The L11 decisions
 
@@ -118,6 +128,28 @@ original approval, which each entry's reason keeps.
 Self-tests: `diff/self/l11-gate-classes.test.ts`, now 21. Run 3's
 specs t7, t18, t14 and q14 also replay with 0 unexplained after the merge.
 
+## The signed changes (run 5)
+
+Each is signed "on the owner's instruction", quoting "Yes, run 5
+(Recommended)" (Jason, in chat, 2026-11-19), next to the row's original
+approval, which each entry's reason keeps.
+
+| Row | Change | Proof |
+| --- | --- | --- |
+| Row (as) (L7a, #357; "Approve (Recommended)", 2026-11-05) | 2 entries, group `row-as-flush`, `when` batched + batchMaxSize: `l11-fuzz-as-flush-hook-onReconcileStart-missing` and `l11-fuzz-as-flush-observe-reconcile.start-missing`. 2.0's `settle()` waits for a running batch and flushes the overflow chunk at once, so 1.35's one extra reconcile pass is missing on 2.0. Its own group, because its `when` differs from `row-as` | PR seed 7's spec (u7) replays with 0 unexplained |
+| Quirk a (GATE-1) | 7 keyed twins of the `l3-quirk-a-fuzz-*` entries, group `quirk-a-keyed`: the requirement id is `keyedRequirementId` and the requirement carries `at` | Deep 24301's spec (u24301) replays with 0 unexplained |
+
+Self-tests: `diff/self/l11-gate-classes.test.ts`, now 29, show other
+shapes still fail. The census seed reaches neither new group, so one case
+each (u7, u24301) is pinned in `diff/fuzz/pinned.json`, as the L8 to L10
+gates did.
+
+**The pin (run 5).** `l11-explain-unset-fact-oracle` and its production
+twin explain a `$exists: false` leaf and a `$ne` leaf on a never-set fact
+and assert the exact text, "(actual: undefined)". They are placed at L11
+in `packages/core` and ported. They pass on v1, v1:prod, v2, v2:prod,
+v2:dist and v2:dist:prod.
+
 ## The pins (run 1)
 
 U1, U2 and U3 in `l11-predicate-pins-oracle` (and U1 in its production
@@ -130,6 +162,13 @@ core-next's `src/__tests__/l11a-predicates.test.ts` pins 2.0's side:
 - "(br) a data form that names a derivation warns in development".
 
 ## The mutation conversion
+
+**Run 5: the last one converted.** The gate=L11 run 44476005404
+(mutation-nightly.yml on p11/l11-gate at 4747b3ba, concluded `success`)
+records **3950:15** Killed by `l11-explain-unset-fact-oracle`, "explain() —
+a data-form leaf on an unset fact renders the unset fact's actual as
+undefined". It is now `later-layer`, and its note names that killer. All
+14 L11 feature-layer entries are converted, and none is left.
 
 **Run 4: 13 of 14 converted.** The gate=L11 run 44431606561
 (mutation-nightly.yml on p11/l11-gate at 1493a624, the explain() pin;
@@ -161,6 +200,41 @@ Run 3 needs an oracle pin first: an `explain()` of a requirement from a
 constraint whose `when` is `{ $all: [...] }`, `{ $any: [...] }` and
 `{ $not: ... }`, with a passing and a failing child, placed at L11, in
 `packages/core` and ported. Then a gate=L11 mutation run names the killers.
+
+## Results (run 5)
+
+Each exit code is the command's own, read from its file ($G/r5, $G/r5pr-*,
+$G/r5slow-*, $G/r5re-*, $G/deep-r5).
+
+| Check | Exit | Result |
+| --- | --- | --- |
+| The 21 PR seeds at L11 (120 s; 1,800 s for 7, 9 and 11, nohup) | 0 for all 21 | Seed 18 timed out at 120 s on the first pass (it took 99 s in run 4); rerun with 1,800 s, it exits 0 in 81 s |
+| Deep seed 1 (report mode, 8 GB) | 0 | 2,363 s; 13 batched cases reported |
+| Deep seed 2 | 0 | 1,681 s; 6 batched cases reported |
+| Deep seed 24301 | 0 | 2,002 s; 5 batched cases reported |
+| `oracle:update` | 0 | after the last oracle change |
+| `ratchet --update` | 0 | added 0, none lost; 2,639 tests pass on source and dist |
+| `pnpm census` | 0 | 10 projects, 15,467 tests; every port ran in every engine |
+| `check:expects` | 0 | 205 files, 7,893 assertions, identical to a fresh port |
+| `conformance:checks` | 0 | 246 passed, 4 skipped |
+| diff self-tests (`diff/self`) | 0 | 61 files, 562 tests |
+| Root biome, error level | 0 | 1,535 files |
+| `pnpm -r --filter './packages/*' typecheck` | 1 (`--no-bail`, at e1454dbe) | Only the known local build gap (`ai-harness`, `cli`, `mcp`); not re-run after the oracle-only changes since |
+
+**Deep triage.** Every case run 5 reports is batched, and each is a case
+run 4 reported with the same first difference. The up-to-L11 phase's case
+numbers moved by 2 (1:#1306 is #1308, 1:#1970 is #1972, 2:#1612 is #1614,
+24301:#1067 is #1069). No new case. Run 4's stop on deep 24301 (u24301) no
+longer fails. Run 4's five untriaged deep-1 data-form cases were triaged
+from their first difference; they were not replayed:
+
+| Case | First difference | Row | Triage |
+| --- | --- | --- | --- |
+| 1:data-forms #651 | `onResolverComplete` extra on 2.0 in step 2: batch `rb`'s items complete in another order | L7 batch ordering, as 2:all#2890 and 24301:all#3053 (GATE-7) | report-mode follow-up |
+| 1:data-forms #976 | external `start` missing on 2.0 in step 2, for a batch call with a repeated item (`["0.0","0.0"]`) | (av), repeated item, as 1:#1970 | report-mode follow-up |
+| 1:data-forms #1150 | external `start` missing on 2.0 at a settle step (step 23); 209 later records shift | (as), settle waits for the batch, as 1:data-forms #102 and GATE-8's 24301:#1917 | report-mode follow-up |
+| 1:data-forms #1234 | the "resolver "a::rb" threw" console warning missing on 2.0 in step 5, before the batch's retry start | quirk b's console warning, batch path | report-mode follow-up |
+| 1:data-forms #1369 | the shared wait finds no common end time in 12 rounds | quirk g's batch timing, as GATE-8's 24301:#948 | report-mode follow-up |
 
 ## Results (run 4)
 
@@ -259,6 +333,10 @@ None new. Every run 2 failure is an approved row's shape.
 
 ## Stops
 
+- **Run 5: none.** No difference matches no approved row. Run 4's two
+  stops are closed by run 5's signed twins: PR seed 7 by row (as)'s flush
+  twin, deep 24301 by quirk a's keyed twins.
+
 - **Run 4, PR seed 7 (a stop).** Spec `$G/specs/u7.json`; replay
   `$G/replay/r20-u7.json`, traces `r20-u7.v1.jsonl` and `r20-u7.v2.jsonl`.
   Two modules; a batched resolver `a::rb` with `maxSize` 2, `windowMs` 5,
@@ -295,10 +373,12 @@ None new. Every run 2 failure is an approved row's shape.
 
 ## Follow-ups
 
-- 3950:15 (a leaf on an unset fact) needs a pin and a gate=L11 mutation run.
-- Run 4 was not finished: census, `oracle:update`, `ratchet --update` and
-  deep seed 1's result.
+- The batched deep cases stay report-mode follow-ups, each with its row
+  named above (run 5's table and run 4's): replay 1:data-forms #651, #976,
+  #1150, #1234 and #1369, and run 4's 2:#1614, 2:data-forms #721 and #801.
 - 1:up to L11#233 (deep, batched): replay it.
+- PR seed 18 runs close to its 120 s limit (81 to 123 s); raise its
+  timeout or move it to the slow pass.
 - The keyed twins' `at` is `{ $like: integer }`. The model can draw
   `at: null`, which the twins do not admit. No case shows it yet.
 - Edits to `divergences.json` during a run change that run's own entries
