@@ -147,17 +147,10 @@ describe("stub exports", () => {
     for (const name of [
       "clobberAlertPlugin",
       "clobberLoopPlugin",
-      "createAgentMetrics",
       "createAuditLedger",
-      "createCircuitBreaker",
-      "createOTLPExporter",
-      "createObservability",
       "devtoolsPlugin",
       "emitDevToolsEvent",
-      "loggingPlugin",
       "memorySink",
-      "normalizeTokenUsage",
-      "performancePlugin",
     ]) {
       const stub = (plugins as Record<string, unknown>)[name];
       expect(typeof stub, name).toBe("function");
@@ -165,8 +158,23 @@ describe("stub exports", () => {
       expect(error).toMatchObject({ code: FEATURE_MISSING, feature: name });
       expect(error.layer).toBe(12);
     }
-    expect(thrown(() => new plugins.CircuitBreakerOpenError("b", 1)).code).toBe(
-      FEATURE_MISSING,
+    // Built at L12b: the circuit breaker, logging, performance, observability,
+    // agent metrics, OTLP and token usage are real, not stubs.
+    for (const name of [
+      "createAgentMetrics",
+      "createCircuitBreaker",
+      "createOTLPExporter",
+      "createObservability",
+      "loggingPlugin",
+      "normalizeTokenUsage",
+      "performancePlugin",
+    ]) {
+      expect(typeof (plugins as Record<string, unknown>)[name], name).toBe(
+        "function",
+      );
+    }
+    expect(new plugins.CircuitBreakerOpenError("b", 1).code).toBe(
+      "CIRCUIT_OPEN",
     );
     // 1.35's constant, not a feature.
     expect(plugins.DEVTOOLS_EVENT_NAME).toBe("directive-devtools-event");
