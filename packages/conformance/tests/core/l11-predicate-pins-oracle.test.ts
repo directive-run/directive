@@ -18,9 +18,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The L11 RFC's probe pins (U1 to U5, U7 to U10, U17 to U19), development
 // build. Each pins what 1.35 does today, through the public API only. U1, U2
-// and U3 are where the approved rows (bp), (bq) and (br) will show: each
-// fails on 2.0 once its row is built, and passes again only with the row's
-// signed entry. U4 and U17 pin the declined (bs) and (bt). U6, U11 and U16
+// and U3 are where the approved rows (bp), (bq) and (br) show. The rows are
+// built (L11a), so at the L11 gate each keeps only what both engines share
+// and names its row (as at L6 to L10); core-next's l11a-predicates "approved
+// rows at registration" pins 2.0's side. U4 and U17 pin the declined (bs)
+// and (bt). U6, U11 and U16
 // are cases in l11-predicate-oracle (the ported predicate.test.ts); U10 and
 // U2's diff half are in diff/scenarios/l11-pins; U12's production half is in
 // l11-predicate-pins-oracle-production.
@@ -131,9 +133,17 @@ function leaves(rows: unknown): { path: string; pass: boolean }[] {
 }
 
 describe("L11 probe pins (development)", () => {
-  it("U1: a global or sticky regex in a constraint's $matches throws on its frozen lastIndex, so the rule never fires (shows (bp))", async () => {
-    const { system, state } = probe({
-      global: { when: { s: { $matches: /a/g } }, require: { type: "GO" } },
+  // Row (bp), approved ("I approve you for to do everything", 2026-11-15):
+  // 2.0's $matches tests a stateless copy of the regex, made at
+  // registration, so the rule fires. 1.35 throws on the frozen lastIndex
+  // ("Cannot assign to read only property 'lastIndex'") and the rule never
+  // fires: that is 1.35's side only, so this keeps what both engines share.
+  // 2.0's side: core-next l11a-predicates "(bp) a global regex fires inside
+  // a system; a direct call alternates".
+  it("U1: a global or sticky regex in a constraint's $matches: the system runs and inspect() keeps the caller's regex (row (bp))", async () => {
+    const global = /a/g;
+    const { system } = probe({
+      global: { when: { s: { $matches: global } }, require: { type: "GO" } },
       sticky: { when: { s: { $matches: /a/y } }, require: { type: "GO" } },
     });
     system.start();
@@ -143,14 +153,10 @@ describe("L11 probe pins (development)", () => {
     system.facts.s = "a";
     await flush();
 
-    expect(state.hits).toBe(0);
-    expect(state.errors.length).toBeGreaterThan(0);
-    expect(state.errors.every((e) => e.includes("lastIndex"))).toBe(true);
-    expect(
-      state.evaluations.some(
-        (e) => (e.id === "global" || e.id === "sticky") && e.active,
-      ),
-    ).toBe(false);
+    const specs = system
+      .inspect()
+      .constraints.map((c: any) => [c.id, c.whenSpec?.s?.$matches]);
+    expect(specs).toContainEqual(["global", global]);
     system.destroy();
   });
 
@@ -163,17 +169,16 @@ describe("L11 probe pins (development)", () => {
     expect([1, 2, 3].map(() => memo({ s: "a" }))).toEqual([true, false, true]);
   });
 
-  it("U2: a combinator beside a fact key ignores the fact key at run time and in describePredicate; the compilers refuse it; validatePredicate accepts it (shows (bq))", async () => {
+  // Row (bq), approved ("I approve you for to do everything", 2026-11-15):
+  // 2.0 refuses this spec at createSystem with the compilers' message. 1.35
+  // registers it and the constraint fires with phase "red" (the fact key is
+  // ignored): that is 1.35's side only, so this keeps the exported tools,
+  // which both engines share; the diff scenario "a combinator beside a fact
+  // key" carries the signed entries. 2.0's side: core-next l11a-predicates
+  // "(bq) a combinator beside a fact key is refused with the compilers'
+  // message".
+  it("U2: a combinator beside a fact key: evaluatePredicate and describePredicate ignore the fact key; the compilers refuse it; validatePredicate accepts it (row (bq))", () => {
     const spec = { $any: [{ n: 1 }], phase: "green" };
-    const { system, state } = probe({
-      c: { when: spec, require: { type: "GO" } },
-    });
-    system.start();
-    system.facts.n = 1;
-    await flush();
-
-    expect(system.facts.phase).toBe("red");
-    expect(state.hits).toBeGreaterThan(0);
     expect(evaluatePredicate(spec, { n: 1, phase: "red" })).toBe(true);
     expect(describePredicate(spec)).toBe("n is 1");
     expect(() => validatePredicate(spec)).not.toThrow();
@@ -186,10 +191,15 @@ describe("L11 probe pins (development)", () => {
         /\$any cannot coexist with sibling keys \(phase\)/,
       );
     }
-    system.destroy();
   });
 
-  it("U3: a data-form when or on that names a derivation reads undefined and never matches, with no warning (shows (br))", async () => {
+  // Row (br), approved ("I approve you for to do everything", 2026-11-15):
+  // 2.0 warns in development that the data form names a derivation; 1.35
+  // is silent. The silence is 1.35's side only, so this keeps what both
+  // engines share: the form still never matches. 2.0's side: core-next
+  // l11a-predicates "(br) a data form that names a derivation warns in
+  // development".
+  it("U3: a data-form when or on that names a derivation reads undefined and never matches (row (br))", async () => {
     const ran: number[] = [];
     const { system, state } = probe(
       { c: { when: { dbl: { $gte: 4 } }, require: { type: "GO" } } },
@@ -211,7 +221,6 @@ describe("L11 probe pins (development)", () => {
     expect(system.derive.dbl).toBe(4);
     expect(state.hits).toBe(0);
     expect(ran).toEqual([]);
-    expect(logged().filter((line) => line.includes("dbl"))).toEqual([]);
     system.destroy();
   });
 

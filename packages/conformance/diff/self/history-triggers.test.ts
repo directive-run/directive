@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { FUZZ_TRIGGERS } from "../../lib/fuzz.js";
 import { type Difference, type Position, compareContract } from "../compare.js";
-import { LIKE, TEXT, generalizeValue } from "../fingerprint.js";
+import { LIKE, TEXT, admits, generalizeValue } from "../fingerprint.js";
 import { type FuzzSpec, specTriggers } from "../fuzz/model.js";
 import type { Json } from "../normalize.js";
 import { type TraceEntry, createRecorder } from "../record.js";
@@ -356,6 +356,61 @@ describe("the history rows' classes", () => {
     ).toBe(true);
     expect(
       TEXT.historyImportFailed?.("[Directive] Failed to import history data"),
+    ).toBe(false);
+  });
+
+  it("(bc)'s console entry excuses only (bc)'s own import failure", () => {
+    const entry = readDivergences().find(
+      (e) => e.id === "l11-fuzz-bc-console-error-extra-import-failed",
+    );
+    expect(entry?.bound).toBeDefined();
+    const failure = (message: Json): Difference =>
+      ({
+        engine: "v2",
+        stream: "console",
+        kind: "error",
+        step: 3,
+        phase: "sync",
+        op: "extra",
+        candidate: {
+          k: "console",
+          level: "error",
+          args: [{ $incidental: "string" }, { $incidental: "object" }],
+        },
+        raw: {
+          k: "console",
+          level: "error",
+          args: [
+            "[Directive] Failed to import history data:",
+            { $error: { name: "Error", message } },
+          ],
+        },
+      }) as unknown as Difference;
+    const bound = entry?.bound as NonNullable<Divergence["bound"]>;
+    expect(
+      admits(
+        bound,
+        failure(
+          "[Directive] Invalid history data: currentIndex must be the index of a snapshot",
+        ),
+      ),
+    ).toBe(true);
+    // Any other import failure stays unexplained.
+    for (const other of [
+      "Invalid history data: currentIndex must be a number",
+      "[Directive] Invalid history data: snapshots must be an array",
+      "Unexpected token",
+    ]) {
+      expect(admits(bound, failure(other))).toBe(false);
+    }
+    expect(
+      TEXT.historyIndexNotASnapshot?.({
+        $error: {
+          name: "TypeError",
+          message:
+            "[Directive] Invalid history data: currentIndex must be the index of a snapshot",
+        },
+      }),
     ).toBe(false);
   });
 

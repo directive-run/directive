@@ -9,6 +9,10 @@
     "tests/core/l10-dynamic-pins-oracle.test.ts",
     "tests/core/l10-gate-pins-oracle-production.test.ts",
     "tests/core/l10-gate-pins-oracle.test.ts",
+    "tests/core/l11-explain-combinators-oracle-production.test.ts",
+    "tests/core/l11-explain-combinators-oracle.test.ts",
+    "tests/core/l11-explain-unset-fact-oracle-production.test.ts",
+    "tests/core/l11-explain-unset-fact-oracle.test.ts",
     "tests/core/l11-predicate-describe-oracle.test.ts",
     "tests/core/l11-predicate-oracle.test.ts",
     "tests/core/l11-predicate-pins-oracle-production.test.ts",
@@ -49,6 +53,10 @@
     "tests/core/l10-dynamic-pins-oracle.test.ts": [],
     "tests/core/l10-gate-pins-oracle-production.test.ts": [],
     "tests/core/l10-gate-pins-oracle.test.ts": [],
+    "tests/core/l11-explain-combinators-oracle-production.test.ts": [],
+    "tests/core/l11-explain-combinators-oracle.test.ts": [],
+    "tests/core/l11-explain-unset-fact-oracle-production.test.ts": [],
+    "tests/core/l11-explain-unset-fact-oracle.test.ts": [],
     "tests/core/l11-predicate-describe-oracle.test.ts": [],
     "tests/core/l11-predicate-oracle.test.ts": [],
     "tests/core/l11-predicate-pins-oracle-production.test.ts": [],
@@ -97,6 +105,10 @@
     "tests/core/l10-dynamic-pins-oracle.test.ts": [],
     "tests/core/l10-gate-pins-oracle-production.test.ts": [],
     "tests/core/l10-gate-pins-oracle.test.ts": [],
+    "tests/core/l11-explain-combinators-oracle-production.test.ts": [],
+    "tests/core/l11-explain-combinators-oracle.test.ts": [],
+    "tests/core/l11-explain-unset-fact-oracle-production.test.ts": [],
+    "tests/core/l11-explain-unset-fact-oracle.test.ts": [],
     "tests/core/l11-predicate-describe-oracle.test.ts": [],
     "tests/core/l11-predicate-oracle.test.ts": [],
     "tests/core/l11-predicate-pins-oracle-production.test.ts": [],
@@ -256,6 +268,18 @@
       "a retired resolver's write after the 10 s drain (L10 gate; row cd) > the drain gives up at 10 s and a same-key replacement starts from its own init": "L10",
       "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > registerModule's init takes a snapshot with `x::c`, and a write to it another": "L10",
       "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > goTo the registration's snapshot puts the module's fact back": "L10"
+    },
+    "tests/core/l11-explain-combinators-oracle-production.test.ts": {
+      "explain() — combinator clauses in a data-form when (production) > renders $all, $any and $not with a passing and a failing child": "L11"
+    },
+    "tests/core/l11-explain-combinators-oracle.test.ts": {
+      "explain() — combinator clauses in a data-form when > renders $all, $any and $not with a passing and a failing child": "L11"
+    },
+    "tests/core/l11-explain-unset-fact-oracle-production.test.ts": {
+      "explain() — a data-form leaf on an unset fact (production) > renders the unset fact's actual as undefined": "L11"
+    },
+    "tests/core/l11-explain-unset-fact-oracle.test.ts": {
+      "explain() — a data-form leaf on an unset fact > renders the unset fact's actual as undefined": "L11"
     },
     "tests/core/l11-predicate-describe-oracle.test.ts": {
       "describePredicate — empty / trivial > renders an empty predicate as 'always true'": "L11",
@@ -438,17 +462,17 @@
       "L11-pre: template escape and unknown keys (U16) > $${ is a literal ${, and an unknown key interpolates empty with a development warning": "L11"
     },
     "tests/core/l11-predicate-pins-oracle-production.test.ts": {
-      "L11 probe pins (production) > U1: a global regex in a constraint's $matches never fires; called directly it alternates": "L11",
+      "L11 probe pins (production) > U1: a global regex in a constraint's $matches logs nothing in production; called directly it alternates (row (bp))": "L11",
       "L11 probe pins (production) > U3: a data form that names a derivation never matches, silently": "L11",
       "L11 probe pins (production) > U4: an unknown operator never matches, and production is silent": "L11",
       "L11 probe pins (production) > U8: past depth 64 the cut part reads false and the $nots above it read true, with no warning": "L11",
       "L11 probe pins (production) > U12: validatePredicateAgainstSchema given a schema instead of the kind map throws a TypeError": "L11"
     },
     "tests/core/l11-predicate-pins-oracle.test.ts": {
-      "L11 probe pins (development) > U1: a global or sticky regex in a constraint's $matches throws on its frozen lastIndex, so the rule never fires (shows (bp))": "L11",
+      "L11 probe pins (development) > U1: a global or sticky regex in a constraint's $matches: the system runs and inspect() keeps the caller's regex (row (bp))": "L11",
       "L11 probe pins (development) > U1: called directly, a global regex alternates: evaluatePredicate and memoizePredicate keep 1.35's answer": "L11",
-      "L11 probe pins (development) > U2: a combinator beside a fact key ignores the fact key at run time and in describePredicate; the compilers refuse it; validatePredicate accepts it (shows (bq))": "L11",
-      "L11 probe pins (development) > U3: a data-form when or on that names a derivation reads undefined and never matches, with no warning (shows (br))": "L11",
+      "L11 probe pins (development) > U2: a combinator beside a fact key: evaluatePredicate and describePredicate ignore the fact key; the compilers refuse it; validatePredicate accepts it (row (bq))": "L11",
+      "L11 probe pins (development) > U3: a data-form when or on that names a derivation reads undefined and never matches (row (br))": "L11",
       "L11 probe pins (development) > U4: an unknown operator never matches and warns on every evaluation in development; validatePredicate and isPredicate accept it": "L11",
       "L11 probe pins (development) > U5: registration deep-freezes the caller's spec, and inspect()'s whenSpec is that same object": "L11",
       "L11 probe pins (development) > U7: two operators in one object are ANDed, with a development warning per evaluation": "L11",

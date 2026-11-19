@@ -86,8 +86,14 @@ function probe(
 }
 
 describe("L11 probe pins (production)", () => {
-  it("U1: a global regex in a constraint's $matches never fires; called directly it alternates", async () => {
-    const { system, state } = probe({
+  // Row (bp), approved ("I approve you for to do everything", 2026-11-15):
+  // inside a system 2.0's rule fires and 1.35's never does (its error is
+  // skipped silently). That is 1.35's side only, so this keeps what both
+  // engines share: no log, and a direct call alternates. 2.0's side: core-next
+  // l11a-predicates "(bp) a global regex fires inside a system; a direct
+  // call alternates".
+  it("U1: a global regex in a constraint's $matches logs nothing in production; called directly it alternates (row (bp))", async () => {
+    const { system } = probe({
       c: { when: { s: { $matches: /a/g } }, require: { type: "GO" } },
     });
     system.start();
@@ -95,8 +101,6 @@ describe("L11 probe pins (production)", () => {
     system.facts.s = "ab";
     await flush();
 
-    expect(state.hits).toBe(0);
-    expect(state.errors.length).toBeGreaterThan(0);
     expect(logged()).toEqual([]);
     system.destroy();
 

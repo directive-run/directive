@@ -11895,10 +11895,35 @@
               }
             }
           ]
+        },
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "keyedRequirementId"
+              },
+              "requirement": {
+                "at": {
+                  "$like": "integer"
+                },
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onResolverCancel hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onResolverCancel hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Run 4 adds the keyed alternative: a single run whose resolver has a function `key` (L11) has the bare-type id (`keyedRequirementId`) and its requirement carries `at` (`integer`); PR seed 14 at L11 cancels such a run with no batch beside it (GATE-11 run 4). Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-12"
   },
@@ -11931,10 +11956,32 @@
               }
             }
           ]
+        },
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "keyedRequirementId"
+              },
+              "requirement": {
+                "at": {
+                  "$like": "integer"
+                },
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onRequirementCanceled hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the onRequirementCanceled hook call only 1.35 makes. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Run 4 adds the keyed alternative: a single run whose resolver has a function `key` (L11) has the bare-type id (`keyedRequirementId`) and its requirement carries `at` (`integer`); PR seed 14 at L11 cancels such a run with no batch beside it (GATE-11 run 4). Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-12"
   },
@@ -11957,10 +12004,19 @@
             },
             "type": "requirement.canceled"
           }
+        },
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "keyedRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
         }
       ]
     },
-    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the requirement.canceled observe event only 1.35 emits. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "reason": "Owner-approved 2026-11-01 (decisions page row t), its third path, found by the fuzz at L3: a reconcile pass retracts a run after the run reported complete but before it left flight (the run's own write retracted its constraint). 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only (it still aborts the signal, and onReconcileEnd lists the requirement canceled on both). Its trigger is `writeRetracts` (the path needs only a resolver whose write retracts its own constraint), so this entry applies only to a case that has one. This covers the requirement.canceled observe event only 1.35 emits. Signed 2026-11-01 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Re-scoped 2026-11-12 (forced-L8 fuzz, seed 24301 case 49): the same path also comes through one more constraint. One constraint's resolver writes a fact that activates a second constraint, whose resolver writes a fact the first reads and so retracts it while the first's completed run is still in flight; 1.35 reports the same three records, and nothing else differs. So `when` is now `writeRetracts` (a resolver's write retracts its constraint directly, or through one other constraint whose resolver writes a fact the first reads) instead of `ownWriteRetracts`. Re-signed 2026-11-12 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Run 4 adds the keyed alternative: a single run whose resolver has a function `key` (L11) has the bare-type id (`keyedRequirementId`) and its requirement carries `at` (`integer`); PR seed 14 at L11 cancels such a run with no batch beside it (GATE-11 run 4). Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-12"
   },
@@ -35375,115 +35431,9 @@
               "expected": {
                 "$like": "integer"
               },
-              "fact": "a::f0",
-              "kind": "rejection",
-              "reason": "clobbered",
-              "req": {
-                "fromConstraint": {
-                  "$like": "batchConstraint"
-                },
-                "id": {
-                  "$like": "batchRequirementId"
-                },
-                "requirement": {
-                  "item": {
-                    "$like": "batchItem"
-                  },
-                  "type": {
-                    "$like": "batchRequirementType"
-                  }
-                }
+              "fact": {
+                "$like": "fact"
               },
-              "resolver": {
-                "$like": "batchResolver"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverWriteRejected",
-          "args": [
-            {
-              "actual": {
-                "$like": "integer"
-              },
-              "expected": {
-                "$like": "integer"
-              },
-              "fact": "f0",
-              "kind": "rejection",
-              "reason": "clobbered",
-              "req": {
-                "fromConstraint": {
-                  "$like": "batchConstraint"
-                },
-                "id": {
-                  "$like": "batchRequirementId"
-                },
-                "requirement": {
-                  "item": {
-                    "$like": "batchItem"
-                  },
-                  "type": {
-                    "$like": "batchRequirementType"
-                  }
-                }
-              },
-              "resolver": {
-                "$like": "batchResolver"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverWriteRejected",
-          "args": [
-            {
-              "actual": {
-                "$like": "integer"
-              },
-              "expected": {
-                "$like": "integer"
-              },
-              "fact": "f1",
-              "kind": "rejection",
-              "reason": "clobbered",
-              "req": {
-                "fromConstraint": {
-                  "$like": "batchConstraint"
-                },
-                "id": {
-                  "$like": "batchRequirementId"
-                },
-                "requirement": {
-                  "item": {
-                    "$like": "batchItem"
-                  },
-                  "type": {
-                    "$like": "batchRequirementType"
-                  }
-                }
-              },
-              "resolver": {
-                "$like": "batchResolver"
-              }
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onResolverWriteRejected",
-          "args": [
-            {
-              "actual": {
-                "$like": "integer"
-              },
-              "expected": {
-                "$like": "integer"
-              },
-              "fact": "a::f1",
               "kind": "rejection",
               "reason": "clobbered",
               "req": {
@@ -35510,7 +35460,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the onResolverWriteRejected call 2.0 makes when the clobbered write of a mixed batch is dropped. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the onResolverWriteRejected call 2.0 makes when the clobbered write of a mixed batch is dropped. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Run 4 names the fact through the `fact` class (a fuzz fact key, `f<n>`, own or namespaced; GATE-11 run 4), not the literal `f0`/`f1` the seeds first showed: PR seed 19 and deep seed 1 at L11 clobber `f2`. Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-08"
   },
@@ -35535,70 +35485,9 @@
             "expected": {
               "$like": "integer"
             },
-            "fact": "f0",
-            "kind": "rejection",
-            "reason": "clobbered",
-            "requirementId": {
-              "$like": "batchRequirementId"
+            "fact": {
+              "$like": "fact"
             },
-            "resolver": {
-              "$like": "batchResolver"
-            },
-            "type": "resolver.write.rejected"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "actual": {
-              "$like": "integer"
-            },
-            "expected": {
-              "$like": "integer"
-            },
-            "fact": "a::f0",
-            "kind": "rejection",
-            "reason": "clobbered",
-            "requirementId": {
-              "$like": "batchRequirementId"
-            },
-            "resolver": {
-              "$like": "batchResolver"
-            },
-            "type": "resolver.write.rejected"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "actual": {
-              "$like": "integer"
-            },
-            "expected": {
-              "$like": "integer"
-            },
-            "fact": "f1",
-            "kind": "rejection",
-            "reason": "clobbered",
-            "requirementId": {
-              "$like": "batchRequirementId"
-            },
-            "resolver": {
-              "$like": "batchResolver"
-            },
-            "type": "resolver.write.rejected"
-          }
-        },
-        {
-          "k": "observe",
-          "event": {
-            "actual": {
-              "$like": "integer"
-            },
-            "expected": {
-              "$like": "integer"
-            },
-            "fact": "a::f1",
             "kind": "rejection",
             "reason": "clobbered",
             "requirementId": {
@@ -35612,7 +35501,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the observe \"resolver.write.rejected\" record 2.0 makes for it. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the observe \"resolver.write.rejected\" record 2.0 makes for it. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Run 4 names the fact through the `fact` class (a fuzz fact key, `f<n>`, own or namespaced; GATE-11 run 4), not the literal `f0`/`f1` the seeds first showed: PR seed 19 and deep seed 1 at L11 clobber `f2`. Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-08"
   },
@@ -35754,20 +35643,9 @@
           "k": "hook",
           "hook": "onFactSet",
           "args": [
-            "f0",
             {
-              "$like": "integer"
+              "$like": "fact"
             },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "a::f0",
             {
               "$like": "integer"
             },
@@ -35778,7 +35656,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the batch's write that 1.35 lets land over the clobber. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk k (L7): a batch is bound to the union of its requirements' abortOn keys, each compared with the batch's baseline (W5); a clobber drops the write, aborts the signal and reports no outcome, as for a single-source batch (the rule the L7 RFC's B1 sets, approved 2026-11-05 with \"Approve all (Recommended)\"). 1.35 binds a batch only when every requirement comes from one constraint, so a mixed-source batch is unbound (resolvers.ts 1589-1601; L7 RFC B-2, probe B5: the batch's write replaced \"external\" with \"from-batch\" and both requirements completed). From there on every later record of the case differs, differently for each seed, so this entry ends the fuzz case (`ends`), and only in a case with a batched resolver fed by two constraints, one with abortOn (`when`). This covers the batch's write that 1.35 lets land over the clobber. Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Run 4 names the fact through the `fact` class (a fuzz fact key, `f<n>`, own or namespaced; GATE-11 run 4), not the literal `f0`/`f1` the seeds first showed: PR seed 19 and deep seed 1 at L11 clobber `f2`. Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-08"
   },
@@ -40639,111 +40517,9 @@
           "k": "hook",
           "hook": "onFactSet",
           "args": [
-            "f0",
             {
-              "$like": "integer"
+              "$like": "fact"
             },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "a::f0",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "a::f2",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "f1",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "a::f1",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "f2",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "b::f0",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "b::f1",
-            {
-              "$like": "integer"
-            },
-            {
-              "$like": "integer"
-            }
-          ]
-        },
-        {
-          "k": "hook",
-          "hook": "onFactSet",
-          "args": [
-            "b::f2",
             {
               "$like": "integer"
             },
@@ -40754,7 +40530,7 @@
         }
       ]
     },
-    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him.",
+    "reason": "GATE-1 quirk k: a consequence of the batch difference its `ends` entries stop at, met before the stop's shared point. This covers that record. Batch-shaped twin of `l7-fuzz-k-hook-onFactSet-missing` (same row, same approval). Signed 2026-11-08 on the owner's instruction: he approved this row at GATE-1 (\"Approved gates and go with your recommendation: but needs to be correct not a patch or monkey fix\", 2026-10-30), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and asked Claude to sign for him. Run 4 names the fact through the `fact` class (a fuzz fact key, `f<n>`, own or namespaced; GATE-11 run 4), not the literal `f0`/`f1` the seeds first showed: PR seed 19 and deep seed 1 at L11 clobber `f2`. Signed again 2026-11-18 on the owner's instruction (run 4 of the L11 gate): \"Allow a run 4 and sign both (Recommended)\" (Jason, in chat, 2026-11-18), next to the row's approval above.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-08"
   },
@@ -45427,5 +45203,3301 @@
       "order": "any"
     },
     "reason": "Row (be) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a changeset counts as one of the steps, and each step is taken in turn with the steps left counted down; 1.35 drops the steps left after the one that lands on the changeset's start (GATE-7.md, the correction to the L8 RFC's (be) row; core-next pin l8-history-rows-ba-bc-be, #391). In a fuzz case that closes a changeset and then goes `back` more than one step (trigger `changesetSteps`), the engines land on different snapshots (deep seed 2, up to L10#1551: a changeset over indexes 1 to 2, `back 3` from 2; 1.35 lands on 1, 2.0 on 0). The restore's batch then writes other facts, so its records differ from their second key on (1.35 b::when, 2.0 a::zf). This covers that changed key of the restore's onFactsBatch in a `back` step (`during` \"back\") and ends the comparison there (`ends`): every later record reads the other snapshot. It requires a changed onHistoryNavigate call in the case (`requires`, order any) whose index on 2.0 is below 1.35's (`args[1]`, `$lt`): (be) takes the steps 1.35 drops, so a `back` lands earlier on 2.0, never later. A `back` that lands on the same snapshot on both engines, or later on 2.0, is outside it. Signed 2026-11-17 on the owner's instruction (GATE-2 rule 1): he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him; the L10 gate runs under \"I approve you for to do everything\" (2026-11-15)."
+  },
+  {
+    "id": "l11-quirk-y-on-gate-hook-onEffectRun-missing-step9",
+    "scenario": "disable then enable: an effect with an on gate and a write to an unrelated fact",
+    "stream": "hook",
+    "kind": "onEffectRun",
+    "engine": "v2",
+    "step": 9,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onEffectRun",
+          "args": ["gated"]
+        }
+      }
+    ],
+    "reason": "Row y (L4; owner-approved 2026-11-01: disable keeps the dependency record, the declared deps, derivation deps, the last auto-tracked read set and the `on` gate, and releases only the derivation watching; enable re-watches, does not run the effect and does not replay changes made while disabled; this covers the error boundary's \"disable\" path too): 1.35 throws the record away at disable (effects.ts:1457), and its `on` gate is evaluated only inside the dependency check (effects.ts:937-972, the gate at 965), so after enable the effect runs on the next change of any fact with the gate skipped; 2.0 keeps both and runs it only when `a` changes and `a > 5` holds. In this scenario the effect has `on: { a: { $gt: 5 } }`; after disable and enable, `a` is set to 2 (step 9, the gate fails) and `b` to 1 (step 11, unrelated); 1.35 runs the effect at both, 2.0 at neither, and both run it at step 13 (a = 8). This covers the onEffectRun hook call for the effect \"gated\" that only 1.35 records in step 9. Signed 2026-11-18 on the owner's instruction: he approved row y in chat on 2026-11-01 (\"Approve all five\") and, for layer eleven, said \"I approve you for to do everything\" (2026-11-15); this extends row y to the `on` gate its text already names, now that L11 runs the data-form `on`.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-quirk-y-on-gate-observe-effect-run-missing-step9",
+    "scenario": "disable then enable: an effect with an on gate and a write to an unrelated fact",
+    "stream": "observe",
+    "kind": "effect.run",
+    "engine": "v2",
+    "step": 9,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "gated",
+            "type": "effect.run"
+          }
+        }
+      }
+    ],
+    "reason": "Row y (L4; owner-approved 2026-11-01: disable keeps the dependency record, the declared deps, derivation deps, the last auto-tracked read set and the `on` gate, and releases only the derivation watching; enable re-watches, does not run the effect and does not replay changes made while disabled; this covers the error boundary's \"disable\" path too): 1.35 throws the record away at disable (effects.ts:1457), and its `on` gate is evaluated only inside the dependency check (effects.ts:937-972, the gate at 965), so after enable the effect runs on the next change of any fact with the gate skipped; 2.0 keeps both and runs it only when `a` changes and `a > 5` holds. In this scenario the effect has `on: { a: { $gt: 5 } }`; after disable and enable, `a` is set to 2 (step 9, the gate fails) and `b` to 1 (step 11, unrelated); 1.35 runs the effect at both, 2.0 at neither, and both run it at step 13 (a = 8). This covers the effect.run observe event for the effect \"gated\" that only 1.35 records in step 9. Signed 2026-11-18 on the owner's instruction: he approved row y in chat on 2026-11-01 (\"Approve all five\") and, for layer eleven, said \"I approve you for to do everything\" (2026-11-15); this extends row y to the `on` gate its text already names, now that L11 runs the data-form `on`.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-quirk-y-on-gate-external-gated-missing-step9",
+    "scenario": "disable then enable: an effect with an on gate and a write to an unrelated fact",
+    "stream": "external",
+    "kind": "gated",
+    "engine": "v2",
+    "step": 9,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["gated", 2]
+        }
+      }
+    ],
+    "reason": "Row y (L4; owner-approved 2026-11-01: disable keeps the dependency record, the declared deps, derivation deps, the last auto-tracked read set and the `on` gate, and releases only the derivation watching; enable re-watches, does not run the effect and does not replay changes made while disabled; this covers the error boundary's \"disable\" path too): 1.35 throws the record away at disable (effects.ts:1457), and its `on` gate is evaluated only inside the dependency check (effects.ts:937-972, the gate at 965), so after enable the effect runs on the next change of any fact with the gate skipped; 2.0 keeps both and runs it only when `a` changes and `a > 5` holds. In this scenario the effect has `on: { a: { $gt: 5 } }`; after disable and enable, `a` is set to 2 (step 9, the gate fails) and `b` to 1 (step 11, unrelated); 1.35 runs the effect at both, 2.0 at neither, and both run it at step 13 (a = 8). This covers the effect's own \"gated\" record that only 1.35 records in step 9. Signed 2026-11-18 on the owner's instruction: he approved row y in chat on 2026-11-01 (\"Approve all five\") and, for layer eleven, said \"I approve you for to do everything\" (2026-11-15); this extends row y to the `on` gate its text already names, now that L11 runs the data-form `on`.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-quirk-y-on-gate-hook-onEffectRun-missing-step11",
+    "scenario": "disable then enable: an effect with an on gate and a write to an unrelated fact",
+    "stream": "hook",
+    "kind": "onEffectRun",
+    "engine": "v2",
+    "step": 11,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onEffectRun",
+          "args": ["gated"]
+        }
+      }
+    ],
+    "reason": "Row y (L4; owner-approved 2026-11-01: disable keeps the dependency record, the declared deps, derivation deps, the last auto-tracked read set and the `on` gate, and releases only the derivation watching; enable re-watches, does not run the effect and does not replay changes made while disabled; this covers the error boundary's \"disable\" path too): 1.35 throws the record away at disable (effects.ts:1457), and its `on` gate is evaluated only inside the dependency check (effects.ts:937-972, the gate at 965), so after enable the effect runs on the next change of any fact with the gate skipped; 2.0 keeps both and runs it only when `a` changes and `a > 5` holds. In this scenario the effect has `on: { a: { $gt: 5 } }`; after disable and enable, `a` is set to 2 (step 9, the gate fails) and `b` to 1 (step 11, unrelated); 1.35 runs the effect at both, 2.0 at neither, and both run it at step 13 (a = 8). This covers the onEffectRun hook call for the effect \"gated\" that only 1.35 records in step 11. Signed 2026-11-18 on the owner's instruction: he approved row y in chat on 2026-11-01 (\"Approve all five\") and, for layer eleven, said \"I approve you for to do everything\" (2026-11-15); this extends row y to the `on` gate its text already names, now that L11 runs the data-form `on`.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-quirk-y-on-gate-observe-effect-run-missing-step11",
+    "scenario": "disable then enable: an effect with an on gate and a write to an unrelated fact",
+    "stream": "observe",
+    "kind": "effect.run",
+    "engine": "v2",
+    "step": 11,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "gated",
+            "type": "effect.run"
+          }
+        }
+      }
+    ],
+    "reason": "Row y (L4; owner-approved 2026-11-01: disable keeps the dependency record, the declared deps, derivation deps, the last auto-tracked read set and the `on` gate, and releases only the derivation watching; enable re-watches, does not run the effect and does not replay changes made while disabled; this covers the error boundary's \"disable\" path too): 1.35 throws the record away at disable (effects.ts:1457), and its `on` gate is evaluated only inside the dependency check (effects.ts:937-972, the gate at 965), so after enable the effect runs on the next change of any fact with the gate skipped; 2.0 keeps both and runs it only when `a` changes and `a > 5` holds. In this scenario the effect has `on: { a: { $gt: 5 } }`; after disable and enable, `a` is set to 2 (step 9, the gate fails) and `b` to 1 (step 11, unrelated); 1.35 runs the effect at both, 2.0 at neither, and both run it at step 13 (a = 8). This covers the effect.run observe event for the effect \"gated\" that only 1.35 records in step 11. Signed 2026-11-18 on the owner's instruction: he approved row y in chat on 2026-11-01 (\"Approve all five\") and, for layer eleven, said \"I approve you for to do everything\" (2026-11-15); this extends row y to the `on` gate its text already names, now that L11 runs the data-form `on`.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-quirk-y-on-gate-external-gated-missing-step11",
+    "scenario": "disable then enable: an effect with an on gate and a write to an unrelated fact",
+    "stream": "external",
+    "kind": "gated",
+    "engine": "v2",
+    "step": 11,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["gated", 2]
+        }
+      }
+    ],
+    "reason": "Row y (L4; owner-approved 2026-11-01: disable keeps the dependency record, the declared deps, derivation deps, the last auto-tracked read set and the `on` gate, and releases only the derivation watching; enable re-watches, does not run the effect and does not replay changes made while disabled; this covers the error boundary's \"disable\" path too): 1.35 throws the record away at disable (effects.ts:1457), and its `on` gate is evaluated only inside the dependency check (effects.ts:937-972, the gate at 965), so after enable the effect runs on the next change of any fact with the gate skipped; 2.0 keeps both and runs it only when `a` changes and `a > 5` holds. In this scenario the effect has `on: { a: { $gt: 5 } }`; after disable and enable, `a` is set to 2 (step 9, the gate fails) and `b` to 1 (step 11, unrelated); 1.35 runs the effect at both, 2.0 at neither, and both run it at step 13 (a = 8). This covers the effect's own \"gated\" record that only 1.35 records in step 11. Signed 2026-11-18 on the owner's instruction: he approved row y in chat on 2026-11-01 (\"Approve all five\") and, for layer eleven, said \"I approve you for to do everything\" (2026-11-15); this extends row y to the `on` gate its text already names, now that L11 runs the data-form `on`.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l7-quirk-j-fuzz-external-batch-start-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "start",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["restart"],
+    "group": "quirk-j",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "start",
+            {
+              "$like": "batchTag"
+            },
+            {
+              "$like": "integer"
+            },
+            {
+              "$like": "batchItems"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk j (L3), its batch path (L7): a restart (stop() then start()) re-dispatches a requirement that is still wanted, so 2.0 runs its resolver again where 1.35 does not. 1.35 keeps the requirement in its previous set across stop() (core engine.ts, the reconcile diff and `state.previousRequirements = currentSet`), so the pass after start() sees nothing added and never calls resolve() again; 2.0's stop_() records the canceled ids and start() re-dispatches them (core-next api/reconcile.ts, `restart`). For a batched resolver the re-dispatch queues the requirement, and the call starts from the queue's window with no onResolverStart hook and before any later reconcile pass, so its first record is the handler's external \"start\" record ([kind, tag \"<module>.rb\", call number, the call's items]), which the group's other entries do not match (fuzz seed 8 at forced L11, shrunk to one batched source: stop, then start). From the re-dispatch on, the case runs differently, so this entry ends the fuzz case (`ends`), only in a case with a stop followed by a start and no destroy (`when: restart`), as the group's other entries do. Signed 2026-11-17 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-17"
+  },
+  {
+    "id": "l11-bq-u2-hook-onInit-missing-setup",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onInit",
+    "engine": "v2",
+    "step": -1,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onInit",
+          "args": []
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onInit\" record in setup, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-error-threw-createSystem-extra-setup",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "error",
+    "kind": "threw createSystem",
+    "engine": "v2",
+    "step": -1,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "threw",
+          "where": "createSystem",
+          "error": {
+            "$error": {
+              "name": "Error",
+              "message": "[Directive] constraint \"mixed\": $any cannot coexist with sibling keys (phase) — wrap them in $all together, or move them inside the $any children"
+            }
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the error \"threw createSystem\" record in setup, which only 2.0 has (extra on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onFactsBatch-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onFactsBatch",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onFactsBatch",
+          "args": [
+            [
+              {
+                "key": "n",
+                "origin": "authored",
+                "prev": {
+                  "$undefined": true
+                },
+                "type": "set",
+                "value": 0
+              },
+              {
+                "key": "phase",
+                "origin": "authored",
+                "prev": {
+                  "$undefined": true
+                },
+                "type": "set",
+                "value": "red"
+              }
+            ]
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onFactsBatch\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-fact-change-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "fact.change",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "key": "n",
+            "next": 0,
+            "origin": "authored",
+            "prev": {
+              "$undefined": true
+            },
+            "type": "fact.change"
+          }
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "key": "phase",
+            "next": "red",
+            "origin": "authored",
+            "prev": {
+              "$undefined": true
+            },
+            "type": "fact.change"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"fact.change\" records in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-notify-n-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "notify",
+    "kind": "n",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "n",
+          "value": 0
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the notify \"n\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-notify-phase-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "notify",
+    "kind": "phase",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "phase",
+          "value": "red"
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the notify \"phase\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onStart-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onStart",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onStart",
+          "args": []
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onStart\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-system-start-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "system.start",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "type": "system.start"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"system.start\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onReconcileStart-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileStart",
+          "args": [
+            {
+              "get": {
+                "$fn": true
+              },
+              "has": {
+                "$fn": true
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onReconcileStart\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-reconcile-start-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "reconcile.start",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "type": "reconcile.start"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"reconcile.start\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onConstraintEvaluate-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onConstraintEvaluate",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onConstraintEvaluate",
+          "args": [
+            "mixed",
+            false,
+            [
+              {
+                "actual": 0,
+                "children": [
+                  {
+                    "actual": 0,
+                    "expected": 1,
+                    "op": "$eq",
+                    "pass": false,
+                    "path": "n"
+                  }
+                ],
+                "expected": 1,
+                "op": "$any",
+                "pass": false,
+                "path": "$any"
+              }
+            ]
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onConstraintEvaluate\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-constraint-evaluate-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "constraint.evaluate",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "active": false,
+            "id": "mixed",
+            "type": "constraint.evaluate",
+            "whenExplain": [
+              {
+                "actual": 0,
+                "children": [
+                  {
+                    "actual": 0,
+                    "expected": 1,
+                    "op": "$eq",
+                    "pass": false,
+                    "path": "n"
+                  }
+                ],
+                "expected": 1,
+                "op": "$any",
+                "pass": false,
+                "path": "$any"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"constraint.evaluate\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-system-init-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "system.init",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "type": "system.init"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"system.init\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onReconcileEnd-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [],
+              "completed": [],
+              "inflight": [],
+              "unmet": []
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onReconcileEnd\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-reconcile-end-missing-step0",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "reconcile.end",
+    "engine": "v2",
+    "step": 0,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "resolversCanceled": 0,
+            "resolversCompleted": 0,
+            "type": "reconcile.end"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"reconcile.end\" record in step 0, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-state-settle-missing-step1",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 1,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "state",
+          "label": "settle",
+          "facts": {
+            "n": 0,
+            "phase": "red"
+          },
+          "derived": {},
+          "inspect": {
+            "attachedSourceCount": 0,
+            "constraints": [
+              {
+                "active": false,
+                "disabled": false,
+                "hitCount": {
+                  "$incidental": "number"
+                },
+                "id": "mixed",
+                "lastActiveAt": {
+                  "$incidental": "null"
+                },
+                "meta": {
+                  "$undefined": true
+                },
+                "priority": 0,
+                "whenSpec": {
+                  "$any": [
+                    {
+                      "n": 1
+                    }
+                  ],
+                  "phase": "green"
+                }
+              }
+            ],
+            "derivations": [],
+            "effects": [],
+            "events": [],
+            "facts": [
+              {
+                "key": "n",
+                "meta": {
+                  "$undefined": true
+                }
+              },
+              {
+                "key": "phase",
+                "meta": {
+                  "$undefined": true
+                }
+              }
+            ],
+            "inflight": [],
+            "modules": [
+              {
+                "id": "m",
+                "meta": {
+                  "$undefined": true
+                }
+              }
+            ],
+            "observedDerivations": {
+              "$incidental": "number"
+            },
+            "pendingInvalidations": {
+              "$incidental": "number"
+            },
+            "resolverDefs": [
+              {
+                "id": "go",
+                "meta": {
+                  "$undefined": true
+                },
+                "requirement": "GO"
+              }
+            ],
+            "resolvers": {},
+            "sources": [],
+            "traceEnabled": false,
+            "unmet": []
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the state \"settle\" record in step 1, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onFactSet-missing-step2",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onFactSet",
+    "engine": "v2",
+    "step": 2,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onFactSet",
+          "args": ["n", 1, 0]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onFactSet\" record in step 2, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-fact-change-missing-step2",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "fact.change",
+    "engine": "v2",
+    "step": 2,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "key": "n",
+            "next": 1,
+            "origin": "authored",
+            "prev": 0,
+            "type": "fact.change"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"fact.change\" record in step 2, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-notify-n-missing-step2",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "notify",
+    "kind": "n",
+    "engine": "v2",
+    "step": 2,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "n",
+          "value": 1
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the notify \"n\" record in step 2, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onReconcileStart-missing-step2",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "step": 2,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileStart",
+          "args": [
+            {
+              "get": {
+                "$fn": true
+              },
+              "has": {
+                "$fn": true
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onReconcileStart\" record in step 2, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-reconcile-start-missing-step2",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "reconcile.start",
+    "engine": "v2",
+    "step": 2,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "type": "reconcile.start"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"reconcile.start\" record in step 2, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onConstraintEvaluate-missing-step2",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onConstraintEvaluate",
+    "engine": "v2",
+    "step": 2,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onConstraintEvaluate",
+          "args": [
+            "mixed",
+            true,
+            [
+              {
+                "actual": 1,
+                "children": [
+                  {
+                    "actual": 1,
+                    "expected": 1,
+                    "op": "$eq",
+                    "pass": true,
+                    "path": "n"
+                  }
+                ],
+                "expected": 1,
+                "op": "$any",
+                "pass": true,
+                "path": "$any"
+              }
+            ]
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onConstraintEvaluate\" record in step 2, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-constraint-evaluate-missing-step2",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "constraint.evaluate",
+    "engine": "v2",
+    "step": 2,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "active": true,
+            "id": "mixed",
+            "type": "constraint.evaluate",
+            "whenExplain": [
+              {
+                "actual": 1,
+                "children": [
+                  {
+                    "actual": 1,
+                    "expected": 1,
+                    "op": "$eq",
+                    "pass": true,
+                    "path": "n"
+                  }
+                ],
+                "expected": 1,
+                "op": "$any",
+                "pass": true,
+                "path": "$any"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"constraint.evaluate\" record in step 2, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onRequirementCreated-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onRequirementCreated",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onRequirementCreated",
+          "args": [
+            {
+              "fromConstraint": "mixed",
+              "id": "GO:{}",
+              "requirement": {
+                "type": "GO"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onRequirementCreated\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-requirement-created-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "requirement.created",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "id": "GO:{}",
+            "requirementType": "GO",
+            "type": "requirement.created"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"requirement.created\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onResolverStart-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onResolverStart",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onResolverStart",
+          "args": [
+            "go",
+            {
+              "fromConstraint": "mixed",
+              "id": "GO:{}",
+              "requirement": {
+                "type": "GO"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onResolverStart\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-resolver-start-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "resolver.start",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "requirementId": "GO:{}",
+            "resolver": "go",
+            "type": "resolver.start"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"resolver.start\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onFactsBatch-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onFactsBatch",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onFactsBatch",
+          "args": [
+            [
+              {
+                "key": "n",
+                "origin": "authored",
+                "prev": 1,
+                "type": "set",
+                "value": 2
+              }
+            ]
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onFactsBatch\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-fact-change-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "fact.change",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "key": "n",
+            "next": 2,
+            "origin": "authored",
+            "prev": 1,
+            "type": "fact.change"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"fact.change\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-notify-n-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "notify",
+    "kind": "n",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "notify",
+          "id": "n",
+          "value": 2
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the notify \"n\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onReconcileEnd-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [],
+              "completed": [],
+              "inflight": [
+                {
+                  "id": "GO:{}",
+                  "resolverId": "go",
+                  "startedAt": 0
+                }
+              ],
+              "unmet": []
+            }
+          ]
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileEnd",
+          "args": [
+            {
+              "canceled": [
+                {
+                  "id": "GO:{}",
+                  "resolverId": "go"
+                }
+              ],
+              "completed": [],
+              "inflight": [
+                {
+                  "id": "GO:{}",
+                  "resolverId": "go",
+                  "startedAt": 0
+                }
+              ],
+              "unmet": []
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onReconcileEnd\" records in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-reconcile-end-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "reconcile.end",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "resolversCanceled": 0,
+            "resolversCompleted": 0,
+            "type": "reconcile.end"
+          }
+        }
+      },
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "resolversCanceled": 1,
+            "resolversCompleted": 0,
+            "type": "reconcile.end"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"reconcile.end\" records in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onReconcileStart-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onReconcileStart",
+          "args": [
+            {
+              "get": {
+                "$fn": true
+              },
+              "has": {
+                "$fn": true
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onReconcileStart\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-reconcile-start-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "reconcile.start",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "type": "reconcile.start"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"reconcile.start\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onConstraintEvaluate-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onConstraintEvaluate",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onConstraintEvaluate",
+          "args": [
+            "mixed",
+            false,
+            [
+              {
+                "actual": 0,
+                "children": [
+                  {
+                    "actual": 2,
+                    "expected": 1,
+                    "op": "$eq",
+                    "pass": false,
+                    "path": "n"
+                  }
+                ],
+                "expected": 1,
+                "op": "$any",
+                "pass": false,
+                "path": "$any"
+              }
+            ]
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onConstraintEvaluate\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-constraint-evaluate-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "constraint.evaluate",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "active": false,
+            "id": "mixed",
+            "type": "constraint.evaluate",
+            "whenExplain": [
+              {
+                "actual": 0,
+                "children": [
+                  {
+                    "actual": 2,
+                    "expected": 1,
+                    "op": "$eq",
+                    "pass": false,
+                    "path": "n"
+                  }
+                ],
+                "expected": 1,
+                "op": "$any",
+                "pass": false,
+                "path": "$any"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"constraint.evaluate\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onResolverComplete-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onResolverComplete",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onResolverComplete",
+          "args": [
+            "go",
+            {
+              "fromConstraint": "mixed",
+              "id": "GO:{}",
+              "requirement": {
+                "type": "GO"
+              }
+            },
+            0
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onResolverComplete\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-resolver-complete-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "resolver.complete",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "duration": 0,
+            "requirementId": "GO:{}",
+            "resolver": "go",
+            "type": "resolver.complete"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"resolver.complete\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onRequirementMet-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onRequirementMet",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onRequirementMet",
+          "args": [
+            {
+              "fromConstraint": "mixed",
+              "id": "GO:{}",
+              "requirement": {
+                "type": "GO"
+              }
+            },
+            "go"
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onRequirementMet\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-requirement-met-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "requirement.met",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "byResolver": "go",
+            "id": "GO:{}",
+            "type": "requirement.met"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"requirement.met\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-state-settle-missing-step3",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "step": 3,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "state",
+          "label": "settle",
+          "facts": {
+            "n": 2,
+            "phase": "red"
+          },
+          "derived": {},
+          "inspect": {
+            "attachedSourceCount": 0,
+            "constraints": [
+              {
+                "active": false,
+                "disabled": false,
+                "hitCount": {
+                  "$incidental": "number"
+                },
+                "id": "mixed",
+                "lastActiveAt": {
+                  "$incidental": "number"
+                },
+                "meta": {
+                  "$undefined": true
+                },
+                "priority": 0,
+                "whenSpec": {
+                  "$any": [
+                    {
+                      "n": 1
+                    }
+                  ],
+                  "phase": "green"
+                }
+              }
+            ],
+            "derivations": [],
+            "effects": [],
+            "events": [],
+            "facts": [
+              {
+                "key": "n",
+                "meta": {
+                  "$undefined": true
+                }
+              },
+              {
+                "key": "phase",
+                "meta": {
+                  "$undefined": true
+                }
+              }
+            ],
+            "inflight": [],
+            "modules": [
+              {
+                "id": "m",
+                "meta": {
+                  "$undefined": true
+                }
+              }
+            ],
+            "observedDerivations": {
+              "$incidental": "number"
+            },
+            "pendingInvalidations": {
+              "$incidental": "number"
+            },
+            "resolverDefs": [
+              {
+                "id": "go",
+                "meta": {
+                  "$undefined": true
+                },
+                "requirement": "GO"
+              }
+            ],
+            "resolvers": {},
+            "sources": [],
+            "traceEnabled": false,
+            "unmet": []
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the state \"settle\" record in step 3, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-external-evaluate-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "external",
+    "kind": "evaluate",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["evaluate", true]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the external \"evaluate\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-external-explained-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "external",
+    "kind": "explained",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": [
+            "explained",
+            [
+              {
+                "actual": 1,
+                "children": [
+                  {
+                    "actual": 1,
+                    "expected": 1,
+                    "op": "$eq",
+                    "pass": true,
+                    "path": "n"
+                  }
+                ],
+                "expected": 1,
+                "op": "$any",
+                "pass": true,
+                "path": "$any"
+              }
+            ]
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the external \"explained\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-external-describe-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "external",
+    "kind": "describe",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": ["describe", "n is 1"]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the external \"describe\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-external-validate-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "external",
+    "kind": "validate",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": [
+            "validate",
+            {
+              "$undefined": true
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the external \"validate\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-external-sql-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "external",
+    "kind": "sql",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": [
+            "sql",
+            "threw",
+            {
+              "$error": {
+                "name": "Error",
+                "message": "[Directive] predicateToSQL: $any cannot coexist with sibling keys (phase) — wrap them in $all together, or move them inside the $any children"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the external \"sql\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-external-postgrest-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "external",
+    "kind": "postgrest",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": [
+            "postgrest",
+            "threw",
+            {
+              "$error": {
+                "name": "Error",
+                "message": "[Directive] predicateToPostgrest: $any cannot coexist with sibling keys (phase) — wrap them in $all together, or move them inside the $any children"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the external \"postgrest\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-external-mongo-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "external",
+    "kind": "mongo",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": [
+            "mongo",
+            "threw",
+            {
+              "$error": {
+                "name": "Error",
+                "message": "[Directive] predicateToMongo: $any cannot coexist with sibling keys (phase) — wrap them in $all together, or move them inside the $any children"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the external \"mongo\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-state-end-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "state",
+          "label": "end",
+          "facts": {
+            "n": 2,
+            "phase": "red"
+          },
+          "derived": {},
+          "inspect": {
+            "attachedSourceCount": 0,
+            "constraints": [
+              {
+                "active": false,
+                "disabled": false,
+                "hitCount": {
+                  "$incidental": "number"
+                },
+                "id": "mixed",
+                "lastActiveAt": {
+                  "$incidental": "number"
+                },
+                "meta": {
+                  "$undefined": true
+                },
+                "priority": 0,
+                "whenSpec": {
+                  "$any": [
+                    {
+                      "n": 1
+                    }
+                  ],
+                  "phase": "green"
+                }
+              }
+            ],
+            "derivations": [],
+            "effects": [],
+            "events": [],
+            "facts": [
+              {
+                "key": "n",
+                "meta": {
+                  "$undefined": true
+                }
+              },
+              {
+                "key": "phase",
+                "meta": {
+                  "$undefined": true
+                }
+              }
+            ],
+            "inflight": [],
+            "modules": [
+              {
+                "id": "m",
+                "meta": {
+                  "$undefined": true
+                }
+              }
+            ],
+            "observedDerivations": {
+              "$incidental": "number"
+            },
+            "pendingInvalidations": {
+              "$incidental": "number"
+            },
+            "resolverDefs": [
+              {
+                "id": "go",
+                "meta": {
+                  "$undefined": true
+                },
+                "requirement": "GO"
+              }
+            ],
+            "resolvers": {},
+            "sources": [],
+            "traceEnabled": false,
+            "unmet": []
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the state \"end\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onStop-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onStop",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onStop",
+          "args": []
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onStop\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-system-stop-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "system.stop",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "type": "system.stop"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"system.stop\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-hook-onDestroy-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "hook",
+    "kind": "onDestroy",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "hook",
+          "hook": "onDestroy",
+          "args": []
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the hook \"onDestroy\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-observe-system-destroy-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "observe",
+    "kind": "system.destroy",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "observe",
+          "event": {
+            "type": "system.destroy"
+          }
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the observe \"system.destroy\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-bq-u2-timers-teardown-missing-step4",
+    "scenario": "a combinator beside a fact key: the fact key is ignored at run time, and the compilers refuse it (U2)",
+    "stream": "timers",
+    "kind": "teardown",
+    "engine": "v2",
+    "step": 4,
+    "op": "missing",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "timers",
+          "at": "teardown",
+          "pending": 0
+        }
+      }
+    ],
+    "reason": "Row (bq) (L11; the L11 RFC rev 2, Decisions: a combinator beside a fact key is refused at registration, with the compilers' message; the exported evaluatePredicate keeps 1.35's answer). In this scenario the constraint `mixed` has `when: { $any: [{ n: 1 }], phase: \"green\" }`. 1.35 registers it, ignores `phase` at run time and fires the constraint; 2.0 refuses it at createSystem (\"$any cannot coexist with sibling keys (phase)\"), so the system is never made and every record 1.35 makes from setup on is missing on 2.0. This covers the timers \"teardown\" record in step 4, which 1.35 has and 2.0 does not (missing on 2.0). Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L11 RFC rev 2, row (bq) among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-quirk-b-keyed-hook-onError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["resolverRejects", "resolverKey"],
+    "group": "quirk-b-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onError",
+          "args": [
+            {
+              "$error": {
+                "name": "DirectiveError",
+                "message": {
+                  "$like": "attemptError"
+                },
+                "context": {
+                  "fromConstraint": {
+                    "$like": "constraint"
+                  },
+                  "id": {
+                    "$like": "keyedRequirementId"
+                  },
+                  "requirement": {
+                    "at": {
+                      "$like": "integer"
+                    },
+                    "type": {
+                      "$like": "requirementType"
+                    }
+                  }
+                },
+                "recoverable": true,
+                "source": "resolver",
+                "sourceId": {
+                  "$like": "resolver"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-hook-onError-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Its `id`/`requirementId` name `keyedRequirementId` (diff/fingerprint.ts: the bare type, plain or JSON-quoted, as a keyed requirement's id is), not `requirementType`; that change signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside the row's approval above.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-quirk-b-keyed-hook-onErrorRecovery-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["resolverRejects", "resolverKey"],
+    "group": "quirk-b-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onErrorRecovery",
+          "args": [
+            {
+              "$error": {
+                "name": "DirectiveError",
+                "message": {
+                  "$like": "attemptError"
+                },
+                "context": {
+                  "fromConstraint": {
+                    "$like": "constraint"
+                  },
+                  "id": {
+                    "$like": "keyedRequirementId"
+                  },
+                  "requirement": {
+                    "at": {
+                      "$like": "integer"
+                    },
+                    "type": {
+                      "$like": "requirementType"
+                    }
+                  }
+                },
+                "recoverable": true,
+                "source": "resolver",
+                "sourceId": {
+                  "$like": "resolver"
+                }
+              }
+            },
+            "retry-later"
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onErrorRecovery",
+          "args": [
+            {
+              "$error": {
+                "name": "DirectiveError",
+                "message": {
+                  "$like": "attemptError"
+                },
+                "context": {
+                  "fromConstraint": {
+                    "$like": "constraint"
+                  },
+                  "id": {
+                    "$like": "keyedRequirementId"
+                  },
+                  "requirement": {
+                    "at": {
+                      "$like": "integer"
+                    },
+                    "type": {
+                      "$like": "requirementType"
+                    }
+                  }
+                },
+                "recoverable": true,
+                "source": "resolver",
+                "sourceId": {
+                  "$like": "resolver"
+                }
+              }
+            },
+            "throw"
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onErrorRecovery",
+          "args": [
+            {
+              "$error": {
+                "name": "DirectiveError",
+                "message": {
+                  "$like": "attemptError"
+                },
+                "context": {
+                  "fromConstraint": {
+                    "$like": "constraint"
+                  },
+                  "id": {
+                    "$like": "keyedRequirementId"
+                  },
+                  "requirement": {
+                    "at": {
+                      "$like": "integer"
+                    },
+                    "type": {
+                      "$like": "requirementType"
+                    }
+                  }
+                },
+                "recoverable": true,
+                "source": "resolver",
+                "sourceId": {
+                  "$like": "resolver"
+                }
+              }
+            },
+            "skip"
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onErrorRecovery",
+          "args": [
+            {
+              "$error": {
+                "name": "DirectiveError",
+                "message": {
+                  "$like": "attemptError"
+                },
+                "context": {
+                  "fromConstraint": {
+                    "$like": "constraint"
+                  },
+                  "id": {
+                    "$like": "keyedRequirementId"
+                  },
+                  "requirement": {
+                    "at": {
+                      "$like": "integer"
+                    },
+                    "type": {
+                      "$like": "requirementType"
+                    }
+                  }
+                },
+                "recoverable": true,
+                "source": "resolver",
+                "sourceId": {
+                  "$like": "resolver"
+                }
+              }
+            },
+            "disable"
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onErrorRecovery",
+          "args": [
+            {
+              "$error": {
+                "name": "DirectiveError",
+                "message": {
+                  "$like": "attemptError"
+                },
+                "context": {
+                  "fromConstraint": {
+                    "$like": "constraint"
+                  },
+                  "id": {
+                    "$like": "keyedRequirementId"
+                  },
+                  "requirement": {
+                    "at": {
+                      "$like": "integer"
+                    },
+                    "type": {
+                      "$like": "requirementType"
+                    }
+                  }
+                },
+                "recoverable": true,
+                "source": "resolver",
+                "sourceId": {
+                  "$like": "resolver"
+                }
+              }
+            },
+            "retry"
+          ]
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-hook-onErrorRecovery-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Its `id`/`requirementId` name `keyedRequirementId` (diff/fingerprint.ts: the bare type, plain or JSON-quoted, as a keyed requirement's id is), not `requirementType`; that change signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside the row's approval above.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-quirk-b-keyed-hook-onResolverError-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["resolverRejects", "resolverKey"],
+    "group": "quirk-b-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverError",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "keyedRequirementId"
+              },
+              "requirement": {
+                "at": {
+                  "$like": "integer"
+                },
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            },
+            {
+              "$error": {
+                "name": "Error",
+                "message": {
+                  "$like": "attemptError"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-hook-onResolverError-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Its `id`/`requirementId` name `keyedRequirementId` (diff/fingerprint.ts: the bare type, plain or JSON-quoted, as a keyed requirement's id is), not `requirementType`; that change signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside the row's approval above.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-quirk-b-keyed-observe-resolver-error-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["resolverRejects", "resolverKey"],
+    "group": "quirk-b-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "error": {
+              "$error": {
+                "name": "Error",
+                "message": {
+                  "$like": "attemptError"
+                }
+              }
+            },
+            "requirementId": {
+              "$like": "keyedRequirementId"
+            },
+            "resolver": {
+              "$like": "resolver"
+            },
+            "type": "resolver.error"
+          }
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): the twin of `l2-quirk-b-observe-resolver-error-missing`, its bound changed only where a keyed requirement differs. In 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. The L11 fuzz gives a constraint's requirement its fact's value (`at`, an integer) and its resolver a `key` (diff/fuzz/model.ts, \"L11, keyed\"), so the requirement is `{ at, type }` and its id is the key's answer, the bare type (`A0`), where the original's bound names `{ type }` and `A0:{}`. Nothing else is wider: `when` adds `resolverKey` to the original's `resolverRejects`, `ends` is the original's, and the twins are their own group, `quirk-b-keyed`, as the batch path's are (`quirk-b-batch`) (deep seed 24301 at L11, the L11-order triage's onError missing at step 11). Signed 2026-11-18 on the owner's instruction: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\") and asked Claude to sign for him. Its `id`/`requirementId` name `keyedRequirementId` (diff/fingerprint.ts: the bare type, plain or JSON-quoted, as a keyed requirement's id is), not `requirementType`; that change signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside the row's approval above.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-quirk-b-keyed-console-warn-missing",
+    "scenario": "fuzz",
+    "stream": "console",
+    "kind": "warn",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["resolverRejects", "resolverKey"],
+    "group": "quirk-b-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "console",
+          "level": "warn",
+          "args": [
+            {
+              "$text": "resolverThrew"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk b (L2), with a keyed resolver (L11): in 1.35 a run whose requirement is retracted during its retry backoff, or in the tick it rejects, reports cancel and then an error for the same run; 2.0 reports exactly one outcome per run: cancel. 1.35's extra error also spends the once-per-source development warning (`$text: resolverThrew`, diff/fingerprint.ts `TEXT`: `[Directive] resolver \"a::r0\" threw: … The default error strategy skips it silently. …`), so with a keyed resolver (diff/fuzz/model.ts, \"L11, keyed\") that warning is missing on 2.0. The bound names only that warning's wording; `when` is the keyed twins' (`resolverRejects`, `resolverKey`); no `ends`, since a warning is printed once per source and is not a run's last record; `op: missing` keeps an extra warning on 2.0 unexcused; the group is the keyed twins' own, `quirk-b-keyed`. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside quirk b's approval (GATE-1; \"If all are better or non user facing they are all approved\", 2026-11-01).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-hook-onResolverCancel-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "path": "args[*]",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "batchResolver"
+          }
+        },
+        {
+          "path": "args[*].fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "batchConstraint"
+          }
+        },
+        {
+          "path": "args[*].id",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        },
+        {
+          "path": "args[*].requirement.item",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "args[*].requirement.type",
+          "from": {
+            "$like": "requirementType"
+          },
+          "to": {
+            "$like": "batchRequirementType"
+          }
+        },
+        {
+          "path": "args[*].id",
+          "from": {
+            "$like": "keyedRequirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        },
+        {
+          "path": "args[*].requirement.at",
+          "from": {
+            "$like": "integer"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the onResolverCancel hook call where 1.35's single-run record is paired with 2.0's batch record: `from` names only the single classes and `to` only the batch classes (the requirement's `item` absent on 1.35's side), so a change between two single runs or two batch requirements stays outside it; `when` is row t's `writeRetracts` with `batched`. The single run may have a keyed resolver (a function `key`, L11; PR seed 14's own case at L11): its id is then `keyedRequirementId` and its requirement carries `at` (`integer`), which the batch requirement lacks. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-hook-onResolverCancel-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "hook",
+      "kind": "onResolverCancel",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "args[*]",
+            "from": {
+              "$like": "resolver"
+            },
+            "to": {
+              "$like": "batchResolver"
+            }
+          },
+          {
+            "path": "args[*].fromConstraint",
+            "from": {
+              "$like": "constraint"
+            },
+            "to": {
+              "$like": "batchConstraint"
+            }
+          },
+          {
+            "path": "args[*].id",
+            "from": {
+              "$like": "requirementId"
+            },
+            "to": {
+              "$like": "batchRequirementId"
+            }
+          },
+          {
+            "path": "args[*].requirement.item",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "$like": "batchItem"
+            }
+          },
+          {
+            "path": "args[*].requirement.type",
+            "from": {
+              "$like": "requirementType"
+            },
+            "to": {
+              "$like": "batchRequirementType"
+            }
+          },
+          {
+            "path": "args[*].id",
+            "from": {
+              "$like": "keyedRequirementId"
+            },
+            "to": {
+              "$like": "batchRequirementId"
+            }
+          },
+          {
+            "path": "args[*].requirement.at",
+            "from": {
+              "$like": "integer"
+            },
+            "to": {
+              "$like": "absent"
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the batch onResolverCancel hook call left unpaired on 1.35's side, and only where the case's 2.0 differences hold, at or before it, the single-to-batch change of `l11-cand-t-batch-hook-onResolverCancel-changed` (`requires`, with that entry's bound): the batch cancel 2.0 does report was paired with 1.35's single-run cancel, so a batch cancel 2.0 really lacks, with no such pairing, stays unexcused. The single run may have a keyed resolver (a function `key`, L11; PR seed 14's own case at L11): its id is then `keyedRequirementId` and its requirement carries `at` (`integer`), which the batch requirement lacks. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-hook-onRequirementCanceled-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0]",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "batchConstraint"
+          }
+        },
+        {
+          "path": "args[0].id",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        },
+        {
+          "path": "args[0].requirement.item",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "args[0].requirement.type",
+          "from": {
+            "$like": "requirementType"
+          },
+          "to": {
+            "$like": "batchRequirementType"
+          }
+        },
+        {
+          "path": "args[0].id",
+          "from": {
+            "$like": "keyedRequirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        },
+        {
+          "path": "args[0].requirement.at",
+          "from": {
+            "$like": "integer"
+          },
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the onRequirementCanceled hook call where 1.35's single-run record is paired with 2.0's batch record: `from` names only the single classes and `to` only the batch classes (the requirement's `item` absent on 1.35's side), so a change between two single runs or two batch requirements stays outside it; `when` is row t's `writeRetracts` with `batched`. The single run may have a keyed resolver (a function `key`, L11; PR seed 14's own case at L11): its id is then `keyedRequirementId` and its requirement carries `at` (`integer`), which the batch requirement lacks. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-hook-onRequirementCanceled-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "hook",
+      "kind": "onRequirementCanceled",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "args[0].fromConstraint",
+            "from": {
+              "$like": "constraint"
+            },
+            "to": {
+              "$like": "batchConstraint"
+            }
+          },
+          {
+            "path": "args[0].id",
+            "from": {
+              "$like": "requirementId"
+            },
+            "to": {
+              "$like": "batchRequirementId"
+            }
+          },
+          {
+            "path": "args[0].requirement.item",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "$like": "batchItem"
+            }
+          },
+          {
+            "path": "args[0].requirement.type",
+            "from": {
+              "$like": "requirementType"
+            },
+            "to": {
+              "$like": "batchRequirementType"
+            }
+          },
+          {
+            "path": "args[0].id",
+            "from": {
+              "$like": "keyedRequirementId"
+            },
+            "to": {
+              "$like": "batchRequirementId"
+            }
+          },
+          {
+            "path": "args[0].requirement.at",
+            "from": {
+              "$like": "integer"
+            },
+            "to": {
+              "$like": "absent"
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the batch onRequirementCanceled hook call left unpaired on 1.35's side, and only where the case's 2.0 differences hold, at or before it, the single-to-batch change of `l11-cand-t-batch-hook-onRequirementCanceled-changed` (`requires`, with that entry's bound): the batch cancel 2.0 does report was paired with 1.35's single-run cancel, so a batch cancel 2.0 really lacks, with no such pairing, stays unexcused. The single run may have a keyed resolver (a function `key`, L11; PR seed 14's own case at L11): its id is then `keyedRequirementId` and its requirement carries `at` (`integer`), which the batch requirement lacks. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-observe-requirement-canceled-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event.id",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "path": "event.id",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        },
+        {
+          "path": "event.id",
+          "from": {
+            "$like": "keyedRequirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        }
+      ]
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the requirement.canceled observe event where 1.35's single-run record is paired with 2.0's batch record: `from` names only the single classes and `to` only the batch classes (the requirement's `item` absent on 1.35's side), so a change between two single runs or two batch requirements stays outside it; `when` is row t's `writeRetracts` with `batched`. The single run may have a keyed resolver (a function `key`, L11; PR seed 14's own case at L11): its id is then `keyedRequirementId` and its requirement carries `at` (`integer`), which the batch requirement lacks. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-cand-t-batch-observe-requirement-canceled-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "group": "quirk-t-batch-pairing",
+    "when": ["writeRetracts", "batched"],
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "requires": {
+      "stream": "observe",
+      "kind": "requirement.canceled",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "event.id",
+            "from": {
+              "$like": "requirementId"
+            },
+            "to": {
+              "$like": "batchRequirementId"
+            }
+          },
+          {
+            "path": "event.id",
+            "from": {
+              "$like": "keyedRequirementId"
+            },
+            "to": {
+              "$like": "batchRequirementId"
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t (owner-approved 2026-11-01, decisions page), its third path (`l3-cand-t-fuzz-*`) in a case with a batched resolver (L7), found by PR seed 14 at L11: a resolver's own write retracts its constraint after its run reported complete but before it left flight, and the same write retracts a batch source's constraint. 1.35 reports cancel for the completed single run and then for the batch requirement; 2.0 reports only the batch requirement's cancel (exactly one outcome per run). The comparison pairs 1.35's single-run cancel with 2.0's batch cancel, so the difference shows as a single-to-batch change and then a batch cancel missing on 2.0. This covers the batch requirement.canceled observe event left unpaired on 1.35's side, and only where the case's 2.0 differences hold, at or before it, the single-to-batch change of `l11-cand-t-batch-observe-requirement-canceled-changed` (`requires`, with that entry's bound): the batch cancel 2.0 does report was paired with 1.35's single-run cancel, so a batch cancel 2.0 really lacks, with no such pairing, stays unexcused. The single run may have a keyed resolver (a function `key`, L11; PR seed 14's own case at L11): its id is then `keyedRequirementId` and its requirement carries `at` (`integer`), which the batch requirement lacks. Signed 2026-11-18 on the owner's instruction: \"Approve; you sign them (Recommended)\" (in chat, 2026-11-18), alongside row t's approval (decisions page, 2026-11-01: \"If all are better or non user facing they are all approved\").",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-fuzz-bc-console-error-extra-import-failed",
+    "scenario": "fuzz",
+    "stream": "console",
+    "kind": "error",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["imported"],
+    "group": "row-bc",
+    "bound": {
+      "match": [
+        {
+          "k": "console",
+          "level": "error",
+          "args": [
+            {
+              "$text": "historyImportFailed"
+            },
+            {
+              "$text": "historyIndexNotASnapshot"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bc) (L8; the L8 RFC, \"an import with a bad index fails\"): 2.0 rejects a history import whose `currentIndex` is outside its snapshot list, and logs 1.35's own import failure, \"[Directive] Failed to import history data:\", with the reason \"currentIndex must be the index of a snapshot\"; 1.35 imports it. The fuzz reaches it when a `roundtrip` exports a history that holds no snapshot (`currentIndex` -1). The `importedEmpty` trigger names one way to get there (a module with `snapshotEvents`); the L11 data-form phase found another (fuzz seed 5 at L11: a module with a template compute and no `snapshotEvents`, whose history is still empty at the roundtrip on both engines). So `when` is `imported` (history on and a roundtrip), and the bound names only this record: an error whose first argument is the import-failure text word for word (`historyImportFailed`) and whose second is the error object with (bc)'s own reason word for word, \"[Directive] Invalid history data: currentIndex must be the index of a snapshot\" (`historyIndexNotASnapshot`, read before the contract's mask), so any other import failure stays unexplained. The case runs the same after it (the import changes nothing on either engine), so the entry does not end it. Signed 2026-11-18 on the owner's instruction (GATE-2 rule 1): \"Approve all as recommended (Recommended)\" (2026-11-10), which approved row (bc).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-18"
+  },
+  {
+    "id": "l11-fuzz-as-flush-hook-onReconcileStart-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileStart",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchMaxSize"],
+    "group": "row-as-flush",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onReconcileStart",
+          "args": [
+            {
+              "get": {
+                "$fn": true
+              },
+              "has": {
+                "$fn": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (as) (L7a, #357): 2.0's `settle()` counts a running batch and waits for it, where 1.35's resolves while it runs. 1.35's own settle() runs every queue at each settled change while it waits (engine.ts:4070-4073, processBatches), and 2.0 keeps that rule (api/batch.ts `kernel.define(\"batch\")`, called from settle's onSettledChange listener). So in a settle step whose batch is still running, a requirement queued behind a `maxSize` flush (the overflow item) is started at the next settled change on 2.0, where 1.35's settle has already returned and the item waits out its window (resolvers.ts:1888-1902). 1.35 then makes one more reconcile pass than 2.0. Pinned with the public API (fix2/shrink/u7.mjs and u7-held.mjs): with an unbatched 40 ms resolver holding 1.35's settle() open as well, 1.35 starts the overflow call at once, as 2.0 does, and both make the same passes. PR seed 7 at L11 (spec u7). This covers a reconcile pass on 1.35 only and ends the case (`ends`): every later record of the step is shifted by the missing pass. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved row (as) (\"Approve (Recommended)\", 2026-11-05), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19",
+    "during": "settle"
+  },
+  {
+    "id": "l11-fuzz-as-flush-observe-reconcile.start-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "reconcile.start",
+    "engine": "v2",
+    "op": "missing",
+    "ends": true,
+    "when": ["batched", "batchMaxSize"],
+    "group": "row-as-flush",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "type": "reconcile.start"
+          }
+        }
+      ]
+    },
+    "reason": "Row (as) (L7a, #357): 2.0's `settle()` counts a running batch and waits for it, where 1.35's resolves while it runs. 1.35's own settle() runs every queue at each settled change while it waits (engine.ts:4070-4073, processBatches), and 2.0 keeps that rule (api/batch.ts `kernel.define(\"batch\")`, called from settle's onSettledChange listener). So in a settle step whose batch is still running, a requirement queued behind a `maxSize` flush (the overflow item) is started at the next settled change on 2.0, where 1.35's settle has already returned and the item waits out its window (resolvers.ts:1888-1902). 1.35 then makes one more reconcile pass than 2.0. Pinned with the public API (fix2/shrink/u7.mjs and u7-held.mjs): with an unbatched 40 ms resolver holding 1.35's settle() open as well, 1.35 starts the overflow call at once, as 2.0 does, and both make the same passes. PR seed 7 at L11 (spec u7). This covers a reconcile pass on 1.35 only and ends the case (`ends`): every later record of the step is shifted by the missing pass. Observe twin of `l11-fuzz-as-flush-hook-onReconcileStart-missing`. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved row (as) (\"Approve (Recommended)\", 2026-11-05), approved Claude signing L7's entries (\"Approve all (Recommended)\", 2026-11-05), and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19",
+    "during": "settle"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onResolverStart-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverStart",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverStart",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "keyedRequirementId"
+              },
+              "requirement": {
+                "at": {
+                  "$like": "integer"
+                },
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onResolverStart-extra` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onResolverRetry-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "missing",
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverRetry",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "keyedRequirementId"
+              },
+              "requirement": {
+                "at": {
+                  "$like": "integer"
+                },
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            },
+            {
+              "$like": "integer"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onResolverRetry-missing` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onResolverRetry-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverRetry",
+    "engine": "v2",
+    "op": "extra",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverRetry",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "keyedRequirementId"
+              },
+              "requirement": {
+                "at": {
+                  "$like": "integer"
+                },
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            },
+            {
+              "$like": "integer"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onResolverRetry-extra` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onReconcileEnd-changed-inflight",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].inflight",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].inflight[*]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "id": {
+              "$like": "keyedRequirementId"
+            },
+            "resolverId": {
+              "$like": "resolver"
+            },
+            "startedAt": {
+              "$like": "integer"
+            }
+          }
+        },
+        {
+          "path": "args[0].inflight[*].id",
+          "from": {
+            "$like": "keyedRequirementId"
+          },
+          "to": {
+            "$like": "keyedRequirementId"
+          }
+        },
+        {
+          "path": "args[0].inflight[*].resolverId",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "resolver"
+          }
+        },
+        {
+          "path": "args[0].inflight[*].startedAt",
+          "from": {
+            "$like": "integer"
+          },
+          "to": {
+            "$like": "integer"
+          }
+        },
+        {
+          "path": "args[0].inflight[*]",
+          "from": {
+            "id": {
+              "$like": "keyedRequirementId"
+            },
+            "resolverId": {
+              "$like": "resolver"
+            },
+            "startedAt": {
+              "$like": "integer"
+            }
+          },
+          "to": {
+            "$like": "absent"
+          }
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onReconcileEnd-changed-inflight` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onReconcileEnd-changed-unmet",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onReconcileEnd",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].unmet",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].unmet[*]",
+          "from": {
+            "fromConstraint": {
+              "$like": "constraint"
+            },
+            "id": {
+              "$like": "keyedRequirementId"
+            },
+            "requirement": {
+              "at": {
+                "$like": "integer"
+              },
+              "type": {
+                "$like": "requirementType"
+              }
+            }
+          },
+          "to": {
+            "$like": "absent"
+          }
+        },
+        {
+          "path": "args[0].unmet[*].fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "constraint"
+          }
+        },
+        {
+          "path": "args[0].unmet[*].id",
+          "from": {
+            "$like": "keyedRequirementId"
+          },
+          "to": {
+            "$like": "keyedRequirementId"
+          }
+        },
+        {
+          "path": "args[0].unmet[*].requirement.type",
+          "from": {
+            "$like": "requirementType"
+          },
+          "to": {
+            "$like": "requirementType"
+          }
+        },
+        {
+          "path": "args[0].unmet[*]",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "fromConstraint": {
+              "$like": "constraint"
+            },
+            "id": {
+              "$like": "keyedRequirementId"
+            },
+            "requirement": {
+              "at": {
+                "$like": "integer"
+              },
+              "type": {
+                "$like": "requirementType"
+              }
+            }
+          }
+        },
+        {
+          "path": "args[0].unmet[*].requirement.at",
+          "from": {
+            "$like": "integer"
+          },
+          "to": {
+            "$like": "integer"
+          }
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onReconcileEnd-changed-unmet` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-hook-onResolverStart-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverStart",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "path": "args[*]",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "resolver"
+          }
+        },
+        {
+          "path": "args[*].fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "constraint"
+          }
+        },
+        {
+          "path": "args[*].id",
+          "from": {
+            "$like": "keyedRequirementId"
+          },
+          "to": {
+            "$like": "keyedRequirementId"
+          }
+        },
+        {
+          "path": "args[*].requirement.type",
+          "from": {
+            "$like": "requirementType"
+          },
+          "to": {
+            "$like": "requirementType"
+          }
+        },
+        {
+          "path": "args[*].requirement.at",
+          "from": {
+            "$like": "integer"
+          },
+          "to": {
+            "$like": "integer"
+          }
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-hook-onResolverStart-changed` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
+  },
+  {
+    "id": "l11-quirk-a-keyed-fuzz-observe-resolver-start-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.start",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event",
+    "ends": true,
+    "when": ["resolverRetry"],
+    "group": "quirk-a-keyed",
+    "bound": {
+      "match": [
+        {
+          "path": "event.requirementId",
+          "from": {
+            "$like": "keyedRequirementId"
+          },
+          "to": {
+            "$like": "keyedRequirementId"
+          }
+        },
+        {
+          "path": "event.resolver",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "resolver"
+          }
+        }
+      ]
+    },
+    "reason": "Keyed twin of `l3-quirk-a-fuzz-observe-resolver-start-changed` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-19"
   }
 ]

@@ -7094,6 +7094,50 @@
         }
       }
     },
+    "tests/core/l11-explain-combinators-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "explain() — combinator clauses in a data-form when (production) > renders $all, $any and $not with a passing and a failing child": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        }
+      }
+    },
+    "tests/core/l11-explain-combinators-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "explain() — combinator clauses in a data-form when > renders $all, $any and $not with a passing and a failing child": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        }
+      }
+    },
+    "tests/core/l11-explain-unset-fact-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "explain() — a data-form leaf on an unset fact (production) > renders the unset fact's actual as undefined": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        }
+      }
+    },
+    "tests/core/l11-explain-unset-fact-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L11",
+      "pin": true,
+      "tests": {
+        "explain() — a data-form leaf on an unset fact > renders the unset fact's actual as undefined": {
+          "layer": "L11",
+          "by": ["option predicate data form"]
+        }
+      }
+    },
     "tests/core/l11-predicate-describe-oracle.test.ts": {
       "category": "black-box",
       "rule": "L11",
@@ -7862,7 +7906,7 @@
       "rule": "L11",
       "pin": true,
       "tests": {
-        "L11 probe pins (production) > U1: a global regex in a constraint's $matches never fires; called directly it alternates": {
+        "L11 probe pins (production) > U1: a global regex in a constraint's $matches logs nothing in production; called directly it alternates (row (bp))": {
           "layer": "L11",
           "by": [
             "import evaluatePredicate",
@@ -7913,7 +7957,7 @@
       "rule": "L11",
       "pin": true,
       "tests": {
-        "L11 probe pins (development) > U1: a global or sticky regex in a constraint's $matches throws on its frozen lastIndex, so the rule never fires (shows (bp))": {
+        "L11 probe pins (development) > U1: a global or sticky regex in a constraint's $matches: the system runs and inspect() keeps the caller's regex (row (bp))": {
           "layer": "L11",
           "by": ["option predicate data form"]
         },
@@ -7925,7 +7969,7 @@
             "option predicate data form"
           ]
         },
-        "L11 probe pins (development) > U2: a combinator beside a fact key ignores the fact key at run time and in describePredicate; the compilers refuse it; validatePredicate accepts it (shows (bq))": {
+        "L11 probe pins (development) > U2: a combinator beside a fact key: evaluatePredicate and describePredicate ignore the fact key; the compilers refuse it; validatePredicate accepts it (row (bq))": {
           "layer": "L11",
           "by": [
             "import describePredicate",
@@ -7937,7 +7981,7 @@
             "option predicate data form"
           ]
         },
-        "L11 probe pins (development) > U3: a data-form when or on that names a derivation reads undefined and never matches, with no warning (shows (br))": {
+        "L11 probe pins (development) > U3: a data-form when or on that names a derivation reads undefined and never matches (row (br))": {
           "layer": "L11",
           "by": ["option predicate data form"]
         },

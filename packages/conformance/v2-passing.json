@@ -1021,6 +1021,12 @@
         "restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written",
         "restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written"
       ],
+      "tests/core/l11-explain-combinators-oracle.test.ts": [
+        "explain() — combinator clauses in a data-form when > renders $all, $any and $not with a passing and a failing child"
+      ],
+      "tests/core/l11-explain-unset-fact-oracle.test.ts": [
+        "explain() — a data-form leaf on an unset fact > renders the unset fact's actual as undefined"
+      ],
       "tests/core/l11-predicate-describe-oracle.test.ts": [
         "describePredicate — array form > renders an array-form predicate equivalently to the object form",
         "describePredicate — array form > renders multiple array clauses joined by AND",
@@ -1202,6 +1208,7 @@
         "validatePredicateAgainstSchema — $matches ReDoS rejection > rejects a string-form pattern with nested quantifiers"
       ],
       "tests/core/l11-predicate-pins-oracle.test.ts": [
+        "L11 probe pins (development) > U1: a global or sticky regex in a constraint's $matches: the system runs and inspect() keeps the caller's regex (row (bp))",
         "L11 probe pins (development) > U1: called directly, a global regex alternates: evaluatePredicate and memoizePredicate keep 1.35's answer",
         "L11 probe pins (development) > U10: $changed in an effect's on fires on the first run, then on a change",
         "L11 probe pins (development) > U17: the tracked evaluation short-circuits, so only what it read is a dependency; whenExplain visits every clause",
@@ -1210,6 +1217,8 @@
         "L11 probe pins (development) > U19: a constraint registered or assigned at run time is normalized as at creation: data over function sets whenSpec, function over data removes it (R1, R2)",
         "L11 probe pins (development) > U19: a derivation registered with a data-form compute is unwrapped, a predicate to a boolean and a template to a string; assign keeps the object and reading it throws (R5)",
         "L11 probe pins (development) > U19: an effect registered with an on gate runs only while it holds, and stops once unregistered (R4)",
+        "L11 probe pins (development) > U2: a combinator beside a fact key: evaluatePredicate and describePredicate ignore the fact key; the compilers refuse it; validatePredicate accepts it (row (bq))",
+        "L11 probe pins (development) > U3: a data-form when or on that names a derivation reads undefined and never matches (row (br))",
         "L11 probe pins (development) > U4: an unknown operator never matches and warns on every evaluation in development; validatePredicate and isPredicate accept it",
         "L11 probe pins (development) > U5: registration deep-freezes the caller's spec, and inspect()'s whenSpec is that same object",
         "L11 probe pins (development) > U7: two operators in one object are ANDed, with a development warning per evaluation",
@@ -2891,7 +2900,14 @@
         "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written",
         "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written"
       ],
+      "tests/core/l11-explain-combinators-oracle-production.test.ts": [
+        "explain() — combinator clauses in a data-form when (production) > renders $all, $any and $not with a passing and a failing child"
+      ],
+      "tests/core/l11-explain-unset-fact-oracle-production.test.ts": [
+        "explain() — a data-form leaf on an unset fact (production) > renders the unset fact's actual as undefined"
+      ],
       "tests/core/l11-predicate-pins-oracle-production.test.ts": [
+        "L11 probe pins (production) > U1: a global regex in a constraint's $matches logs nothing in production; called directly it alternates (row (bp))",
         "L11 probe pins (production) > U12: validatePredicateAgainstSchema given a schema instead of the kind map throws a TypeError",
         "L11 probe pins (production) > U3: a data form that names a derivation never matches, silently",
         "L11 probe pins (production) > U4: an unknown operator never matches, and production is silent",
