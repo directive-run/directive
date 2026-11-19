@@ -11,6 +11,8 @@
     "tests/core/l10-gate-pins-oracle.test.ts",
     "tests/core/l11-explain-combinators-oracle-production.test.ts",
     "tests/core/l11-explain-combinators-oracle.test.ts",
+    "tests/core/l11-explain-unset-fact-oracle-production.test.ts",
+    "tests/core/l11-explain-unset-fact-oracle.test.ts",
     "tests/core/l11-predicate-describe-oracle.test.ts",
     "tests/core/l11-predicate-oracle.test.ts",
     "tests/core/l11-predicate-pins-oracle-production.test.ts",
@@ -53,6 +55,8 @@
     "tests/core/l10-gate-pins-oracle.test.ts": [],
     "tests/core/l11-explain-combinators-oracle-production.test.ts": [],
     "tests/core/l11-explain-combinators-oracle.test.ts": [],
+    "tests/core/l11-explain-unset-fact-oracle-production.test.ts": [],
+    "tests/core/l11-explain-unset-fact-oracle.test.ts": [],
     "tests/core/l11-predicate-describe-oracle.test.ts": [],
     "tests/core/l11-predicate-oracle.test.ts": [],
     "tests/core/l11-predicate-pins-oracle-production.test.ts": [],
@@ -103,6 +107,8 @@
     "tests/core/l10-gate-pins-oracle.test.ts": [],
     "tests/core/l11-explain-combinators-oracle-production.test.ts": [],
     "tests/core/l11-explain-combinators-oracle.test.ts": [],
+    "tests/core/l11-explain-unset-fact-oracle-production.test.ts": [],
+    "tests/core/l11-explain-unset-fact-oracle.test.ts": [],
     "tests/core/l11-predicate-describe-oracle.test.ts": [],
     "tests/core/l11-predicate-oracle.test.ts": [],
     "tests/core/l11-predicate-pins-oracle-production.test.ts": [],
@@ -268,6 +274,12 @@
     },
     "tests/core/l11-explain-combinators-oracle.test.ts": {
       "explain() — combinator clauses in a data-form when > renders $all, $any and $not with a passing and a failing child": "L11"
+    },
+    "tests/core/l11-explain-unset-fact-oracle-production.test.ts": {
+      "explain() — a data-form leaf on an unset fact (production) > renders the unset fact's actual as undefined": "L11"
+    },
+    "tests/core/l11-explain-unset-fact-oracle.test.ts": {
+      "explain() — a data-form leaf on an unset fact > renders the unset fact's actual as undefined": "L11"
     },
     "tests/core/l11-predicate-describe-oracle.test.ts": {
       "describePredicate — empty / trivial > renders an empty predicate as 'always true'": "L11",

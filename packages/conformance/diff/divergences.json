@@ -48037,7 +48037,7 @@
     "op": "missing",
     "ends": true,
     "when": ["batched", "batchMaxSize"],
-    "group": "row-as",
+    "group": "row-as-flush",
     "bound": {
       "match": [
         {
@@ -48070,7 +48070,7 @@
     "op": "missing",
     "ends": true,
     "when": ["batched", "batchMaxSize"],
-    "group": "row-as",
+    "group": "row-as-flush",
     "bound": {
       "match": [
         {

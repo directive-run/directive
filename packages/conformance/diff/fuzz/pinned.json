@@ -4318,5 +4318,288 @@
         "inserted": []
       }
     }
+  },
+  {
+    "group": "row-as-flush",
+    "why": "PR seed 7 at L11, run 4 of the L11 gate (fix2/specs/u7): a batched resolver with maxSize 2 is fed three items in a settle step. 2.0, whose settle() still waits for the running batch (row (as)), starts the overflow call [1.2] at once; 1.35 starts it one window later and makes one more reconcile pass (the l11-fuzz-as-flush-* entries, signed in run 5). Pinned so the group stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 5,
+              "fails": 1,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 2,
+            "abortOn": false
+          },
+          {
+            "fact": 0,
+            "atLeast": 0,
+            "items": 3,
+            "abortOn": false
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 5,
+        "maxSize": 2,
+        "delay": 5,
+        "fails": 0,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": 1
+      },
+      "predicates": {
+        "modules": [
+          {
+            "when": [null],
+            "on": [],
+            "compute": [],
+            "patch": [null],
+            "key": [null]
+          },
+          {
+            "when": [],
+            "on": [],
+            "compute": [],
+            "patch": [null],
+            "key": []
+          }
+        ],
+        "inserted": []
+      }
+    }
+  },
+  {
+    "group": "quirk-a-keyed",
+    "why": "Deep seed 24301 at L11, data-form phase, run 4 of the L11 gate (fix2/specs/u24301): a keyed resolver (requirement A1, at 2) fails under onResolverError \"retry\". 1.35 never runs it again and leaves A1 unmet; 2.0 re-dispatches it (quirk a; the l11-quirk-a-keyed-* entries, signed in run 5). Pinned so the group stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 4,
+              "throwsAt": 5
+            },
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 4,
+              "throwsAt": 7
+            },
+            {
+              "facts": [1],
+              "derived": [1],
+              "threshold": 0,
+              "throwsAt": 4
+            }
+          ],
+          "events": [
+            {
+              "target": 1,
+              "add": true
+            },
+            {
+              "target": 1,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 1,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 3,
+              "writes": 0,
+              "value": 6,
+              "delay": 5,
+              "fails": 2,
+              "retry": 1,
+              "timeout": null
+            },
+            {
+              "fact": 1,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 0,
+              "value": -1,
+              "delay": 5,
+              "fails": 2,
+              "retry": 0,
+              "timeout": null
+            },
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 1,
+              "value": -1,
+              "delay": 5,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 10
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": false,
+              "throwsAt": null,
+              "onNavigate": "skip"
+            }
+          ],
+          "source": null,
+          "factTags": [[], ["pii", "billing"]],
+          "boundaries": [2]
+        }
+      ],
+      "boundary": "retry",
+      "history": true,
+      "trace": true,
+      "steps": [
+        {
+          "op": "end"
+        },
+        {
+          "op": "roundtrip"
+        },
+        {
+          "op": "meta"
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 3,
+          "value": 1
+        },
+        {
+          "op": "publish",
+          "event": "cross",
+          "value": 2
+        },
+        {
+          "op": "advance",
+          "ms": 200
+        },
+        {
+          "op": "goTo",
+          "position": 2
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1931438327,
+          "value": 0
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1718061220,
+          "value": 3
+        },
+        {
+          "op": "meta"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1060739302,
+          "value": 2
+        },
+        {
+          "op": "advance",
+          "ms": 1
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 441091104,
+          "value": 0
+        },
+        {
+          "op": "roundtrip"
+        }
+      ],
+      "batch": null,
+      "maxSnapshots": 5,
+      "respectsAbort": false,
+      "maxRuns": 100,
+      "predicates": {
+        "modules": [
+          {
+            "when": [null, null, null],
+            "on": [null],
+            "compute": [null, null, null],
+            "patch": [
+              null,
+              {
+                "kind": "literal",
+                "value": -1
+              }
+            ],
+            "key": [null, "fn", null]
+          }
+        ],
+        "inserted": []
+      }
+    }
   }
 ]

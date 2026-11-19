@@ -1024,6 +1024,9 @@
       "tests/core/l11-explain-combinators-oracle.test.ts": [
         "explain() — combinator clauses in a data-form when > renders $all, $any and $not with a passing and a failing child"
       ],
+      "tests/core/l11-explain-unset-fact-oracle.test.ts": [
+        "explain() — a data-form leaf on an unset fact > renders the unset fact's actual as undefined"
+      ],
       "tests/core/l11-predicate-describe-oracle.test.ts": [
         "describePredicate — array form > renders an array-form predicate equivalently to the object form",
         "describePredicate — array form > renders multiple array clauses joined by AND",
@@ -2899,6 +2902,9 @@
       ],
       "tests/core/l11-explain-combinators-oracle-production.test.ts": [
         "explain() — combinator clauses in a data-form when (production) > renders $all, $any and $not with a passing and a failing child"
+      ],
+      "tests/core/l11-explain-unset-fact-oracle-production.test.ts": [
+        "explain() — a data-form leaf on an unset fact (production) > renders the unset fact's actual as undefined"
       ],
       "tests/core/l11-predicate-pins-oracle-production.test.ts": [
         "L11 probe pins (production) > U1: a global regex in a constraint's $matches logs nothing in production; called directly it alternates (row (bp))",
