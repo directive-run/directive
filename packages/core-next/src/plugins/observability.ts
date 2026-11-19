@@ -1,0 +1,752 @@
+/**
+ * Observability Dashboard Plugin
+ *
+ * Provides comprehensive monitoring, metrics collection, and dashboard integration
+ * for AI agent operations.
+ *
+ * @example
+ * ```typescript
+ * import { createObservability, createAgentMetrics } from '@directive-run/ai';
+ *
+ * const observability = createObservability({
+ *   metrics: {
+ *     enabled: true,
+ *     exportInterval: 10000, // Export every 10 seconds
+ *   },
+ *   tracing: {
+ *     enabled: true,
+ *     sampleRate: 1.0, // 100% sampling for dev
+ *   },
+ *   alerts: [
+ *     { metric: 'agent.errors', threshold: 10, action: 'warn' },
+ *     { metric: 'agent.latency', threshold: 5000, action: 'alert' },
+ *   ],
+ * });
+ *
+ * // Use createAgentMetrics for standard metric names (required for getDashboard() summary)
+ * const agentMetrics = createAgentMetrics(observability);
+ *
+ * // Access dashboard data
+ * const dashboard = observability.getDashboard();
+ *
+ * // Clean up when done
+ * await observability.destroy();
+ * ```
+ */
+
+import type {
+  AggregatedMetric,
+  AlertEvent,
+  DashboardData,
+  MetricDataPoint,
+  ObservabilityConfig,
+  ObservabilityInstance,
+  TraceSpan,
+} from "../types/plugin-observability.js";
+import { normalizeTokenUsage, readOwnNumber } from "./token-usage.js";
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+function generateId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`
+  );
+}
+
+function calculatePercentile(values: number[], percentile: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.ceil((percentile / 100) * sorted.length) - 1;
+  return sorted[Math.max(0, index)] ?? 0;
+}
+
+// ============================================================================
+// Factory
+// ============================================================================
+
+/**
+ * Create an observability instance for monitoring AI agents.
+ *
+ * @example
+ * ```typescript
+ * const obs = createObservability({
+ *   serviceName: 'my-agent-service',
+ *   metrics: { enabled: true },
+ *   tracing: { enabled: true, sampleRate: 0.1 },
+ *   alerts: [
+ *     { metric: 'agent.errors', threshold: 10, action: 'alert' },
+ *   ],
+ * });
+ *
+ * // Track agent operations
+ * const span = obs.startSpan('agent.run');
+ * obs.incrementCounter('agent.requests', { agent: 'support' });
+ *
+ * try {
+ *   await runAgent();
+ *   obs.observeHistogram('agent.latency', Date.now() - start);
+ *   obs.endSpan(span.spanId, 'ok');
+ * } catch (e) {
+ *   obs.incrementCounter('agent.errors');
+ *   obs.endSpan(span.spanId, 'error');
+ * }
+ * ```
+ */
+export function createObservability(
+  config: ObservabilityConfig = {},
+): ObservabilityInstance {
+  const {
+    serviceName = "directive-agents",
+    metrics: metricsConfig = {},
+    tracing: tracingConfig = {},
+    alerts: alertConfigs = [],
+    summaryMetrics: summaryMetricsConfig = {},
+    events = {},
+  } = config;
+
+  const summaryMetricNames = {
+    requests: summaryMetricsConfig.requests ?? "agent.requests",
+    errors: summaryMetricsConfig.errors ?? "agent.errors",
+    latency: summaryMetricsConfig.latency ?? "agent.latency",
+    tokens: summaryMetricsConfig.tokens ?? "agent.tokens",
+    cost: summaryMetricsConfig.cost ?? "agent.cost",
+  };
+
+  const {
+    enabled: metricsEnabled = true,
+    exportInterval,
+    exporter: metricsExporter,
+    maxDataPoints = 1000,
+  } = metricsConfig;
+
+  const {
+    enabled: tracingEnabled = true,
+    sampleRate = 1.0,
+    maxSpans = 1000,
+    exporter: tracingExporter,
+  } = tracingConfig;
+
+  // State
+  const startTime = Date.now();
+  const metricDataPoints = new Map<string, MetricDataPoint[]>();
+  const activeSpans = new Map<string, TraceSpan>();
+  const completedSpans: TraceSpan[] = [];
+  const alertEvents: AlertEvent[] = [];
+  const alertCooldowns = new Map<string, number>();
+
+  // Aggregated metrics cache
+  const aggregatedMetrics = new Map<string, AggregatedMetric>();
+
+  // Export timer
+  let exportTimer: ReturnType<typeof setInterval> | undefined;
+  if (exportInterval && (metricsExporter || tracingExporter)) {
+    exportTimer = setInterval(async () => {
+      try {
+        if (metricsExporter && metricsEnabled) {
+          await metricsExporter(Array.from(aggregatedMetrics.values()));
+        }
+        if (tracingExporter && tracingEnabled) {
+          const spansToExport = completedSpans.splice(0, 100);
+          if (spansToExport.length > 0) {
+            await tracingExporter(spansToExport);
+          }
+        }
+      } catch (error) {
+        console.error("[Directive Observability] Export error:", error);
+      }
+    }, exportInterval);
+  }
+
+  function recordMetric(dataPoint: MetricDataPoint): void {
+    if (!metricsEnabled) return;
+
+    const key = `${dataPoint.name}:${JSON.stringify(Object.fromEntries(Object.entries(dataPoint.labels).sort()))}`;
+    let points = metricDataPoints.get(key);
+    if (!points) {
+      points = [];
+      metricDataPoints.set(key, points);
+    }
+
+    points.push(dataPoint);
+
+    // Trim old data points
+    if (points.length > maxDataPoints) {
+      points.shift();
+    }
+
+    // Update aggregation
+    updateAggregation(dataPoint.name, points);
+
+    events.onMetricRecorded?.(dataPoint);
+
+    // Check alerts
+    checkAlerts(dataPoint.name);
+  }
+
+  function updateAggregation(name: string, points: MetricDataPoint[]): void {
+    if (points.length === 0) return;
+
+    const values = points.map((p) => p.value);
+    const sum = values.reduce((a, b) => a + b, 0);
+
+    // We've already checked points.length === 0 above, so these are safe
+    const firstPoint = points[0]!;
+    const lastValue = values[values.length - 1]!;
+
+    const aggregated: AggregatedMetric = {
+      name,
+      type: firstPoint.type,
+      count: points.length,
+      sum,
+      min: Math.min(...values),
+      max: Math.max(...values),
+      avg: sum / points.length,
+      lastValue,
+      lastUpdated: Date.now(),
+    };
+
+    aggregatedMetrics.set(name, aggregated);
+  }
+
+  function checkAlerts(metricName: string): void {
+    for (const alertConfig of alertConfigs) {
+      if (alertConfig.metric !== metricName) continue;
+
+      const metric = aggregatedMetrics.get(metricName);
+      if (!metric) continue;
+
+      const cooldownKey = `${alertConfig.metric}:${alertConfig.threshold}`;
+      const lastAlert = alertCooldowns.get(cooldownKey);
+      const cooldown = alertConfig.cooldownMs ?? 60000;
+
+      if (lastAlert && Date.now() - lastAlert < cooldown) continue;
+
+      const operator = alertConfig.operator ?? ">";
+      const value = metric.lastValue;
+      const threshold = alertConfig.threshold;
+
+      let triggered = false;
+      switch (operator) {
+        case ">":
+          triggered = value > threshold;
+          break;
+        case "<":
+          triggered = value < threshold;
+          break;
+        case ">=":
+          triggered = value >= threshold;
+          break;
+        case "<=":
+          triggered = value <= threshold;
+          break;
+        case "==":
+          triggered = value === threshold;
+          break;
+      }
+
+      if (triggered) {
+        const alertEvent: AlertEvent = {
+          alertId: generateId(),
+          metric: metricName,
+          currentValue: value,
+          threshold,
+          operator,
+          action: alertConfig.action,
+          timestamp: Date.now(),
+          message: `Alert: ${metricName} ${operator} ${threshold} (current: ${value})`,
+        };
+
+        alertEvents.push(alertEvent);
+        if (alertEvents.length > 1000)
+          alertEvents.splice(0, alertEvents.length - 1000);
+        alertCooldowns.set(cooldownKey, Date.now());
+
+        events.onAlert?.(alertEvent);
+
+        switch (alertConfig.action) {
+          case "log":
+            console.log(`[Observability] ${alertEvent.message}`);
+            break;
+          case "warn":
+            console.warn(`[Observability] ${alertEvent.message}`);
+            break;
+          case "alert":
+            console.error(`[Observability ALERT] ${alertEvent.message}`);
+            break;
+          case "callback":
+            alertConfig.callback?.(metric, threshold);
+            break;
+        }
+      }
+    }
+  }
+
+  function getPercentiles(name: string): {
+    p50?: number;
+    p90?: number;
+    p99?: number;
+  } {
+    // Collect all data points for this metric name across all label combinations
+    const allValues: number[] = [];
+    for (const [key, points] of metricDataPoints) {
+      if (key.startsWith(`${name}:`)) {
+        for (const p of points) {
+          allValues.push(p.value);
+        }
+      }
+    }
+    if (allValues.length === 0) return {};
+    return {
+      p50: calculatePercentile(allValues, 50),
+      p90: calculatePercentile(allValues, 90),
+      p99: calculatePercentile(allValues, 99),
+    };
+  }
+
+  return {
+    incrementCounter(
+      name: string,
+      labels: Record<string, string> = {},
+      value = 1,
+    ): void {
+      recordMetric({
+        name,
+        type: "counter",
+        value,
+        labels,
+        timestamp: Date.now(),
+      });
+    },
+
+    setGauge(
+      name: string,
+      value: number,
+      labels: Record<string, string> = {},
+    ): void {
+      recordMetric({
+        name,
+        type: "gauge",
+        value,
+        labels,
+        timestamp: Date.now(),
+      });
+    },
+
+    observeHistogram(
+      name: string,
+      value: number,
+      labels: Record<string, string> = {},
+    ): void {
+      recordMetric({
+        name,
+        type: "histogram",
+        value,
+        labels,
+        timestamp: Date.now(),
+      });
+    },
+
+    startSpan(operationName: string, parentSpanId?: string): TraceSpan {
+      // Apply sampling
+      if (Math.random() > sampleRate) {
+        // Return a no-op span that won't be tracked
+        return {
+          traceId: "sampled-out",
+          spanId: "sampled-out",
+          operationName,
+          serviceName,
+          startTime: Date.now(),
+          status: "ok",
+          tags: {},
+          logs: [],
+        };
+      }
+
+      const span: TraceSpan = {
+        traceId: parentSpanId
+          ? (activeSpans.get(parentSpanId)?.traceId ?? generateId())
+          : generateId(),
+        spanId: generateId(),
+        parentSpanId,
+        operationName,
+        serviceName,
+        startTime: Date.now(),
+        status: "ok",
+        tags: {},
+        logs: [],
+      };
+
+      if (tracingEnabled) {
+        activeSpans.set(span.spanId, span);
+        events.onSpanStart?.(span);
+      }
+
+      return span;
+    },
+
+    endSpan(spanId: string, status: "ok" | "error" | "timeout" = "ok"): void {
+      if (spanId === "sampled-out") return;
+
+      const span = activeSpans.get(spanId);
+      if (!span) return;
+
+      span.endTime = Date.now();
+      span.duration = span.endTime - span.startTime;
+      span.status = status;
+
+      activeSpans.delete(spanId);
+      completedSpans.push(span);
+
+      // Trim old spans
+      while (completedSpans.length > maxSpans) {
+        completedSpans.shift();
+      }
+
+      // Record latency metric (use recordMetric directly to avoid `this` binding issues)
+      recordMetric({
+        name: `${span.operationName}.latency`,
+        type: "histogram",
+        value: span.duration,
+        labels: {},
+        timestamp: Date.now(),
+      });
+
+      if (status === "error") {
+        recordMetric({
+          name: `${span.operationName}.errors`,
+          type: "counter",
+          value: 1,
+          labels: {},
+          timestamp: Date.now(),
+        });
+      }
+
+      events.onSpanEnd?.(span);
+    },
+
+    addSpanLog(
+      spanId: string,
+      message: string,
+      level: "debug" | "info" | "warn" | "error" = "info",
+    ): void {
+      if (spanId === "sampled-out") return;
+
+      const span = activeSpans.get(spanId);
+      if (!span) return;
+
+      span.logs.push({
+        timestamp: Date.now(),
+        message,
+        level,
+      });
+    },
+
+    addSpanTag(
+      spanId: string,
+      key: string,
+      value: string | number | boolean,
+    ): void {
+      if (spanId === "sampled-out") return;
+
+      const span = activeSpans.get(spanId);
+      if (!span) return;
+
+      span.tags[key] = value;
+    },
+
+    getDashboard(): DashboardData {
+      // Calculate summary stats using configurable metric names
+      const requestsMetric = aggregatedMetrics.get(summaryMetricNames.requests);
+      const errorsMetric = aggregatedMetrics.get(summaryMetricNames.errors);
+      const latencyMetric = aggregatedMetrics.get(summaryMetricNames.latency);
+      const tokensMetric = aggregatedMetrics.get(summaryMetricNames.tokens);
+      const costMetric = aggregatedMetrics.get(summaryMetricNames.cost);
+
+      const totalRequests = requestsMetric?.sum ?? 0;
+      const totalErrors = errorsMetric?.sum ?? 0;
+      const errorRate = totalRequests > 0 ? totalErrors / totalRequests : 0;
+
+      // Calculate percentiles on demand for latency
+      const latencyPercentiles = latencyMetric
+        ? getPercentiles(summaryMetricNames.latency)
+        : {};
+
+      return {
+        service: {
+          name: serviceName,
+          uptime: Date.now() - startTime,
+          startTime,
+        },
+        metrics: Object.fromEntries(aggregatedMetrics),
+        traces: [...completedSpans].slice(-100),
+        alerts: [...alertEvents].slice(-50),
+        summary: {
+          totalRequests,
+          totalErrors,
+          errorRate,
+          avgLatency: latencyMetric?.avg ?? 0,
+          p99Latency: latencyPercentiles.p99 ?? 0,
+          activeSpans: activeSpans.size,
+          totalTokens: tokensMetric?.sum ?? 0,
+          totalCost: costMetric?.sum ?? 0,
+        },
+      };
+    },
+
+    getMetric(name: string): AggregatedMetric | undefined {
+      const metric = aggregatedMetrics.get(name);
+      if (!metric) return undefined;
+      // Calculate percentiles on demand
+      const percentiles = getPercentiles(name);
+      return { ...metric, ...percentiles };
+    },
+
+    getTraces(limit = 100): TraceSpan[] {
+      return [...completedSpans].slice(-limit);
+    },
+
+    getAlerts(): AlertEvent[] {
+      return [...alertEvents];
+    },
+
+    export() {
+      return {
+        metrics: Array.from(aggregatedMetrics.values()),
+        traces: [...completedSpans],
+        alerts: [...alertEvents],
+      };
+    },
+
+    clear() {
+      metricDataPoints.clear();
+      aggregatedMetrics.clear();
+      activeSpans.clear();
+      completedSpans.length = 0;
+      alertEvents.length = 0;
+      alertCooldowns.clear();
+    },
+
+    async destroy() {
+      // Clear the export timer
+      if (exportTimer) {
+        clearInterval(exportTimer);
+        exportTimer = undefined;
+      }
+
+      // Flush any remaining data to exporters
+      try {
+        if (metricsExporter && metricsEnabled && aggregatedMetrics.size > 0) {
+          await metricsExporter(Array.from(aggregatedMetrics.values()));
+        }
+        if (tracingExporter && tracingEnabled && completedSpans.length > 0) {
+          await tracingExporter([...completedSpans]);
+        }
+      } catch (error) {
+        console.error(
+          "[Directive Observability] Error flushing data during destroy:",
+          error,
+        );
+      }
+
+      // Clear all data
+      metricDataPoints.clear();
+      aggregatedMetrics.clear();
+      activeSpans.clear();
+      completedSpans.length = 0;
+      alertEvents.length = 0;
+      alertCooldowns.clear();
+    },
+
+    getHealthStatus() {
+      const requestsMetric = aggregatedMetrics.get(summaryMetricNames.requests);
+      const errorsMetric = aggregatedMetrics.get(summaryMetricNames.errors);
+
+      const totalRequests = requestsMetric?.sum ?? 0;
+      const totalErrors = errorsMetric?.sum ?? 0;
+      const errorRate = totalRequests > 0 ? totalErrors / totalRequests : 0;
+
+      // Consider unhealthy if error rate > 10% or there are active alerts
+      const activeAlertCount = alertEvents.filter(
+        (a) => Date.now() - a.timestamp < 300000, // Last 5 minutes
+      ).length;
+
+      return {
+        healthy: errorRate < 0.1 && activeAlertCount === 0,
+        uptime: Date.now() - startTime,
+        errorRate,
+        activeAlerts: activeAlertCount,
+      };
+    },
+  };
+}
+
+// ============================================================================
+// Pre-built Metric Helpers
+// ============================================================================
+
+/**
+ * Create standard agent metrics for an observability instance.
+ *
+ * @example
+ * ```typescript
+ * const obs = createObservability({ serviceName: 'my-service' });
+ * const agentMetrics = createAgentMetrics(obs);
+ *
+ * // Track an agent run. Spreading a runner's `tokenUsage` in works directly —
+ * // `inputTokens` is only the uncached remainder on providers that cache.
+ * agentMetrics.trackRun('support-agent', {
+ *   success: true,
+ *   latencyMs: 1500,
+ *   inputTokens: 100,
+ *   outputTokens: 500,
+ *   cacheReadTokens: 12_000,
+ *   cacheWriteTokens: 0,
+ *   cost: 0.05,
+ * });
+ * ```
+ */
+export function createAgentMetrics(obs: ObservabilityInstance) {
+  return {
+    trackRun(
+      agentName: string,
+      result: {
+        success: boolean;
+        latencyMs: number;
+        inputTokens?: number;
+        outputTokens?: number;
+        /**
+         * Tokens read from the provider's prompt cache, when the provider
+         * reports them.
+         */
+        cacheReadTokens?: number;
+        /**
+         * Tokens written to the provider's prompt cache, when the provider
+         * reports them.
+         */
+        cacheWriteTokens?: number;
+        /**
+         * Tokens written to the provider's prompt cache, under Anthropic's wire
+         * spelling. A documented alias of `cacheWriteTokens`, resolved by
+         * {@link normalizeTokenUsage} like everywhere else — supply either.
+         */
+        cacheCreationTokens?: number;
+        cost?: number;
+        toolCalls?: number;
+      },
+    ): void {
+      const labels = { agent: agentName };
+
+      obs.incrementCounter("agent.requests", labels);
+
+      if (!result.success) {
+        obs.incrementCounter("agent.errors", labels);
+      }
+
+      obs.observeHistogram("agent.latency", result.latencyMs, labels);
+
+      // The token counts are read through the shared normalizer, so this
+      // surface accepts exactly the shapes every other token consumer accepts.
+      // It previously read `cacheWriteTokens` only, while every shipped adapter
+      // emits `cacheCreationTokens`, and a cached run under-reported by its
+      // whole cached prefix with nothing to indicate it.
+      const tokens = normalizeTokenUsage(result);
+
+      /**
+       * Add one caller-supplied amount to a cumulative counter, or drop it.
+       *
+       * Counters are cumulative, so one poisoned addend is permanent: a `NaN`
+       * turns every later reading of that counter into `NaN`, and an
+       * `Infinity` pins it there for the life of the process. Neither can be
+       * subtracted back out.
+       */
+      function addToCounter(metric: string, amount: number | undefined): void {
+        if (amount === undefined || !Number.isFinite(amount) || amount < 0) {
+          return;
+        }
+        obs.incrementCounter(metric, labels, amount);
+      }
+
+      /** Token classes also roll up into the combined `agent.tokens` counter. */
+      function countTokens(metric: string, count: number | undefined): void {
+        addToCounter(metric, count);
+        addToCounter("agent.tokens", count);
+      }
+
+      countTokens("agent.tokens.input", tokens.inputTokens);
+      countTokens("agent.tokens.output", tokens.outputTokens);
+
+      // Cache tokens count toward `agent.tokens` alongside input and output.
+      // On a provider that reports cache usage, `inputTokens` is the *uncached
+      // remainder*, so a run that reads a large cached prefix looks like a tiny
+      // run when only input and output are counted — the same under-reporting
+      // the cost ledger carried before cache classes were priced.
+      countTokens("agent.tokens.cache_read", tokens.cacheReadTokens);
+      countTokens("agent.tokens.cache_write", tokens.cacheWriteTokens);
+
+      // `cost` and `toolCalls` are read through the same own-property-gated
+      // reader as the token counts, and validated the same way. They sat three
+      // lines below the token guard reading `result.cost` bare, which is how a
+      // polluted `Object.prototype.cost` came to sum `1e308` into `agent.cost`
+      // on a call that reported no cost at all, and a `NaN` came to make the
+      // aggregate unreadable for the life of the process.
+      addToCounter("agent.cost", readOwnNumber(result, "cost"));
+      addToCounter("agent.tool_calls", readOwnNumber(result, "toolCalls"));
+    },
+
+    trackGuardrail(
+      guardrailName: string,
+      result: {
+        passed: boolean;
+        latencyMs: number;
+        blocked?: boolean;
+      },
+    ): void {
+      const labels = { guardrail: guardrailName };
+
+      obs.incrementCounter("guardrail.checks", labels);
+
+      if (!result.passed) {
+        obs.incrementCounter("guardrail.failures", labels);
+      }
+
+      if (result.blocked) {
+        obs.incrementCounter("guardrail.blocks", labels);
+      }
+
+      obs.observeHistogram("guardrail.latency", result.latencyMs, labels);
+    },
+
+    trackApproval(
+      toolName: string,
+      result: {
+        approved: boolean;
+        waitTimeMs: number;
+        timedOut?: boolean;
+      },
+    ): void {
+      const labels = { tool: toolName };
+
+      obs.incrementCounter("approval.requests", labels);
+
+      if (result.approved) {
+        obs.incrementCounter("approval.approved", labels);
+      } else {
+        obs.incrementCounter("approval.rejected", labels);
+      }
+
+      if (result.timedOut) {
+        obs.incrementCounter("approval.timeouts", labels);
+      }
+
+      obs.observeHistogram("approval.wait_time", result.waitTimeMs, labels);
+    },
+
+    trackHandoff(fromAgent: string, toAgent: string, latencyMs: number): void {
+      obs.incrementCounter("handoff.count", { from: fromAgent, to: toAgent });
+      obs.observeHistogram("handoff.latency", latencyMs);
+    },
+  };
+}
