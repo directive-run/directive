@@ -1021,6 +1021,9 @@
         "restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written",
         "restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written"
       ],
+      "tests/core/l11-explain-combinators-oracle.test.ts": [
+        "explain() — combinator clauses in a data-form when > renders $all, $any and $not with a passing and a failing child"
+      ],
       "tests/core/l11-predicate-describe-oracle.test.ts": [
         "describePredicate — array form > renders an array-form predicate equivalently to the object form",
         "describePredicate — array form > renders multiple array clauses joined by AND",
@@ -2893,6 +2896,9 @@
         "production: a retired resolver's write after the 10 s drain (L10 gate; row cd) > the drain gives up at 10 s and a same-key replacement starts from its own init",
         "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written",
         "production: restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written"
+      ],
+      "tests/core/l11-explain-combinators-oracle-production.test.ts": [
+        "explain() — combinator clauses in a data-form when (production) > renders $all, $any and $not with a passing and a failing child"
       ],
       "tests/core/l11-predicate-pins-oracle-production.test.ts": [
         "L11 probe pins (production) > U1: a global regex in a constraint's $matches logs nothing in production; called directly it alternates (row (bp))",
