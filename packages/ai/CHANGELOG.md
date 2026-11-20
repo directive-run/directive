@@ -1,5 +1,23 @@
 # @directive-run/ai
 
+## 1.36.1
+
+### Patch Changes
+
+- [#386](https://github.com/directive-run/directive/pull/386) [`ea25c6f`](https://github.com/directive-run/directive/commit/ea25c6ff9efd352efa874dd065edd38a634d7b05) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Re-checks the Anthropic, OpenAI, Gemini, Workers AI and Ollama rate tables
+  against each provider's own pricing page on 2026-11-15 and moves the five
+  `*_PRICING_AS_OF` dates. No existing rate changed. The tables now also price the
+  current models they were missing: the Claude 5.x family, the GPT-6 family and
+  other OpenAI text models, the Gemini 4 and 3.8 models, and every row of the
+  Workers AI LLM table. The pinned digests move for the four tables that gained
+  rows; Ollama's is unchanged.
+
+- [#379](https://github.com/directive-run/directive/pull/379) [`5d1b93c`](https://github.com/directive-run/directive/commit/5d1b93c4e04e51c8a34f570886b6ec6691e425ee) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Re-checks the Anthropic, OpenAI, Gemini and Ollama rate tables against each
+  provider's own pricing page on 2026-11-12 and moves the four `*_PRICING_AS_OF`
+  dates. No rate changed, so the pinned digests are unchanged. Rows the providers
+  no longer list (retired or routed to another model) are kept for reconciling
+  past spend and are marked in the source as not re-verified.
+
 ## 1.36.0
 
 ### Minor Changes
