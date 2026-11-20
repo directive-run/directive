@@ -416,6 +416,9 @@ export async function main(engine, load, loadPlugins) {
     t: mod.t,
     // The engine's own `/plugins` entry (frame-loop-persist).
     persistencePlugin: (await loadPlugins()).persistencePlugin,
+    // plugins-100 (L12b, B2): the engine's own logging and performance plugins.
+    loggingPlugin: (await loadPlugins()).loggingPlugin,
+    performancePlugin: (await loadPlugins()).performancePlugin,
   };
   const devChecks = devChecksOn(api);
   const report =

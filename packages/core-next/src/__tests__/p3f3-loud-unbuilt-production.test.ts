@@ -89,8 +89,8 @@ describe.each(["single", "namespaced"])("production, %s system", (form) => {
 describe("production stub exports", () => {
   it("throw E_FEATURE_MISSING with the code and the name, no development text", () => {
     for (const [stub, name, layer] of [
-      [plugins.loggingPlugin, "loggingPlugin", 12],
-      [plugins.createCircuitBreaker, "createCircuitBreaker", 12],
+      [plugins.devtoolsPlugin, "devtoolsPlugin", 12],
+      [plugins.createAuditLedger, "createAuditLedger", 12],
       [testing.createTestSystem, "createTestSystem", 13],
       [testing.mockResolver, "mockResolver", 13],
     ] as const) {

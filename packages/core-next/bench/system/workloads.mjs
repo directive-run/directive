@@ -627,6 +627,68 @@ export const workloads = {
       };
     },
   },
+  // The L12b workload (RFC 2.0 L12, decision B2): the logging and the
+  // performance plugin installed, 100 writes to one number fact, then settle.
+  // Logging runs at "debug" into a counting logger (no console), so every
+  // fact.set and facts.batch line is built and handed over; judged at 1.0 or
+  // better against 1.35 at the L12 gate.
+  "plugins-100": {
+    op: "1 fact write with loggingPlugin (debug, counting logger) and performancePlugin installed (100 writes, then 1 settle)",
+    ops: 100,
+    async: true,
+    async build({
+      createModule,
+      createSystem,
+      t,
+      loggingPlugin,
+      performancePlugin,
+    }) {
+      let lines = 0;
+      const count = () => {
+        lines++;
+      };
+      const perf = performancePlugin();
+      const sys = createSystem({
+        plugins: [
+          loggingPlugin({
+            level: "debug",
+            logger: { debug: count, info: count, warn: count, error: count },
+          }),
+          perf,
+        ],
+        module: createModule("scalar", {
+          schema: { facts: { n: t.number() } },
+          init: (f) => {
+            f.n = 0;
+          },
+        }),
+      });
+      sys.start();
+      await sys.settle();
+      let i = 0;
+
+      return {
+        step() {
+          const f = sys.facts;
+          for (let k = 0; k < 100; k++) {
+            f.n = ++i;
+          }
+
+          return sys.settle();
+        },
+        check(steps) {
+          expect("plugins-100", "n", sys.facts.n, steps * 100);
+          // The logger heard at least a line per write (fact.set or batch).
+          if (lines < steps) {
+            throw new Error(`plugins-100: logger heard ${lines} lines`);
+          }
+
+          return { loggerLines: lines };
+        },
+        done: () => sys.destroy(),
+      };
+    },
+  },
   // The L6 gate's persistence workload (RFC 2.0 L6, decision B7): the
   // frame-loop-source frame with the persistence plugin installed as the
   // Aperture lab installs it, `include` naming one fact. Each frame's batch
