@@ -31,7 +31,7 @@
     "contracts/next-drift.json": "053904052ff4a058e9dc0f45c94d3e2a1f0b7762b0b0e253ff9cdb81b26298d5",
     "contracts/next-unshipped.json": "127d2b1bd4fb5b1ab360eace4eb2ba8d060ee2560e0b22386c7ef5900610cf55",
     "contracts/scripts/freeze.ts": "25c1e9b3d8379e30b9624f3daf24d62cffe9ef114973a5c622e409d0379ee310",
-    "contracts/types.test.ts": "db7e53ae7ab339ded86cba589e1c579bef14590c4fcfd7556abc838458c61060",
+    "contracts/types.test.ts": "e5361433ca5681f8f8527e3ac2c5b6ff76e097740703845a7635e1886c7944dd",
     "contracts/types/check.ts": "5225d68a81c4b68938cbbcb40488d899a5163b24b6daf11f3f95c33c5c1b9cec",
     "contracts/types/frozen.ts": "b52383efb9d7e466239588c1e06810d62bc31d45c1b1e51824f96425ff5087ae",
     "contracts/write-log.ts": "1fb3d46abd9f40a3c6446443881467ff618ce74486ca014b64aea6d7fca874d5",
