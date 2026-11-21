@@ -144,20 +144,15 @@ describe("built members are left alone", () => {
 
 describe("stub exports", () => {
   it("every /plugins export 1.35 has is defined, and the unbuilt ones throw when called", () => {
-    for (const name of ["devtoolsPlugin", "emitDevToolsEvent"]) {
-      const stub = (plugins as Record<string, unknown>)[name];
-      expect(typeof stub, name).toBe("function");
-      const error = thrown(() => (stub as (...a: unknown[]) => unknown)({}));
-      expect(error).toMatchObject({ code: FEATURE_MISSING, feature: name });
-      expect(error.layer).toBe(12);
-    }
-    // Built at L12b: the circuit breaker, logging, performance, observability,
-    // agent metrics, OTLP and token usage are real, not stubs.
+    // Built at L12b (and devtools at L12d): the circuit breaker, logging,
+    // performance, observability, agent metrics, OTLP and token usage are real.
     for (const name of [
       "createAgentMetrics",
       "createCircuitBreaker",
       "createOTLPExporter",
       "createObservability",
+      "devtoolsPlugin",
+      "emitDevToolsEvent",
       "loggingPlugin",
       "normalizeTokenUsage",
       "performancePlugin",
