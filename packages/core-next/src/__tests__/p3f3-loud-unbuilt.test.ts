@@ -144,14 +144,7 @@ describe("built members are left alone", () => {
 
 describe("stub exports", () => {
   it("every /plugins export 1.35 has is defined, and the unbuilt ones throw when called", () => {
-    for (const name of [
-      "clobberAlertPlugin",
-      "clobberLoopPlugin",
-      "createAuditLedger",
-      "devtoolsPlugin",
-      "emitDevToolsEvent",
-      "memorySink",
-    ]) {
+    for (const name of ["devtoolsPlugin", "emitDevToolsEvent"]) {
       const stub = (plugins as Record<string, unknown>)[name];
       expect(typeof stub, name).toBe("function");
       const error = thrown(() => (stub as (...a: unknown[]) => unknown)({}));
