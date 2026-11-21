@@ -74,9 +74,20 @@ describe("type contracts", () => {
   });
 
   it("a type the lab imports, gone from core-next, fails the Aperture check", () => {
-    const out = compileAperture((file, text) =>
-      file === "index.d.ts" ? text.replace("as as SourcePublish, ", "") : text,
-    );
+    // The bundler's alias for SourcePublish moves as exports are added
+    // (`as as`, then `at as`), so match any alias, and fail if none matched:
+    // an edit that changes nothing would pass for the wrong reason.
+    let edited = false;
+    const out = compileAperture((file, text) => {
+      if (file !== "index.d.ts") {
+        return text;
+      }
+      const next = text.replace(/\b[\w$]+ as SourcePublish, /, "");
+      edited = next !== text;
+
+      return next;
+    });
+    expect(edited).toBe(true);
     expect(out).toMatch(/scene\.ts\(\d+,\d+\): error TS\d+: .*SourcePublish/);
   });
 });
