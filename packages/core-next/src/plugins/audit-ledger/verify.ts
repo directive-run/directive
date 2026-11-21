@@ -167,8 +167,16 @@ export function verify(
       const prevEntry = i > 0 ? entries[i - 1]! : null;
       const entryIsTombstone = entry.kind === "system.entry-erased";
       const prevIsTombstone = prevEntry?.kind === "system.entry-erased";
+      // Row (by), approved (the L12 RFC): `erase()` keeps a tombstone's own
+      // `prevHash`, so a break *at* a tombstone this module minted cannot come
+      // from the erasure; it means the entry before it was changed. The one
+      // legitimate case is adjacent erasures, where the entry before is a
+      // tombstone too. An unmarked tombstone (any exported or copied ledger)
+      // keeps 1.35's forgiveness and is reported in `unmarkedTombstoneSeqs`.
+      const tamperBeforeTombstone =
+        entryIsTombstone && !prevIsTombstone && isInternal(entry);
 
-      if (entryIsTombstone || prevIsTombstone) {
+      if ((entryIsTombstone || prevIsTombstone) && !tamperBeforeTombstone) {
         // A tombstone that this runtime did not write is reported, not
         // rejected.
         //
