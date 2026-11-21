@@ -290,6 +290,38 @@ describe("core-next public API surface", () => {
     expect(gate(noWorker).failures).toHaveLength(workerNames.length);
   });
 
+  // Self-tests 1 and 2 at the root and /plugins (run 1 removed them, since
+  // from L12 neither ships a name above `current`): each runs again as soon
+  // as its entry ships such a name, and skips with the reason until then.
+  const dropsUnbuilt = (
+    entry: string,
+    ctx: { skip: (note: string) => void },
+  ) => {
+    {
+      const name = Object.keys(next[entry] ?? {}).find(
+        (n) =>
+          !n.startsWith("#ref:") &&
+          n in (frozen[entry] ?? {}) &&
+          layerIndex(layerOf(`${entry} ${n}`)) > layerIndex(current as Layer),
+      );
+      if (name === undefined) {
+        ctx.skip(
+          `skipped: core-next ships no ${entry} name above current ${current}, so none to drop`,
+        );
+      }
+      const key = `${entry} ${name}`;
+      const tampered = copy(next);
+      delete tampered[entry]?.[name as string];
+      const result = gate(tampered);
+      expect(result.failures).toEqual([dropped(key)]);
+      expect(result.unbuilt).toEqual(baseline.unbuilt);
+    }
+  };
+  it("a name core-next ships at an unbuilt layer may not be dropped (root)", (ctx) =>
+    dropsUnbuilt(".", ctx));
+  it("a name core-next ships at an unbuilt layer may not be dropped (/plugins)", (ctx) =>
+    dropsUnbuilt("./plugins", ctx));
+
   // Self-test 3, and the list's other rules.
   it("a stale, built-layer, misplaced or unknown next-unshipped.json entry fails", () => {
     expect(
