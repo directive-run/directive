@@ -1,9 +1,4 @@
 {
   "$comment": "The 1.35 names core-next does not ship yet, each with its layer (lib/layers.ts layerOfExport). Hand-maintained, never generated, and tighten-only: remove a name when core-next ships it, in the same engine PR (owner, 2026-11-17: \"Route B: approve the rule (Recommended)\"); lib/guard.ts lets an engine PR change this file only by pure removal. The core-next surface gate (contracts/lib/next-surface.ts) accepts a missing 1.35 name only if it is listed here and its layer is above layers.rules.json `current`; a missing name not listed fails at any layer, a listed name core-next ships fails as stale, and a listed name whose layer is built fails. This file is in harness.lock.json: changing it needs the oracle-change label.",
-  ". createAuditLedger": "L12",
-  ". createRequirementStatusPlugin": "L12",
-  ". createStatusHook": "L12",
-  ". createSystemWithStatus": "L12",
-  ". memorySink": "L12",
   "./internals safeStringify": "L13"
 }

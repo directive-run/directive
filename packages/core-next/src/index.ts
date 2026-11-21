@@ -85,6 +85,14 @@ export { describePredicate } from "./api/predicate-describe.js";
 export { predicateToSQL, predicateToWhere } from "./api/predicate-to-sql.js";
 export { predicateToMongo } from "./api/predicate-to-mongo.js";
 export { predicateToPostgrest } from "./api/predicate-to-pgrest.js";
+// The audit ledger and the requirement-status plugin (L12c), root exports as in
+// 1.35; an app that does not import them bundles none.
+export { createAuditLedger, memorySink } from "./plugins/audit-ledger/index.js";
+export {
+  createRequirementStatusPlugin,
+  createStatusHook,
+} from "./utils/requirement-status.js";
+export { createSystemWithStatus } from "./utils/system-with-status.js";
 // The snapshot tools (L12a): root exports only, so a system that does not
 // call them bundles none.
 export {
