@@ -91,7 +91,10 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
     };
   }
 
-  if (!window.__DIRECTIVE__) {
+  // Quoted: the build mangles every property that ends in `_`, and
+  // `__DIRECTIVE__` is a public global, not a private member.
+  // biome-ignore lint/complexity/useLiteralKeys: a quoted key is not mangled
+  if (!window["__DIRECTIVE__"]) {
     const systems = new Map<string, DevtoolsState>();
 
     const api: NonNullable<Window["__DIRECTIVE__"]> = {
@@ -256,7 +259,8 @@ function initDevtools(): NonNullable<Window["__DIRECTIVE__"]> {
     return api;
   }
 
-  return window.__DIRECTIVE__!;
+  // biome-ignore lint/complexity/useLiteralKeys: a quoted key is not mangled
+  return window["__DIRECTIVE__"]!;
 }
 
 // ============================================================================
