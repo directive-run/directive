@@ -28,7 +28,13 @@ import { join, relative } from "node:path";
 import { Node, Project, type SourceFile } from "ts-morph";
 import { PART_NAMES, partLayer } from "../contracts/lib/golden.js";
 import { describeDrift, gateBuiltNext } from "../contracts/lib/next-surface.js";
-import { LIKE, TEXT, canonicalJson, isLower } from "../diff/fingerprint.js";
+import {
+  LIKE,
+  PAIR,
+  TEXT,
+  canonicalJson,
+  isLower,
+} from "../diff/fingerprint.js";
 import type { Json } from "../diff/normalize.js";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import {
@@ -1331,6 +1337,7 @@ const BOUND_LIKES = Object.keys(LIKE);
 
 /** The `$text` classes a fuzz entry's bound may name. */
 const BOUND_TEXTS = Object.keys(TEXT);
+const BOUND_PAIRS = Object.keys(PAIR);
 
 /**
  * A fuzz entry's `bound` (diff/scenario.ts `Bound`): `{ match }`, a
@@ -1435,7 +1442,13 @@ function checkBound(e: Partial<DivergenceEntry>): string[] {
     } else if (e.op === "changed") {
       const q = p as Record<string, unknown>;
       const keys = Object.keys(q).sort().join();
-      if (
+      if (keys === "pair,path") {
+        if (typeof q.path !== "string" || typeof q.pair !== "string") {
+          out.push(`${at} of a changed entry's { path, pair } needs strings`);
+        } else if (!BOUND_PAIRS.includes(q.pair)) {
+          out.push(`${at} names an unknown pair "${q.pair}"`);
+        }
+      } else if (
         (keys !== "from,path,to" && keys !== "from,path,record,to") ||
         typeof q.path !== "string" ||
         (keys === "from,path,record,to" &&

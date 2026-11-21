@@ -17,8 +17,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The L12 RFC's probe pins (development): U3, U4, U5 to U10, U13 and U17 of
 // its untested list. Each pins 1.35's behaviour. U5, U6 and U10 are where
-// the rows (bu), (bv) and (bw) live: an approved row changes its test only
-// with a signed entry, at the slice that builds it. U1, U2 and U16 are diff
+// the rows (bu), (bv) and (bw) live. (bu) and (bv) are built (L12a), so at
+// the L12 gate U5 and U6 keep only what both engines share and name their
+// rows (as at L6 to L11); core-next's l12a-distributable pins 2.0's side.
+// (bw) is declined, so U10 still pins 1.35. U1, U2 and U16 are diff
 // scenarios ("L12 pins"); the production halves of U3 and U4 are in
 // l12-plugins-pins-oracle-production.
 
@@ -170,7 +172,13 @@ describe("L12 probe pins (development)", () => {
     system.destroy();
   });
 
-  it("U5: a snapshot holding undefined verifies in place and fails after JSON (S2)", async () => {
+  // Row (bu), approved ("I approve you for to do everything", 2026-11-15):
+  // 2.0 signs data and metadata in their JSON form, so a snapshot holding
+  // undefined or a Date also verifies after a JSON round trip. 1.35 fails
+  // it there: that is 1.35's side only, so these keep what both engines
+  // share. 2.0's side: core-next l12a-distributable "(bu): undefined and a
+  // Date verify in place and after JSON".
+  it("U5: a snapshot holding undefined verifies in place (S2; row (bu))", async () => {
     const system = started();
     const snapshot = system.getDistributableSnapshot({
       includeDerivations: ["display", "none"],
@@ -179,20 +187,16 @@ describe("L12 probe pins (development)", () => {
     const signed = await signSnapshot(snapshot, SECRET);
 
     expect(await verifySnapshotSignature(signed, SECRET)).toBe(true);
-    const travelled = JSON.parse(JSON.stringify(signed));
-    expect(await verifySnapshotSignature(travelled, SECRET)).toBe(false);
     system.destroy();
   });
 
-  it("U5: a snapshot holding a Date verifies in place and fails after JSON (S3)", async () => {
+  it("U5: a snapshot holding a Date verifies in place (S3; row (bu))", async () => {
     const signed = await signSnapshot(
       { data: { at: new Date(0) }, createdAt: 0 },
       SECRET,
     );
 
     expect(await verifySnapshotSignature(signed, SECRET)).toBe(true);
-    const travelled = JSON.parse(JSON.stringify(signed));
-    expect(await verifySnapshotSignature(travelled, SECRET)).toBe(false);
   });
 
   it("U5: plain JSON data verifies in place and after JSON (S1)", async () => {
@@ -206,14 +210,23 @@ describe("L12 probe pins (development)", () => {
     ).toBe(true);
   });
 
-  it("U6: a change below 50 levels still verifies (S5)", async () => {
+  // Row (bv), approved ("I approve you for to do everything", 2026-11-15):
+  // 2.0 refuses to sign data past 50 levels (signSnapshot throws) and drops
+  // a function as JSON does, so "[function]" no longer verifies in its
+  // place. 1.35 signs a "[max depth exceeded]" placeholder, so a change
+  // below 50 levels still verifies, and signs a function as "[function]":
+  // that is 1.35's side only, so these keep what both engines share. 2.0's
+  // side: core-next l12a-distributable "(bv): data past 50 levels throws at
+  // signing and does not verify" and "(bv): a function is dropped, so
+  // "[function]" does not verify in its place; a cycle throws".
+  it("U6: data 60 levels deep under a shallow snapshot's signature does not verify (S5; row (bv))", async () => {
     const signed = await signSnapshot(
-      { data: nested(60, "a"), createdAt: 0 },
+      { data: nested(3, "a"), createdAt: 0 },
       SECRET,
     );
-    const forged = { ...signed, data: nested(60, "EVIL") };
+    const forged = { ...signed, data: nested(60, "a") };
 
-    expect(await verifySnapshotSignature(forged as never, SECRET)).toBe(true);
+    expect(await verifySnapshotSignature(forged as never, SECRET)).toBe(false);
   });
 
   it("U6: a change at a shallow level does not verify", async () => {
@@ -226,14 +239,14 @@ describe("L12 probe pins (development)", () => {
     expect(await verifySnapshotSignature(forged as never, SECRET)).toBe(false);
   });
 
-  it('U6: "[function]" verifies for a function (S6)', async () => {
+  it("U6: a snapshot holding a function signs and verifies in place (S6; row (bv))", async () => {
     const signed = await signSnapshot(
       { data: { f: () => 1 }, createdAt: 0 },
       SECRET,
     );
-    const forged = { ...signed, data: { f: "[function]" } };
 
-    expect(await verifySnapshotSignature(forged as never, SECRET)).toBe(true);
+    expect(signed.signature).toMatch(/^[0-9a-f]{64}$/);
+    expect(await verifySnapshotSignature(signed, SECRET)).toBe(true);
   });
 
   it("U7: an empty secret throws (S4)", async () => {

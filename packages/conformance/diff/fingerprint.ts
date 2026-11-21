@@ -551,6 +551,178 @@ export function pathFits(pattern: string, path: string): boolean {
   ).test(path);
 }
 
+/** One ledger entry as the fuzz's `ledger` step records it (`query({})`). */
+type LedgerEntry = Record<string, Json>;
+
+const LEDGER_LABEL = JSON.stringify({ op: "ledger" });
+
+const NAVIGATE_KEYS = "from,hashAlgo,kind,prevHash,schemaVersion,seq,to,ts";
+
+/** `a` and `b` are the same entry but for `seq` and `prevHash`. */
+function sameButChain(a: Json | undefined, b: Json | undefined): boolean {
+  if (!isEntry(a) || !isEntry(b)) {
+    return false;
+  }
+  const rest = (e: LedgerEntry) =>
+    canonicalJson(
+      Object.fromEntries(
+        Object.entries(e).filter(([k]) => k !== "seq" && k !== "prevHash"),
+      ),
+    );
+
+  return rest(a) === rest(b);
+}
+
+function isEntry(v: Json | undefined): v is LedgerEntry {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+/**
+ * Whether 2.0's ledger entries (`b`, newest first, as `query({})` lists
+ * them) are 1.35's (`a`) with at least one `system.history.navigate`
+ * entry inserted (row (az)). Read oldest first, each 2.0 entry either is
+ * 1.35's next entry, equal but for its `seq` (1.35's plus the navigate
+ * entries inserted before it) and its `prevHash` (1.35's until the first
+ * insertion, a djb2 hex after it, since the chain now covers the inserted
+ * entry), or is an inserted navigate entry: that kind, an integer `from`,
+ * `to`, `seq` and `ts`, 1.35's `hashAlgo` and `schemaVersion`, and no
+ * other field. Every 1.35 entry is used, in order.
+ */
+function navigateInserted(a: Json[], b: Json[]): boolean {
+  const ref = [...a].reverse();
+  const cand = [...b].reverse();
+  let i = 0;
+  let inserted = 0;
+  for (const e of cand) {
+    if (!isEntry(e)) {
+      return false;
+    }
+    const next = ref[i];
+    if (sameButChain(next, e) && isEntry(next)) {
+      const seqOk =
+        typeof next.seq === "number" &&
+        typeof e.seq === "number" &&
+        e.seq === next.seq + inserted;
+      const hashOk =
+        inserted === 0
+          ? e.prevHash === next.prevHash
+          : typeof e.prevHash === "string" &&
+            /^[0-9a-f]{1,8}$/.test(e.prevHash);
+      if (!seqOk || !hashOk) {
+        return false;
+      }
+      i += 1;
+      continue;
+    }
+    const shape = Object.keys(e).sort().join();
+    const like = ref[0] as LedgerEntry | undefined;
+    if (
+      shape !== NAVIGATE_KEYS ||
+      e.kind !== "system.history.navigate" ||
+      ![e.from, e.to, e.seq, e.ts].every(
+        (v) => typeof v === "number" && Number.isInteger(v),
+      ) ||
+      typeof e.prevHash !== "string" ||
+      !/^[0-9a-f]{1,8}$/.test(e.prevHash) ||
+      like === undefined ||
+      e.hashAlgo !== like.hashAlgo ||
+      e.schemaVersion !== like.schemaVersion
+    ) {
+      return false;
+    }
+    inserted += 1;
+  }
+
+  return i === ref.length && inserted > 0;
+}
+
+/**
+ * Classes of a changed pattern's `pair` (`{ path, pair }`): each judges
+ * 1.35's whole record and the engine under test's whole record together
+ * (`Difference.record`, `candidateRecord`), so a field-by-field change is
+ * excused only when the two records stand in the named relation. Each is
+ * hand-named for one approved row; `generalize` never picks one.
+ */
+export const PAIR: Record<
+  string,
+  (reference: Json | undefined, candidate: Json | undefined) => boolean
+> = {
+  /**
+   * Row (az) in the audit ledger (L12c): 2.0's `replay()` and `import()`
+   * call `onHistoryNavigate`, which the ledger records as a
+   * `system.history.navigate` entry; 1.35 does not. So a fuzz `ledger`
+   * step's two records differ only so: `verify()` reports a higher
+   * `entryCount` with every other field equal, and the entries are 1.35's
+   * with navigate entries inserted (`navigateInserted`). Added on the
+   * owner's instruction, under row (az)'s approval ("Approve all as
+   * recommended (Recommended)", 2026-11-10).
+   */
+  ledgerNavigateInserted: (referenceRecord, candidateRecord) => {
+    const dataOf = (r: Json | undefined) =>
+      isEntry(r) && r.k === "external" && Object.keys(r).length === 2
+        ? r.data
+        : undefined;
+    const reference = dataOf(referenceRecord);
+    const candidate = dataOf(candidateRecord);
+    if (
+      !Array.isArray(reference) ||
+      !Array.isArray(candidate) ||
+      reference[0] !== LEDGER_LABEL ||
+      candidate[0] !== LEDGER_LABEL ||
+      reference.length !== candidate.length
+    ) {
+      return false;
+    }
+    if (reference.length === 2) {
+      const [, r] = reference;
+      const [, c] = candidate;
+      if (!isEntry(r) || !isEntry(c)) {
+        return false;
+      }
+      const rest = (e: LedgerEntry) =>
+        canonicalJson(
+          Object.fromEntries(
+            Object.entries(e).filter(([k]) => k !== "entryCount"),
+          ),
+        );
+
+      return (
+        typeof r.entryCount === "number" &&
+        typeof c.entryCount === "number" &&
+        c.entryCount > r.entryCount &&
+        r.valid === true &&
+        rest(r) === rest(c)
+      );
+    }
+    if (reference.length === 3) {
+      const [, rTag, r] = reference;
+      const [, cTag, c] = candidate;
+
+      return (
+        rTag === "entries" &&
+        cTag === "entries" &&
+        Array.isArray(r) &&
+        Array.isArray(c) &&
+        navigateInserted(r, c)
+      );
+    }
+
+    return false;
+  },
+};
+
+/**
+ * Whether `path` is `prefix` or inside it (a `pair` pattern's path: the two
+ * records are judged whole, so any field under the prefix may differ).
+ */
+export function pathWithin(prefix: string, path: string): boolean {
+  return (
+    path === prefix ||
+    path.startsWith(`${prefix}.`) ||
+    path.startsWith(`${prefix}[`)
+  );
+}
+
 /** Whether bound `b` admits difference `d` (`Bound`). */
 export function admits(b: Bound, d: Difference): boolean {
   const payload = payloadOf(d);
@@ -567,14 +739,19 @@ export function admits(b: Bound, d: Difference): boolean {
     return (
       typeof path === "string" &&
       (keys === "from,path,to" ||
-        (keys === "from,path,record,to" && fits(q.record as Json, d.record))) &&
-      pathFits(path, d.path ?? "") &&
-      fits(q.from as Json, d.reference) &&
-      (isLower(q.to)
-        ? typeof d.reference === "number" &&
-          typeof d.candidate === "number" &&
-          d.candidate < d.reference
-        : fits(q.to as Json, d.candidate))
+        (keys === "from,path,record,to" && fits(q.record as Json, d.record)) ||
+        (keys === "pair,path" &&
+          typeof q.pair === "string" &&
+          PAIR[q.pair]?.(d.record, d.candidateRecord) === true &&
+          pathWithin(path, d.path ?? ""))) &&
+      (keys === "pair,path" ||
+        (pathFits(path, d.path ?? "") &&
+          fits(q.from as Json, d.reference) &&
+          (isLower(q.to)
+            ? typeof d.reference === "number" &&
+              typeof d.candidate === "number" &&
+              d.candidate < d.reference
+            : fits(q.to as Json, d.candidate))))
     );
   });
 }

@@ -107,6 +107,13 @@ export interface Difference {
    * inside a record of a given shape.
    */
   record?: Json;
+  /**
+   * For `changed` only: the engine under test's whole record (as compared).
+   * Only a fuzz bound's changed pattern with a `pair` reads it
+   * (diff/fingerprint.ts `PAIR`), which judges the two whole records
+   * together, never one field alone.
+   */
+  candidateRecord?: Json;
   reference?: Json;
   candidate?: Json;
   /**
@@ -980,6 +987,25 @@ const traceRunText = (k: Keyed, project: (entry: TraceEntry) => Json) =>
     : "";
 
 /**
+ * In the external stream, a fuzz logging plugin's record (`["log", level,
+ * message]`, diff/fuzz/model.ts) as compared, and "" for every other
+ * external: `lcs` breaks ties by it, as for `traceRunText`. Every log line
+ * has the kind `log`, so by keys alone a line 2.0 logs and 1.35 does not
+ * (row (az)'s `timetravel.jump`, row (bi)'s late `trace.complete`) took the
+ * next line's place and every later line in its step and phase was paired
+ * with the one before it, a `changed` on its level and message (L12 gate,
+ * the census seed's plugin phase). The pairing is still a longest one, so
+ * no record that is missing or extra by keys pairs. Self-test:
+ * diff/self/l12-gate-classes.test.ts.
+ */
+const logLineText = (k: Keyed, project: (entry: TraceEntry) => Json) =>
+  k.entry.k === "external" &&
+  Array.isArray(k.entry.data) &&
+  k.entry.data[0] === "log"
+    ? JSON.stringify(project(k.entry))
+    : "";
+
+/**
  * Longest common subsequence of keys: pairs of matched indexes.
  *
  * With `text` (the console stream: each record's printed arguments, which
@@ -1137,7 +1163,14 @@ function compareWith(
             a.some((k) => k.kind === "onTraceComplete") &&
             b.some((k) => k.kind === "onTraceComplete")
           ? ([a.map(runText), b.map(runText)] as [string[], string[]])
-          : undefined;
+          : stream === "external" &&
+              a.some((k) => logLineText(k, project) !== "") &&
+              b.some((k) => logLineText(k, project) !== "")
+            ? ([
+                a.map((k) => logLineText(k, project)),
+                b.map((k) => logLineText(k, project)),
+              ] as [string[], string[]])
+            : undefined;
 
     return { stream, a, b, pairs: lcs(a.map(keyOf), b.map(keyOf), text) };
   });
@@ -1198,6 +1231,7 @@ function compareWith(
           op: "changed",
           ...f,
           record: project(ka.entry),
+          candidateRecord: project(kb.entry),
           at: { reference: ka.index, candidate: kb.index },
           where,
         });

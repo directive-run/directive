@@ -48499,5 +48499,100 @@
     "reason": "Keyed twin of `l3-quirk-a-fuzz-observe-resolver-start-changed` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
     "approvedBy": "Jason Comes",
     "date": "2026-11-19"
+  },
+  {
+    "id": "l12-bx-watch-hears-included-fact",
+    "scenario": "a watch misses an included fact's change until a derivation changes (U1)",
+    "stream": "external",
+    "kind": "watch",
+    "engine": "v2",
+    "step": 3,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": [
+            "watch",
+            {
+              "display": "Ada (1)",
+              "plan": "pro"
+            },
+            true
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bx), the L12 RFC: a watched distributable snapshot also subscribes to its includeFacts keys, so the write of an included fact that changes data calls back (2.0 records one \"watch\" external in step 3, the `plan` write, carrying plan \"pro\"); 1.35 subscribes to the watched derivations only and stays silent until a derivation moves (probe D4). The version check is 1.35's, so a callback still means data changed, and the later `count` write's callback is identical on both engines. Pinned on 2.0's side by core-next's l12a-distributable \"(bx): a write to an included fact calls back; an equal write does not\". Signed on the owner's instruction: the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-21"
+  },
+  {
+    "id": "l12-fuzz-az-external-ledger-navigate-entry",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "{\"op\":\"ledger\"}",
+    "engine": "v2",
+    "op": "changed",
+    "when": ["replayedOrImported"],
+    "group": "row-az",
+    "bound": {
+      "match": [
+        {
+          "path": "data[1].entryCount",
+          "pair": "ledgerNavigateInserted"
+        },
+        {
+          "path": "data[2]",
+          "pair": "ledgerNavigateInserted"
+        }
+      ]
+    },
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate, as goTo does; 1.35 does not. The audit ledger (L12c) records each onHistoryNavigate as a system.history.navigate entry, so in a fuzz case with the ledger and a replay or roundtrip step 2.0's trail has a navigate entry 1.35's lacks for each replay or import. Reproduced (L12 gate run 1, PR fuzz at L12, phase with plugins, seed 24301): history.import(history.export()) gives 1.35 [system.init, fact.change, system.start, system.snapshot] and 2.0 the same plus system.history.navigate {from 0, to 0}. This covers the `ledger` step's two records only as a pair (diff/fingerprint.ts PAIR.ledgerNavigateInserted): verify() reports a higher entryCount with valid true and every other field equal, and the entries are 1.35's, in order, with navigate entries inserted, each later entry's seq raised by the insertions before it and its prevHash 1.35's until the first insertion. Any other change to either record is not covered. Signed on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-21"
+  },
+  {
+    "id": "l12-fuzz-az-external-log-timetravel-jump-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "log",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["replayedOrImported"],
+    "group": "row-az",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": ["log", "info", "[Directive] timetravel.jump"]
+        }
+      ]
+    },
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate, as goTo does; 1.35 does not. The logging plugin (L12b) logs each onHistoryNavigate as \"[Directive] timetravel.jump\" at info, so in a fuzz case with the logging plugin and a replay or roundtrip step 2.0 logs that line once more per replay or import (L12 gate run 1, the census seed's plugin phase: a replay in step 6). This covers only that log line, extra on 2.0, exactly [\"log\", \"info\", \"[Directive] timetravel.jump\"], in a case with a replay or import (`when` replayedOrImported). Any other extra or missing log line is not covered. Signed on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-21"
+  },
+  {
+    "id": "l12-fuzz-bi-external-log-trace-complete-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "log",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["traceRing"],
+    "group": "row-bi",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": ["log", "debug", "[Directive] trace.complete"]
+        }
+      ]
+    },
+    "reason": "Row (bi) (L9; owner-approved 2026-11-15, \"I approve you for to do everything\"): every run reports onTraceComplete once; 2.0 reports a run pushed out of a ring of 1 or 3 when its last in-flight resolver ends, which 1.35 drops (its twin, `l9-fuzz-bi-hook-onTraceComplete-extra`). The logging plugin (L12b) logs each onTraceComplete as \"[Directive] trace.complete\" at debug, so in a fuzz case with the logging plugin and the trace ring (`when` traceRing) 2.0 logs that line once more for such a run (L12 gate run 1, the census seed's plugin phase: step 15, after the resolver's error). This covers only that log line, extra on 2.0, exactly [\"log\", \"debug\", \"[Directive] trace.complete\"], in a case with a ring of 1 or 3. Any other extra or missing log line is not covered. Signed on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L9 RFC rev 2, this row's among them.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-21"
   }
 ]
