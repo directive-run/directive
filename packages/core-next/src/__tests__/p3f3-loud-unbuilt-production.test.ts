@@ -6,7 +6,7 @@
  * - The unbuilt system members are left out (their names alone would put the
  *   minimal app past its 28,800 B ceiling): a call is the platform's
  *   TypeError, as before this slice.
- * - A `/plugins` or `/testing` stub throws E_FEATURE_MISSING with the code
+ * - A `/testing` stub throws E_FEATURE_MISSING with the code
  *   and the export's name as its message, none of the development text.
  * - `plugins: [undefined]` throws 1.35's production TypeError (reading
  *   'name'), not a mangled one at the first hook.
@@ -19,7 +19,6 @@ const { createModule } = await import("../api/core.js");
 const { FEATURE_MISSING } = await import("../api/missing.js");
 const { t } = await import("../api/schema-builders.js");
 const { createSystem } = await import("../api/system.js");
-const plugins = await import("../plugins/index.js");
 const testing = await import("../utils/testing.js");
 
 afterEach(() => {
@@ -89,8 +88,6 @@ describe.each(["single", "namespaced"])("production, %s system", (form) => {
 describe("production stub exports", () => {
   it("throw E_FEATURE_MISSING with the code and the name, no development text", () => {
     for (const [stub, name, layer] of [
-      [plugins.devtoolsPlugin, "devtoolsPlugin", 12],
-      [plugins.emitDevToolsEvent, "emitDevToolsEvent", 12],
       [testing.createTestSystem, "createTestSystem", 13],
       [testing.mockResolver, "mockResolver", 13],
     ] as const) {

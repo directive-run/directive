@@ -392,8 +392,11 @@ const inlineIsDevelopment = {
 // list, so the production bundle's lack of one is the bundler's doing and not a
 // needle that matches nothing; and the list must hold exactly DEV_STRINGS_MIN
 // strings, so an under-derived list fails loudly.
+// The /testing entry is in it too: since L12d no /plugins stub throws
+// featureMissing, and /testing's stubs are the ones that still do, so
+// missing.ts's development text is reached only from there.
 const entryContents =
-  'export * as a from "./index.ts"; export * as b from "./internals.ts"; export * as c from "./plugins/index.ts";';
+  'export * as a from "./index.ts"; export * as b from "./internals.ts"; export * as c from "./plugins/index.ts"; export * as d from "./utils/testing.ts";';
 const bundleEntry = async (nodeEnv) =>
   Buffer.from(
     (
