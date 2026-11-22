@@ -1252,6 +1252,12 @@
         "mutation debt owed to L9: fact tags through meta, beside observe() > meta reports each fact's tags, untagged facts as carrying none, and observe() sees the same writes"
       ],
       "tests/core/l12-plugins-pins-oracle.test.ts": [
+        "L12 gate mutation pins (development) > a watch whose exclusions remove every derivation warns and never calls",
+        "L12 gate mutation pins (development) > a watch with no include list watches every derivation, less its exclusions",
+        "L12 gate mutation pins (development) > U4: excludeDerivations leaves those derivations out, with or without an include list",
+        "L12 gate mutation pins (development) > U4: metadata is carried as given",
+        "L12 gate mutation pins (development) > U4: the unknown-key warnings name the ignored keys and every available one",
+        "L12 gate mutation pins (development) > U4: with nothing available the warnings say (none)",
         "L12 probe pins (development) > U10: verify({ strong: true }) throws 1.35's \"reserved for v2\"; entries are djb2-1, chained by hex hashes of at most 8 characters (A1)",
         "L12 probe pins (development) > U13: createSystemWithStatus wires the status plugin into the system",
         "L12 probe pins (development) > U13: the status plugin records a failed requirement's error",
