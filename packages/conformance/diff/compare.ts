@@ -1016,10 +1016,12 @@ const logLineText = (k: Keyed, project: (entry: TraceEntry) => Json) =>
  * so `Difference.raw` named the wrong record. Without `text` it is the
  * plain LCS, unchanged.
  */
-function lcs(
+export function lcs(
   a: string[],
   b: string[],
   text?: [string[], string[]],
+  /** Test-only: take the band whenever it fits (diff/self/lcs-bounded.test.ts). */
+  alwaysBand = false,
 ): [number, number][] {
   const n = a.length;
   const m = b.length;
@@ -1055,57 +1057,269 @@ function lcs(
   const rows = endA - start;
   const cols = endB - start;
   if (rows > 0 && cols > 0) {
-    const width = cols + 1;
-    // A pair scores `unit`, and one more with identical text: `unit` is
-    // above the most identical texts a pairing can have, so a longer
-    // pairing always scores higher. Without text every pair scores 1 (the
-    // plain LCS). The largest score, about min(rows, cols)², fits 32 bits
-    // whenever the table itself can be allocated.
-    const unit = text === undefined ? 1 : Math.min(rows, cols) + 1;
-    const score = (i: number, j: number) =>
-      unit + (text !== undefined && sameText(start + i, start + j) ? 1 : 0);
-    const table = new Uint32Array((rows + 1) * width);
-    for (let i = rows - 1; i >= 0; i--) {
-      for (let j = cols - 1; j >= 0; j--) {
-        const skip = Math.max(
-          table[(i + 1) * width + j] as number,
-          table[i * width + j + 1] as number,
-        );
-        table[i * width + j] =
-          a[start + i] === b[start + j]
-            ? Math.max(
-                (table[(i + 1) * width + j + 1] as number) + score(i, j),
-                skip,
-              )
-            : skip;
-      }
-    }
-    let i = 0;
-    let j = 0;
-    while (i < rows && j < cols) {
-      if (
-        a[start + i] === b[start + j] &&
-        table[i * width + j] ===
-          (table[(i + 1) * width + j + 1] as number) + score(i, j)
-      ) {
-        pairs.push([start + i, start + j]);
-        i++;
-        j++;
-      } else if (
-        (table[(i + 1) * width + j] as number) >=
-        (table[i * width + j + 1] as number)
-      ) {
-        i++;
-      } else {
-        j++;
-      }
-    }
+    alignMiddle(a, b, text, start, rows, cols, pairs, alwaysBand);
   }
   for (let k = 0; k < n - endA; k++) {
     pairs.push([endA + k, endB + k]);
   }
 
   return pairs;
+}
+
+/**
+ * The most band cells `alignMiddle` fills (one byte each) before it throws
+ * rather than run for minutes: about 2 GB, and well past any trace the suite
+ * makes.
+ */
+export const ALIGN_CELL_LIMIT = 2 ** 31;
+
+/** The most full-table cells (four bytes each, about 2 GB). */
+export const TABLE_CELL_LIMIT = 2 ** 29;
+
+/** Tables up to this many cells run whole, without Myers or the band. */
+const SMALL_TABLE = 2 ** 22;
+
+/**
+ * The middle of `lcs` (rows x cols records past the trimmed prefix and
+ * suffix), with the same pairings as the full suffix table it replaced,
+ * which filled rows x cols cells synchronously (5.3e9 for a 72k-record
+ * fuzz trace: it never finished, and a timeout cannot fire on it).
+ *
+ * 1. Myers' O((N+M)D) pass finds D, the fewest insertions and deletions
+ *    that turn one key list into the other (D = rows + cols - 2L, L the
+ *    LCS length). Every longest pairing, with or without `text`, has L
+ *    pairs, so D indels; a path through cell (i, j) spends at least
+ *    |i - j| indels before it and |(rows - cols) - (i - j)| after, so every
+ *    optimal path lies in the band of diagonals where their sum is <= D
+ *    (D + 1 diagonals).
+ * 2. The suffix table is filled inside the band only, reading 0 for cells
+ *    outside it. Values never exceed the full table's (every value is >= 0),
+ *    and equal it on every cell of an optimal path, since that path's tail
+ *    stays in the band. Each cell keeps only the walk's choice (pair, down,
+ *    right), taken with the old rule; two rows of scores are kept.
+ * 3. The walk from (0, 0) visits only cells of an optimal path, where the
+ *    band value is exact. At such a cell the old rule compares the table at
+ *    (i+1, j+1) + score with (i, j), and (i+1, j) with (i, j+1): a neighbour
+ *    whose full value is optimal is on an optimal path (exact), and one that
+ *    is not has band value <= full value < optimal. So every comparison has
+ *    the outcome it had in the full table, and the pairs are identical.
+ *    Self-test: diff/self/lcs-bounded.test.ts (the old table as reference).
+ *
+ * Cost O((rows + cols) D) time and rows x (D + 1) bytes: mostly-equal traces
+ * are fast. Tables up to SMALL_TABLE cells run whole. The band is taken
+ * only when D <= cols / 4 (a quarter of the
+ * table or less; Myers stops there), or when the full table would pass
+ * TABLE_CELL_LIMIT; otherwise the old full table runs as it was (`fullTable`),
+ * so streams that differ a lot cost what they did. Past both limits it
+ * throws, naming the sizes, instead of running on.
+ */
+function alignMiddle(
+  a: string[],
+  b: string[],
+  text: [string[], string[]] | undefined,
+  start: number,
+  rows: number,
+  cols: number,
+  pairs: [number, number][],
+  alwaysBand: boolean,
+): void {
+  // Integer ids for the keys, so comparisons are cheap.
+  const ids = new Map<string, number>();
+  const idOf = (key: string) => {
+    let id = ids.get(key);
+    if (id === undefined) {
+      id = ids.size;
+      ids.set(key, id);
+    }
+    return id;
+  };
+  const ka = new Int32Array(rows);
+  const kb = new Int32Array(cols);
+  for (let i = 0; i < rows; i++) {
+    ka[i] = idOf(a[start + i] as string);
+  }
+  for (let j = 0; j < cols; j++) {
+    kb[j] = idOf(b[start + j] as string);
+  }
+
+  const tableFits = rows * cols <= TABLE_CELL_LIMIT;
+  // A small table (about 10 ms) is cheaper than Myers and the band.
+  if (rows * cols <= SMALL_TABLE && !alwaysBand) {
+    fullTable(ka, kb, text, start, rows, cols, pairs);
+
+    return;
+  }
+  const bandMost = Math.floor(ALIGN_CELL_LIMIT / rows) - 1;
+  const maxD =
+    tableFits && !alwaysBand
+      ? Math.min(bandMost, Math.floor(cols / 4))
+      : bandMost;
+  // D >= |rows - cols|: past maxD already, Myers would only spend time.
+  const d = Math.abs(rows - cols) > maxD ? -1 : editDistance(ka, kb, maxD);
+  if (d < 0 && tableFits) {
+    fullTable(ka, kb, text, start, rows, cols, pairs);
+
+    return;
+  }
+  if (d < 0) {
+    throw new Error(
+      `lcs: ${rows} x ${cols} records differ by more than ${maxD} insertions and deletions; the alignment would pass ${ALIGN_CELL_LIMIT} cells`,
+    );
+  }
+
+  const delta = rows - cols;
+  const half = (d - Math.abs(delta)) / 2;
+  const kMin = Math.min(0, delta) - half;
+  const kMax = Math.max(0, delta) + half;
+  const width = kMax - kMin + 1;
+  const PAIR = 0;
+  const DOWN = 1;
+  const RIGHT = 2;
+  const choice = new Uint8Array(rows * width);
+
+  const sameText = (i: number, j: number) =>
+    text === undefined || text[0][start + i] === text[1][start + j];
+  const unit = text === undefined ? 1 : Math.min(rows, cols) + 1;
+  // Scores pass 2^32 on large traces: doubles are exact to 2^53.
+  let next = new Float64Array(cols + 1);
+  let cur = new Float64Array(cols + 1);
+  const inBand = (i: number, j: number) =>
+    i < rows && j < cols && i - j >= kMin && i - j <= kMax;
+  for (let i = rows - 1; i >= 0; i--) {
+    const jLo = Math.max(0, i - kMax);
+    const jHi = Math.min(cols - 1, i - kMin);
+    for (let j = jHi; j >= jLo; j--) {
+      const down = inBand(i + 1, j) ? (next[j] as number) : 0;
+      const right = inBand(i, j + 1) ? (cur[j + 1] as number) : 0;
+      const skip = Math.max(down, right);
+      let value = skip;
+      let pick = down >= right ? DOWN : RIGHT;
+      if (ka[i] === kb[j]) {
+        const diag =
+          (inBand(i + 1, j + 1) ? (next[j + 1] as number) : 0) +
+          unit +
+          (text !== undefined && sameText(i, j) ? 1 : 0);
+        if (diag >= skip) {
+          value = diag;
+          pick = PAIR;
+        }
+      }
+      cur[j] = value;
+      choice[i * width + (j - i + kMax)] = pick;
+    }
+    const swap = next;
+    next = cur;
+    cur = swap;
+  }
+
+  let i = 0;
+  let j = 0;
+  while (i < rows && j < cols) {
+    if (!inBand(i, j)) {
+      throw new Error(`lcs: the walk left the band at ${i}, ${j}`);
+    }
+    const pick = choice[i * width + (j - i + kMax)];
+    if (pick === PAIR) {
+      pairs.push([start + i, start + j]);
+      i++;
+      j++;
+    } else if (pick === DOWN) {
+      i++;
+    } else {
+      j++;
+    }
+  }
+}
+
+/** The full suffix table and walk, as `lcs` had them before the band. */
+function fullTable(
+  ka: Int32Array,
+  kb: Int32Array,
+  text: [string[], string[]] | undefined,
+  start: number,
+  rows: number,
+  cols: number,
+  pairs: [number, number][],
+): void {
+  const width = cols + 1;
+  // A pair scores `unit`, and one more with identical text: `unit` is above
+  // the most identical texts a pairing can have, so a longer pairing always
+  // scores higher. Without text every pair scores 1 (the plain LCS). The
+  // largest score, about min(rows, cols)^2, fits 32 bits within
+  // TABLE_CELL_LIMIT.
+  const unit = text === undefined ? 1 : Math.min(rows, cols) + 1;
+  const score = (i: number, j: number) =>
+    unit +
+    (text !== undefined && text[0][start + i] === text[1][start + j] ? 1 : 0);
+  const table = new Uint32Array((rows + 1) * width);
+  for (let i = rows - 1; i >= 0; i--) {
+    for (let j = cols - 1; j >= 0; j--) {
+      const skip = Math.max(
+        table[(i + 1) * width + j] as number,
+        table[i * width + j + 1] as number,
+      );
+      table[i * width + j] =
+        ka[i] === kb[j]
+          ? Math.max(
+              (table[(i + 1) * width + j + 1] as number) + score(i, j),
+              skip,
+            )
+          : skip;
+    }
+  }
+  let i = 0;
+  let j = 0;
+  while (i < rows && j < cols) {
+    if (
+      ka[i] === kb[j] &&
+      table[i * width + j] ===
+        (table[(i + 1) * width + j + 1] as number) + score(i, j)
+    ) {
+      pairs.push([start + i, start + j]);
+      i++;
+      j++;
+    } else if (
+      (table[(i + 1) * width + j] as number) >=
+      (table[i * width + j + 1] as number)
+    ) {
+      i++;
+    } else {
+      j++;
+    }
+  }
+}
+
+/**
+ * Myers' greedy pass: the fewest insertions and deletions turning `a` into
+ * `b`, or -1 past `limit`. O((N + M) D) time, O(N + M) memory.
+ */
+function editDistance(a: Int32Array, b: Int32Array, limit: number): number {
+  const n = a.length;
+  const m = b.length;
+  const most = Math.min(n + m, limit);
+  const offset = most + 1;
+  const v = new Int32Array(2 * most + 3);
+  for (let d = 0; d <= most; d++) {
+    for (let k = -d; k <= d; k += 2) {
+      let x =
+        k === -d ||
+        (k !== d &&
+          (v[offset + k - 1] as number) < (v[offset + k + 1] as number))
+          ? (v[offset + k + 1] as number)
+          : (v[offset + k - 1] as number) + 1;
+      let y = x - k;
+      while (x < n && y < m && a[x] === b[y]) {
+        x++;
+        y++;
+      }
+      v[offset + k] = x;
+      if (x >= n && y >= m) {
+        return d;
+      }
+    }
+  }
+
+  return -1;
 }
 
 export function diffJson(
