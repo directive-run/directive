@@ -146,16 +146,17 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
         typeof x === "string" &&
         (/^([a-z]::)?([fd]\d+|when|tx)$/.test(x) ||
           /^derive\.([a-z]::)?d\d+$/.test(x) ||
-          /^z::g[01]$/.test(x)),
+          /^(z::)?g[01]$/.test(x)),
     ),
   /**
    * A derivation a distributable snapshot can hold (row (bx)'s knock-on,
    * L12 gate run 4): a fuzz derivation (`derivation`), or `z::h0`, the one
-   * derivation of the module a `module` step registers (diff/fuzz/model.ts
-   * `extraModule`; PR seed 19). Hand-named.
+   * derivation of the module a `module` step registers, `h0` in a case
+   * with one module (diff/fuzz/model.ts `extraModule`; PR seeds 19, 8).
+   * Hand-named.
    */
   snapshotDerivation: (v) =>
-    typeof v === "string" && /^(([a-z]::)?d\d+|z::h0)$/.test(v),
+    typeof v === "string" && /^(([a-z]::)?d\d+|(z::)?h0)$/.test(v),
   /**
    * A distributable snapshot as a watch passes it (L12): `createdAt` and
    * `data`, a plain object, with `version` (a string) and `expiresAt` (an

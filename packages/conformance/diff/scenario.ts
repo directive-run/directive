@@ -1900,13 +1900,25 @@ export function markStale(
               ? ((e.args[0] as { $error: { sourceId?: Json } }).$error
                   .sourceId as string | undefined)
               : undefined;
-        for (const [who, fresh] of [
-          [ok, true],
-          [threw, false],
+        // A compute counts at its observation, the record after its hook
+        // when there is one: the hook and the observation are one compute,
+        // so a missing observation is judged before both (PR seed 5).
+        const next = reference[i + 1];
+        const at =
+          ok !== undefined &&
+          next?.k === "observe" &&
+          (next.event as { type?: unknown; id?: unknown } | null)?.type ===
+            "derivation.compute" &&
+          (next.event as { id?: unknown }).id === ok
+            ? i + 1
+            : i;
+        for (const [who, fresh, where] of [
+          [ok, true, at],
+          [threw, false, i],
         ] as const) {
           if (typeof who === "string") {
             const list = timeline.get(who) ?? [];
-            list.push([i, fresh]);
+            list.push([where, fresh]);
             timeline.set(who, list);
           }
         }

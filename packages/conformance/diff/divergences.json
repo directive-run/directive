@@ -49016,10 +49016,26 @@
           "value": {
             "$like": "derivedValue"
           }
+        },
+        {
+          "k": "notify",
+          "id": {
+            "$like": "snapshotDerivation"
+          },
+          "value": {
+            "$throws": {
+              "$error": {
+                "name": "Error",
+                "message": {
+                  "$like": "derivationThrownMessage"
+                }
+              }
+            }
+          }
         }
       ]
     },
-    "reason": "Row (bx)'s knock-on (L12 gate run 4): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty the same cases pass (diff-notes l12gate/triage, the nf replays). Found by PR seeds 3 and 10: the extra read computes a derivation whose last compute threw or that had never computed, so 2.0 tracks it again; from then on 2.0 invalidates, recomputes and notifies it on each write of its facts, where 1.35, which has not computed it since, does none of that until its closing read. This covers only an extra notify of a fuzz derivation (any derivation id, `kind` \"*\" with the bound naming it) with a plain value, while, on 1.35, its last compute threw or it has never computed (`stale`). Signed on the owner's instruction: asked for a run 4 that signs the remaining (bx) knock-ons, he answered \"Yes, run 4 (Recommended)\" (2026-11-22), with his earlier \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "reason": "Row (bx)'s knock-on (L12 gate run 4): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty the same cases pass (diff-notes l12gate/triage, the nf replays). Found by PR seeds 3 and 10: the extra read computes a derivation whose last compute threw or that had never computed, so 2.0 tracks it again; from then on 2.0 invalidates, recomputes and notifies it on each write of its facts, where 1.35, which has not computed it since, does none of that until its closing read. This covers only an extra notify of a fuzz derivation (any derivation id, `kind` \"*\" with the bound naming it) with a plain value, or its own thrown error when the re-tracked derivation throws again (PR seed 17, run 4), while, on 1.35, its last compute threw or it has never computed (`stale`). Signed on the owner's instruction: asked for a run 4 that signs the remaining (bx) knock-ons, he answered \"Yes, run 4 (Recommended)\" (2026-11-22), with his earlier \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
     "approvedBy": "Jason Comes",
     "date": "2026-11-22"
   },

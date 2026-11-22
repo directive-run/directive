@@ -342,10 +342,42 @@ describe("row (bx), run 4: the remaining knock-ons, and no other", () => {
     });
   });
 
+  it("a re-tracked derivation throwing again, and h0, are covered; other errors are not (seeds 5, 8, 17)", () => {
+    const boom = (m: string) =>
+      notify("a::d1", { $throws: { $error: { name: "Error", message: m } } });
+    const v1 = [
+      ...step(12, [threw()]),
+      ...step(13, []),
+      ...step(14, [], compute()),
+    ];
+    // The closing compute's observation is judged before its hook (seed 5).
+    expect(
+      left(v1, [
+        ...step(12, [threw()]),
+        ...step(13, [...compute(), boom("a.d1 throws at 4")]),
+        ...step(14, []),
+      ]),
+    ).toEqual([]);
+    expect(
+      left(v1, [
+        ...step(12, [threw()]),
+        ...step(13, [...compute(), boom("something else")]),
+        ...step(14, []),
+      ]),
+    ).toEqual(["extra notify a::d1 13"]);
+    expect(
+      left(
+        [...step(6, []), ...step(7, compute("h0", 0))],
+        [...step(6, compute("h0", 0)), ...step(7, [])],
+      ),
+    ).toEqual([]);
+  });
+
   it("dependencyKeys admits derive.<id>, and only a derivation's", () => {
     const keys = LIKE.dependencyKeys as (v: Json) => boolean;
     expect(keys(["a::f1", "derive.a::d0", "derive.d1"])).toBe(true);
     expect(keys(["z::g0"])).toBe(true);
+    expect(keys(["g1"])).toBe(true);
     expect(keys(["derive.f0"])).toBe(false);
     expect(keys(["derive.x"])).toBe(false);
     expect(keys(["z::g2"])).toBe(false);
