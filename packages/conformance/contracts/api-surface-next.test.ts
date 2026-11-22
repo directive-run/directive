@@ -290,37 +290,43 @@ describe("core-next public API surface", () => {
     expect(gate(noWorker).failures).toHaveLength(workerNames.length);
   });
 
-  // Self-tests 1 and 2 at the root and /plugins (run 1 removed them, since
-  // from L12 neither ships a name above `current`): each runs again as soon
-  // as its entry ships such a name, and skips with the reason until then.
-  const dropsUnbuilt = (
-    entry: string,
-    ctx: { skip: (note: string) => void },
-  ) => {
-    {
-      const name = Object.keys(next[entry] ?? {}).find(
-        (n) =>
-          !n.startsWith("#ref:") &&
-          n in (frozen[entry] ?? {}) &&
-          layerIndex(layerOf(`${entry} ${n}`)) > layerIndex(current as Layer),
-      );
-      if (name === undefined) {
-        ctx.skip(
-          `skipped: core-next ships no ${entry} name above current ${current}, so none to drop`,
-        );
-      }
-      const key = `${entry} ${name}`;
-      const tampered = copy(next);
-      delete tampered[entry]?.[name as string];
-      const result = gate(tampered);
-      expect(result.failures).toEqual([dropped(key)]);
-      expect(result.unbuilt).toEqual(baseline.unbuilt);
-    }
+  // Self-tests 1 and 2 at the root and /plugins. From L12 neither ships a
+  // name above `current` (the plugins are L12), so each is judged one layer
+  // below the newest layer its entry ships (gate run 3: a skip here fails
+  // the census): dropping a name at that layer must fail as unbuilt there.
+  // Once the entry ships a name above `current`, that name is used instead.
+  const dropsUnbuilt = (entry: string) => {
+    const shipped = Object.keys(next[entry] ?? {}).filter(
+      (n) => !n.startsWith("#ref:") && n in (frozen[entry] ?? {}),
+    );
+    const above = shipped.find(
+      (n) =>
+        layerIndex(layerOf(`${entry} ${n}`)) > layerIndex(current as Layer),
+    );
+    const name =
+      above ??
+      [...shipped].sort(
+        (x, y) =>
+          layerIndex(layerOf(`${entry} ${y}`)) -
+          layerIndex(layerOf(`${entry} ${x}`)),
+      )[0];
+    expect(name).toBeDefined();
+    const key = `${entry} ${name}`;
+    const layer = layerOf(key);
+    const at = (
+      above === undefined ? LAYERS[layerIndex(layer) - 1] : current
+    ) as Layer;
+    expect(layerIndex(layer)).toBeGreaterThan(layerIndex(at));
+    const tampered = copy(next);
+    delete tampered[entry]?.[name as string];
+    expect(gate(tampered, { current: at }).failures).toEqual([
+      `core-next ${key} (missing): 1.35 exports it and contracts/next-unshipped.json does not list it (layer ${layer}, unbuilt at current ${at}): a name core-next ships may not be dropped`,
+    ]);
   };
-  it("a name core-next ships at an unbuilt layer may not be dropped (root)", (ctx) =>
-    dropsUnbuilt(".", ctx));
-  it("a name core-next ships at an unbuilt layer may not be dropped (/plugins)", (ctx) =>
-    dropsUnbuilt("./plugins", ctx));
+  it("a name core-next ships at an unbuilt layer may not be dropped (root)", () =>
+    dropsUnbuilt("."));
+  it("a name core-next ships at an unbuilt layer may not be dropped (/plugins)", () =>
+    dropsUnbuilt("./plugins"));
 
   // Self-test 3, and the list's other rules.
   it("a stale, built-layer, misplaced or unknown next-unshipped.json entry fails", () => {
