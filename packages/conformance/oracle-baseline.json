@@ -541,7 +541,13 @@
       "L12 probe pins (development) > U13: the status plugin tracks a requirement from pending to settled": "L12",
       "L12 probe pins (development) > U13: the status plugin records a failed requirement's error": "L12",
       "L12 probe pins (development) > U13: createSystemWithStatus wires the status plugin into the system": "L12",
-      "L12 probe pins (development) > U17: registerModule and unregisterModule reach an observer as { type, id }": "L10"
+      "L12 probe pins (development) > U17: registerModule and unregisterModule reach an observer as { type, id }": "L10",
+      "L12 gate mutation pins (development) > U4: the unknown-key warnings name the ignored keys and every available one": "L12",
+      "L12 gate mutation pins (development) > U4: with nothing available the warnings say (none)": "L12",
+      "L12 gate mutation pins (development) > U4: excludeDerivations leaves those derivations out, with or without an include list": "L12",
+      "L12 gate mutation pins (development) > U4: metadata is carried as given": "L12",
+      "L12 gate mutation pins (development) > a watch with no include list watches every derivation, less its exclusions": "L12",
+      "L12 gate mutation pins (development) > a watch whose exclusions remove every derivation warns and never calls": "L12"
     },
     "tests/core/l2-constraints-oracle-state.test.ts": {
       "a disabled constraint is not asked while it is waiting on another > is not asked when the constraint it follows finishes and the finishing write wakes a pass": "L2",

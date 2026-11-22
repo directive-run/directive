@@ -48594,5 +48594,246 @@
     "reason": "Row (bi) (L9; owner-approved 2026-11-15, \"I approve you for to do everything\"): every run reports onTraceComplete once; 2.0 reports a run pushed out of a ring of 1 or 3 when its last in-flight resolver ends, which 1.35 drops (its twin, `l9-fuzz-bi-hook-onTraceComplete-extra`). The logging plugin (L12b) logs each onTraceComplete as \"[Directive] trace.complete\" at debug, so in a fuzz case with the logging plugin and the trace ring (`when` traceRing) 2.0 logs that line once more for such a run (L12 gate run 1, the census seed's plugin phase: step 15, after the resolver's error). This covers only that log line, extra on 2.0, exactly [\"log\", \"debug\", \"[Directive] trace.complete\"], in a case with a ring of 1 or 3. Any other extra or missing log line is not covered. Signed on the owner's instruction (GATE-2 rule 1): \"I approve you for to do everything\" (2026-11-15), which took each recommended option of the L9 RFC rev 2, this row's among them.",
     "approvedBy": "Jason Comes",
     "date": "2026-11-21"
+  },
+  {
+    "id": "l12-fuzz-bx-console-warn-distributable-skip-extra",
+    "scenario": "fuzz",
+    "stream": "console",
+    "kind": "warn",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "console",
+          "level": "warn",
+          "args": [
+            {
+              "$text": "distributableSkipped"
+            },
+            {
+              "$text": "derivationThrown"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. That read meets a throwing derivation and prints the development warning \"[Directive] getDistributableSnapshot: Skipping derivation \\\"<id>\\\" due to error:\" with the derivation's own error, once more on 2.0. This covers only that warning, extra on 2.0, word for word (`distributableSkipped`, `derivationThrown`: a derivation id and a fuzz derivation's thrown error). Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onError-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "extra",
+    "requires": {
+      "stream": "console",
+      "kind": "warn",
+      "op": "extra",
+      "order": "any",
+      "bound": {
+        "match": [
+          {
+            "k": "console",
+            "level": "warn",
+            "args": [
+              {
+                "$text": "distributableSkipped"
+              },
+              {
+                "$text": "derivationThrown"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onError",
+          "args": [
+            {
+              "$error": {
+                "name": "DirectiveError",
+                "message": {
+                  "$like": "derivationThrownMessage"
+                },
+                "context": {
+                  "$undefined": true
+                },
+                "recoverable": true,
+                "source": "derivation",
+                "sourceId": {
+                  "$like": "derivation"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. The same read reports the throwing derivation's error to onError once more on 2.0. This covers only an onError of a fuzz derivation's own error (source \"derivation\", recoverable), extra on 2.0, and only with that read's extra warning in the same case (`requires`). Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onErrorRecovery-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "extra",
+    "requires": {
+      "stream": "console",
+      "kind": "warn",
+      "op": "extra",
+      "order": "any",
+      "bound": {
+        "match": [
+          {
+            "k": "console",
+            "level": "warn",
+            "args": [
+              {
+                "$text": "distributableSkipped"
+              },
+              {
+                "$text": "derivationThrown"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onErrorRecovery",
+          "args": [
+            {
+              "$error": {
+                "name": "DirectiveError",
+                "message": {
+                  "$like": "derivationThrownMessage"
+                },
+                "context": {
+                  "$undefined": true
+                },
+                "recoverable": true,
+                "source": "derivation",
+                "sourceId": {
+                  "$like": "derivation"
+                }
+              }
+            },
+            "skip"
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. The same read reports the throwing derivation's recovery, \"skip\", once more on 2.0. This covers only an onErrorRecovery \"skip\" of a fuzz derivation's own error, extra on 2.0, and only with that read's extra warning in the same case (`requires`). Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-observe-derivation-compute-moved",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "derivation"
+            },
+            "type": "derivation.compute",
+            "value": {
+              "$like": "derivedValue"
+            }
+          }
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. That read computes a derivation one step earlier than 1.35, which computes it at its next read. This covers only a derivation.compute that moved one step earlier on 2.0 (`by` -1); its value is still compared. Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onDerivationCompute-moved",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": [
+            {
+              "$like": "derivation"
+            },
+            {
+              "$like": "derivedValue"
+            },
+            {
+              "$like": "dependencyKeys"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. The same compute, as onDerivationCompute reports it, one step earlier on 2.0. This covers only that move (`by` -1); its value and dependencies are still compared. Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-external-watch-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "watch",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "watch",
+            {
+              "$like": "distributableSnapshot"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. Row (bx) itself in the fuzz model (the U1 entry `l12-bx-watch-hears-included-fact` covers its scenario): the write of an included fact that changes the snapshot calls the watch back on 2.0, where 1.35 waits for a derivation to move. This covers only an extra \"watch\" callback carrying a distributable snapshot (`distributableSnapshot`), in a case whose watch includes facts. Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
   }
 ]

@@ -647,3 +647,125 @@ describe("L12 probe pins (development)", () => {
     system.destroy();
   });
 });
+
+// The L12 gate's mutation pins (run 3): the feature-layer mutants of
+// getDistributableSnapshot and watchDistributableSnapshot the gate=L12 run
+// 44937079779 left alive or unreached (engine.ts 4138 to 4256): the full
+// unknown-key warnings, "(none)" when nothing is available, exclusions in a
+// snapshot and in a watch, a watch of every derivation, and metadata. Both
+// engines print and behave the same (core-next api/distributable.ts).
+function bare() {
+  return createModule("bare", {
+    schema: { facts: {}, derivations: {}, events: {}, requirements: {} },
+    init: () => {},
+    derive: {},
+  } as never);
+}
+
+describe("L12 gate mutation pins (development)", () => {
+  it("U4: the unknown-key warnings name the ignored keys and every available one", () => {
+    const system = started();
+    system.getDistributableSnapshot({
+      includeDerivations: ["display", "nope"],
+      includeFacts: ["count", "missing"],
+    });
+
+    expect(warned()).toEqual([
+      "[Directive] getDistributableSnapshot: Unknown derivation keys ignored: nope. Available: display, boom, none",
+      "[Directive] getDistributableSnapshot: Unknown fact keys ignored: missing. Available: name, count, plan",
+    ]);
+    system.destroy();
+  });
+
+  it("U4: with nothing available the warnings say (none)", () => {
+    const system = createSystem({ module: bare() } as never) as any;
+    system.start();
+    const snapshot = system.getDistributableSnapshot({
+      includeDerivations: ["nope"],
+      includeFacts: ["missing"],
+    });
+
+    expect(snapshot.data).toEqual({});
+    expect(warned()).toEqual([
+      "[Directive] getDistributableSnapshot: Unknown derivation keys ignored: nope. Available: (none)",
+      "[Directive] getDistributableSnapshot: Unknown fact keys ignored: missing. Available: (none)",
+    ]);
+    system.destroy();
+  });
+
+  it("U4: excludeDerivations leaves those derivations out, with or without an include list", () => {
+    const system = started();
+
+    expect(
+      Object.keys(
+        system.getDistributableSnapshot({ excludeDerivations: ["boom"] }).data,
+      ).sort(),
+    ).toEqual(["display", "none"]);
+    expect(
+      system.getDistributableSnapshot({
+        includeDerivations: ["display", "boom"],
+        excludeDerivations: ["display"],
+      }).data,
+    ).toEqual({ boom: 1 });
+    expect(warned()).toEqual([]);
+    system.destroy();
+  });
+
+  it("U4: metadata is carried as given", () => {
+    const system = started();
+    const snapshot = system.getDistributableSnapshot({
+      includeDerivations: ["display"],
+      metadata: { source: "pin", n: 1 },
+    });
+
+    expect(snapshot.metadata).toEqual({ source: "pin", n: 1 });
+    expect(
+      "metadata" in system.getDistributableSnapshot({ includeDerivations: [] }),
+    ).toBe(false);
+    system.destroy();
+  });
+
+  it("a watch with no include list watches every derivation, less its exclusions", async () => {
+    const system = started();
+    const all: any[] = [];
+    const some: any[] = [];
+    const stopAll = system.watchDistributableSnapshot({}, (s: any) =>
+      all.push(s.data),
+    );
+    const stopSome = system.watchDistributableSnapshot(
+      { excludeDerivations: ["display", "none"] },
+      (s: any) => some.push(s.data),
+    );
+
+    system.facts.name = "Bo";
+    await wait();
+    expect(all).toEqual([{ display: "Bo (1)", boom: 1, none: undefined }]);
+    expect(some).toEqual([]);
+    system.facts.count = 0;
+    await wait();
+    expect(all).toHaveLength(2);
+    expect(some).toEqual([{ boom: 0 }]);
+    stopAll();
+    stopSome();
+    system.destroy();
+  });
+
+  it("a watch whose exclusions remove every derivation warns and never calls", async () => {
+    const system = started();
+    const calls: unknown[] = [];
+    const stop = system.watchDistributableSnapshot(
+      { excludeDerivations: ["display", "boom", "none"] },
+      (s: unknown) => calls.push(s),
+    );
+
+    system.facts.name = "Bo";
+    system.facts.count = 0;
+    await wait();
+    expect(calls).toEqual([]);
+    expect(warned()).toEqual([
+      "[Directive] watchDistributableSnapshot: No derivations to watch. Callback will never be called.",
+    ]);
+    stop();
+    system.destroy();
+  });
+});

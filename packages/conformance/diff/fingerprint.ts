@@ -117,6 +117,54 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
    */
   thrownError: (v) =>
     typeof v === "string" && /^[a-z]\.[dx]\d+ throws at \d+$/.test(v),
+  /**
+   * The error a fuzz derivation throws, derivations only: `a.d2 throws at
+   * 4` (row (bx)'s knock-on entries, L12 gate run 3). Hand-named.
+   */
+  derivationThrownMessage: (v) =>
+    typeof v === "string" && /^[a-z]\.d\d+ throws at \d+$/.test(v),
+  /**
+   * A fuzz derivation's value: a boolean (a threshold), a number (a sum) or
+   * a string (an L11 `$template`). Hand-named.
+   */
+  derivedValue: (v) =>
+    typeof v === "boolean" ||
+    typeof v === "string" ||
+    (typeof v === "number" && Number.isFinite(v)),
+  /**
+   * A derivation's dependency keys as `onDerivationCompute` passes them:
+   * fuzz fact or derivation keys, own or namespaced (`f0`, `a::d1`, the
+   * Date fact `when`, the L11 string fact `tx`). Hand-named.
+   */
+  dependencyKeys: (v) =>
+    Array.isArray(v) &&
+    v.every(
+      (x) => typeof x === "string" && /^([a-z]::)?([fd]\d+|when|tx)$/.test(x),
+    ),
+  /**
+   * A distributable snapshot as a watch passes it (L12): `createdAt` and
+   * `data`, a plain object, with `version` (a string) and `expiresAt` (an
+   * integer) when the options ask for them. Row (bx)'s fuzz entry names it.
+   * Hand-named.
+   */
+  distributableSnapshot: (v) => {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      return false;
+    }
+    const o = v as Record<string, Json | undefined>;
+    const keys = Object.keys(o).filter((k) => o[k] !== undefined);
+    const allowed = new Set(["createdAt", "data", "version", "expiresAt"]);
+
+    return (
+      keys.every((k) => allowed.has(k)) &&
+      Number.isInteger(o.createdAt) &&
+      o.data !== null &&
+      typeof o.data === "object" &&
+      !Array.isArray(o.data) &&
+      (o.version === undefined || typeof o.version === "string") &&
+      (o.expiresAt === undefined || Number.isInteger(o.expiresAt))
+    );
+  },
   /** A derivation or effect id, own or namespaced: `d0`, `b::x1`. */
   thrower: (v) => typeof v === "string" && /^([a-z]::)?[dx]\d+$/.test(v),
   /** A fuzz fact's key, own or namespaced: `f0`, `a::f1`. */
@@ -421,6 +469,41 @@ export const TEXT: Record<string, (v: Json | undefined) => boolean> = {
    * only (bc)'s own failure, and any other import failure (a bad snapshot
    * list, a non-number index) stays unexplained.
    */
+  /**
+   * Row (bx)'s knock-on (L12 gate run 3): the development warning 2.0's
+   * extra distributable-snapshot read prints when a fuzz derivation throws
+   * (core-next api/distributable.ts), word for word:
+   * `[Directive] getDistributableSnapshot: Skipping derivation "a::d2" due
+   * to error:`. Only a derivation id, plain or namespaced. Hand-named.
+   */
+  distributableSkipped: (v) =>
+    typeof v === "string" &&
+    /^\[Directive\] getDistributableSnapshot: Skipping derivation "([a-z]::)?d\d+" due to error:$/.test(
+      v,
+    ),
+  /**
+   * The error that warning carries: a fuzz derivation's own thrown error,
+   * exactly `{ $error: { name: "Error", message: "a.d2 throws at 4" } }`
+   * (an effect's, `a.x0 throws at 4`, is outside it). Hand-named.
+   */
+  derivationThrown: (v) => {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      return false;
+    }
+    const e = (v as Record<string, Json>).$error;
+    if (e === null || typeof e !== "object" || Array.isArray(e)) {
+      return false;
+    }
+    const o = e as Record<string, Json>;
+
+    return (
+      Object.keys(v).length === 1 &&
+      Object.keys(o).length === 2 &&
+      o.name === "Error" &&
+      typeof o.message === "string" &&
+      /^[a-z]\.d\d+ throws at \d+$/.test(o.message)
+    );
+  },
   historyIndexNotASnapshot: (v) => {
     if (v === null || typeof v !== "object" || Array.isArray(v)) {
       return false;

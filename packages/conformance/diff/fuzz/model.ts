@@ -2695,6 +2695,14 @@ const TRIGGERS = {
     spec.steps.some((s) => s.op === "distributable"),
   /** L12: a watched distributable snapshot. */
   distributableWatch: (spec) => (spec.plugins?.watch ?? null) !== null,
+  /**
+   * Row (bx)'s knock-on (L12 gate run 3, on the owner's instruction): the
+   * watch includes facts (`includeFacts`), so 2.0's fact subscription
+   * re-reads the snapshot (core-next api/distributable.ts :53, :89, the
+   * subscription at :158) and computes every derivation it holds one step
+   * earlier than 1.35's watch does.
+   */
+  watchIncludesFacts: (spec) => (spec.plugins?.watch?.facts.length ?? 0) > 0,
   /** L12: the audit ledger, recorded by its `ledger` steps. */
   auditLedger: (spec) => spec.plugins?.ledger === true,
   /** L12: the logging plugin. */
