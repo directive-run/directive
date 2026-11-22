@@ -202,55 +202,16 @@ describe("row (az): the ledger's inserted navigate entries, and nothing else", (
   });
 });
 
-describe("rows (az) and (bi) in the logging plugin: one log line each, and no other", () => {
-  const log = (level: string, message: string): TraceEntry =>
-    ({ k: "external", data: ["log", level, message] }) as TraceEntry;
-  const JUMP = log("info", "[Directive] timetravel.jump");
-  const TRACE = log("debug", "[Directive] trace.complete");
-  const shared = [
-    log("error", "[Directive] resolver.error"),
-    log("debug", "[Directive] reconcile.start"),
-    log("debug", "[Directive] reconcile.end"),
-  ];
-  const ids = [
-    "l12-fuzz-az-external-log-timetravel-jump-extra",
-    "l12-fuzz-bi-external-log-trace-complete-extra",
-  ];
-  const left = (candidate: TraceEntry[], triggers: string[]) =>
-    explain(
-      FUZZ_SCENARIO,
-      compareContract(stepped(0, shared), stepped(0, candidate), "v2"),
-      ids.map(entry),
-      triggers,
-    ).unexplained.map((d) => `${d.op} ${d.path ?? ""}`.trim());
-  const [error, start, end] = shared as [TraceEntry, TraceEntry, TraceEntry];
-
-  it("an extra line pairs by text: only it is extra, the later lines pair with their own", () => {
-    expect(left([error, TRACE, start, end], [])).toEqual(["extra"]);
-  });
-
-  it("control: each line is excused under its own trigger", () => {
-    expect(left([error, TRACE, start, end], ["traceRing"])).toEqual([]);
-    expect(left([JUMP, error, start, end], ["replayedOrImported"])).toEqual([]);
-  });
-
-  it("under the other row's trigger, another line, or a second line, it fails", () => {
-    expect(left([JUMP, error, start, end], ["traceRing"])).toEqual(["extra"]);
-    expect(left([error, TRACE, start, end], ["replayedOrImported"])).toEqual([
-      "extra",
-    ]);
-    expect(
-      left(
-        [error, log("info", "[Directive] trace.complete"), start, end],
-        ["traceRing"],
-      ),
-    ).toEqual(["extra"]);
-    expect(
-      left(
-        [error, log("debug", "[Directive] effect.run"), start, end],
-        ["traceRing", "replayedOrImported"],
-      ),
-    ).toEqual(["extra"]);
-    expect(left([error, start, end, end], ["traceRing"])).toEqual(["extra"]);
+// Rows (az) and (bi)'s logging-plugin twins (run 1) are gone (L12 gate run
+// 4): the lines are no longer compared across engines, only checked per
+// engine against the hook records they report (diff/log-projection.ts, on
+// the owner's "Project, don't sign copies (Recommended)", 2026-11-22), and
+// those hook records stay under (az)'s and (bi)'s own entries. Self-test:
+// diff/self/l12-gate-run4.test.ts.
+describe("rows (az) and (bi): no logging-plugin twin is left", () => {
+  it("neither run-1 log twin is signed any more", () => {
+    const ids = readDivergences().map((d) => d.id);
+    expect(ids).not.toContain("l12-fuzz-az-external-log-timetravel-jump-extra");
+    expect(ids).not.toContain("l12-fuzz-bi-external-log-trace-complete-extra");
   });
 });

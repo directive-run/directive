@@ -59,10 +59,12 @@ import { type CoreApi, type EngineHandle, engines } from "./engines.js";
 import {
   type Bound,
   type Excuse,
+  LIKE,
   admits,
   excuseFor,
   names,
 } from "./fingerprint.js";
+import { logProjectionProblems } from "./log-projection.js";
 import { type Json, normalize } from "./normalize.js";
 import {
   type Recorder,
@@ -533,10 +535,22 @@ export interface Divergence {
   repeats?: true;
   /**
    * Op `moved` only: which way the engine's record moved, one step later
-   * (1, the default) or one step earlier (-1) than the reference's
-   * (`fileMoves`, `Difference.by`).
+   * (1, the default), one step earlier (-1) than the reference's, or
+   * earlier in the same step (0) (`fileMoves`, `Difference.by`).
    */
-  by?: 1 | -1;
+  by?: 1 | -1 | 0;
+  /**
+   * Op `moved` only (L12 gate run 4): a path both records must hold equal,
+   * such as a compute's id (`args[0]`, `event.id`), so a move between two
+   * different records is never excused.
+   */
+  same?: string;
+  /**
+   * Fuzz only (L12 gate run 4): the entry covers a derivation's record only
+   * while, on the reference, that derivation's last compute threw or it
+   * has never computed (`Difference.stale`, `markStale`).
+   */
+  stale?: true;
   reason: string;
   approvedBy: string;
   date: string;
@@ -554,6 +568,13 @@ export interface Requirement {
    * (ap) moves).
    */
   order?: "any";
+  /**
+   * A path (`data[1].version`, `args[0]`) the other difference's record
+   * must hold equal to the covered one's (L12 gate run 4): a watch callback
+   * 2.0 lacks is excused only by its own earlier delivery of the same
+   * snapshot version.
+   */
+  same?: string;
 }
 
 /** The scenario name every fuzz case runs under (diff/fuzz/model.ts `toScenario`). */
@@ -1324,6 +1345,30 @@ function engineStep(d: Difference): number {
   return d.op === "moved" ? d.step + (d.by ?? 1) : d.step;
 }
 
+/** The value at `path` (`a.b[0].c`) in `value`. */
+export function valueAt(
+  value: Json | undefined,
+  path: string,
+): Json | undefined {
+  let v: Json | undefined = value;
+  for (const part of path
+    .split(/\.|\[(\d+)\]/)
+    .filter((x) => x !== undefined && x !== "")) {
+    if (v === null || typeof v !== "object") {
+      return undefined;
+    }
+    v = Array.isArray(v)
+      ? v[Number(part)]
+      : (v as Record<string, Json | undefined>)[part];
+  }
+
+  return v;
+}
+
+/** A difference's own record: the engine's for an extra, else the reference's. */
+const ownRecord = (d: Difference): Json | undefined =>
+  d.op === "extra" ? d.candidate : d.reference;
+
 /**
  * Whether `div` covers difference `d` of scenario `name`. An entry with
  * `when` covers only in a fuzz case whose `triggers` include every one it
@@ -1346,7 +1391,7 @@ export function covers(
     (div.during === undefined ||
       (name === FUZZ_SCENARIO && steps?.get(engineStep(d)) === div.during)) &&
     div.stream === d.stream &&
-    div.kind === d.kind &&
+    (div.kind === d.kind || (div.kind === "*" && d.stream === "notify")) &&
     (div.engine === undefined || div.engine === d.engine) &&
     (div.step === undefined || div.step === d.step) &&
     (div.op === undefined || div.op === d.op) &&
@@ -1359,6 +1404,12 @@ export function covers(
     (div.repeats !== true ||
       (name === FUZZ_SCENARIO && d.op === "missing" && d.repeat === true)) &&
     (div.op !== "moved" || (div.by ?? 1) === (d.by ?? 1)) &&
+    (div.same === undefined ||
+      (d.op === "moved" &&
+        valueAt(d.reference, div.same) !== undefined &&
+        JSON.stringify(valueAt(d.reference, div.same)) ===
+          JSON.stringify(valueAt(d.candidate, div.same)))) &&
+    (div.stale !== true || (name === FUZZ_SCENARIO && d.stale === true)) &&
     (div.bound === undefined || admits(div.bound, d)) &&
     (div.requires === undefined ||
       (name === FUZZ_SCENARIO && meets(div.requires, d, context ?? []))) &&
@@ -1382,6 +1433,28 @@ export function meets(
   context: readonly Difference[],
 ): boolean {
   const at = latestPosition(d);
+  if (req.same !== undefined) {
+    // Scanned, not memoized as below: only an entry with `same` reads it,
+    // and it covers a few watch or compute records a case.
+    const want = valueAt(ownRecord(d), req.same);
+    if (want === undefined) {
+      return false;
+    }
+    const key = JSON.stringify(want);
+
+    return context.some(
+      (x) =>
+        x !== d &&
+        x.engine === d.engine &&
+        x.stream === req.stream &&
+        x.kind === req.kind &&
+        x.op === req.op &&
+        (req.bound === undefined || admits(req.bound, x)) &&
+        JSON.stringify(valueAt(ownRecord(x), req.same as string)) === key &&
+        (req.order === "any" ||
+          comparePositions(latestPosition(x), at, 3) <= 0),
+    );
+  }
   // The two earliest differences `req` describes on `d`'s engine (one may
   // be `d` itself, which never counts): whether any is at or before `d` is
   // whether the earliest other one is. Found once per context and entry,
@@ -1766,6 +1839,99 @@ export function stopsBefore(
   return where[0] < step || (where[0] === step && where[1] < phase);
 }
 
+/** A derivation record's id: a compute, an invalidation or a notify. */
+function derivationIdOf(e: Json | undefined): string | undefined {
+  const r = e as Record<string, Json> | null | undefined;
+  if (r === null || typeof r !== "object") {
+    return undefined;
+  }
+  const id =
+    r.k === "hook" &&
+    (r.hook === "onDerivationCompute" || r.hook === "onDerivationInvalidate")
+      ? (r.args as Json[] | undefined)?.[0]
+      : r.k === "observe" &&
+          (r.event as Record<string, Json> | null)?.type ===
+            "derivation.compute"
+        ? (r.event as Record<string, Json>).id
+        : r.k === "notify"
+          ? r.id
+          : undefined;
+
+  return typeof id === "string" && LIKE.snapshotDerivation?.(id) === true
+    ? id
+    : undefined;
+}
+
+/**
+ * Mark `Difference.stale` (L12 gate run 4, row (bx)'s re-tracked
+ * derivation): a difference of a derivation's record whose derivation, on
+ * the reference just before it (a missing or moved record: before its own
+ * index; an extra: through the last paired record before it), had never
+ * computed or last threw (a `notify` of a thrown value, or an `onError`
+ * from that derivation). Returns `differences`, marked in place.
+ */
+export function markStale(
+  differences: Difference[],
+  reference: TraceEntry[],
+): Difference[] {
+  let timeline: Map<string, [number, boolean][]> | undefined;
+  for (const d of differences) {
+    const id = derivationIdOf(d.op === "extra" ? d.candidate : d.reference);
+    if (id === undefined) {
+      continue;
+    }
+    if (timeline === undefined) {
+      timeline = new Map();
+      for (const [i, e] of reference.entries()) {
+        const ok =
+          e.k === "hook" && e.hook === "onDerivationCompute"
+            ? (e.args[0] as string)
+            : undefined;
+        const threw =
+          e.k === "notify" &&
+          e.value !== null &&
+          typeof e.value === "object" &&
+          "$throws" in (e.value as object)
+            ? e.id
+            : e.k === "hook" &&
+                e.hook === "onError" &&
+                (e.args[0] as { $error?: { source?: Json } })?.$error
+                  ?.source === "derivation"
+              ? ((e.args[0] as { $error: { sourceId?: Json } }).$error
+                  .sourceId as string | undefined)
+              : undefined;
+        for (const [who, fresh] of [
+          [ok, true],
+          [threw, false],
+        ] as const) {
+          if (typeof who === "string") {
+            const list = timeline.get(who) ?? [];
+            list.push([i, fresh]);
+            timeline.set(who, list);
+          }
+        }
+      }
+    }
+    const before =
+      d.op === "extra" ? d.shared.reference + 1 : (d.at.reference as number);
+    let fresh = false;
+    for (const [i, f] of timeline.get(id) ?? []) {
+      if (i >= before) {
+        break;
+      }
+      fresh = f;
+    }
+    if (!fresh) {
+      d.stale = true;
+    }
+  }
+
+  return differences;
+}
+
+/** How many unpaired extras of a step `fileMoves` tries for one missing record. */
+export const MOVE_SCAN = 32;
+
 /**
  * File moves (`Difference.op` "moved"): a missing record in step N and the
  * first unpaired extra record of the same engine, stream and kind in step
@@ -1814,27 +1980,48 @@ export function fileMoves(
     // One step later first (the first kind of move), then one step earlier.
     let moved: Difference | undefined;
     let x: Difference | undefined;
-    for (const by of [1, -1] as const) {
-      x = extras.get(key(m, m.step + by))?.find((d) => !taken.has(d));
-      if (!x) {
-        continue;
+    // Then, L12 gate run 4, earlier in the same step (`by` 0). Of the
+    // unpaired extras of that step, the first one a signed entry covers as a
+    // move (an entry with `same` covers only a move between equal ids).
+    for (const by of [1, -1, 0] as const) {
+      // At most MOVE_SCAN untaken extras each: a runaway case's step can
+      // hold a cascade of thousands, and the scan stays linear.
+      let scanned = 0;
+      for (const e of extras.get(key(m, m.step + by)) ?? []) {
+        if (taken.has(e)) {
+          continue;
+        }
+        if (++scanned > MOVE_SCAN) {
+          break;
+        }
+        if (
+          by === 0 &&
+          comparePositions(latestPosition(e), latestPosition(m), 3) >= 0
+        ) {
+          continue;
+        }
+        const { raw: _raw, ...base } = m;
+        const candidate: Difference = {
+          ...base,
+          op: "moved",
+          ...(by === 1 ? {} : { by }),
+          candidate: e.candidate,
+          at: { reference: m.at.reference, candidate: e.at.candidate },
+          where: { reference: m.where.reference, candidate: e.where.candidate },
+          shared:
+            m.shared.reference <= e.shared.reference ? m.shared : e.shared,
+        };
+        if (
+          movers.some((div) =>
+            covers(div, name, candidate, triggers, steps, differences),
+          )
+        ) {
+          moved = candidate;
+          x = e;
+          break;
+        }
       }
-      const { raw: _raw, ...base } = m;
-      const candidate: Difference = {
-        ...base,
-        op: "moved",
-        ...(by === -1 ? { by } : {}),
-        candidate: x.candidate,
-        at: { reference: m.at.reference, candidate: x.at.candidate },
-        where: { reference: m.where.reference, candidate: x.where.candidate },
-        shared: m.shared.reference <= x.shared.reference ? m.shared : x.shared,
-      };
-      if (
-        movers.some((div) =>
-          covers(div, name, candidate, triggers, steps, differences),
-        )
-      ) {
-        moved = candidate;
+      if (moved) {
         break;
       }
     }
@@ -2036,7 +2223,7 @@ export async function runScenario(
   const advisories: string[] = [];
   const steps = stepOps(first);
   for (const [engine, trace] of Object.entries(theirs)) {
-    const compared = compareContract(first, trace, engine);
+    const compared = markStale(compareContract(first, trace, engine), first);
     const contractDiffs = fileMoves(
       def.name,
       compared,
@@ -2125,6 +2312,14 @@ export async function runScenario(
   // A drawn delay is incidental to the comparison but must stay in bounds,
   // on the reference and on every engine under test: the same values the
   // comparison masks (the reference's drawn resolvers) are checked.
+  for (const problem of logProjectionProblems(
+    again,
+    def.triggers?.includes("loggingPlugin") === true,
+  )) {
+    problems.push(
+      `${reference.name} (second run) in scenario "${def.name}": ${problem}`,
+    );
+  }
   const drawn = drawnResolvers(first);
   for (const [engine, trace] of [
     [reference.name, first],
@@ -2134,6 +2329,12 @@ export async function runScenario(
       problems.push(`${engine} in scenario "${def.name}": ${problem}`);
     }
     for (const problem of traceIdProblems(trace)) {
+      problems.push(`${engine} in scenario "${def.name}": ${problem}`);
+    }
+    for (const problem of logProjectionProblems(
+      trace,
+      def.triggers?.includes("loggingPlugin") === true,
+    )) {
       problems.push(`${engine} in scenario "${def.name}": ${problem}`);
     }
   }

@@ -134,13 +134,28 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
   /**
    * A derivation's dependency keys as `onDerivationCompute` passes them:
    * fuzz fact or derivation keys, own or namespaced (`f0`, `a::d1`, the
-   * Date fact `when`, the L11 string fact `tx`). Hand-named.
+   * Date fact `when`, the L11 string fact `tx`), and a derivation read by
+   * another as 1.35 and 2.0 name it, `derive.<id>` (`derive.d0`,
+   * `derive.a::d0`; L12 gate run 4, PR seed 2), and the `module` step's
+   * module's facts `z::g0`, `z::g1` (PR seed 19). Hand-named.
    */
   dependencyKeys: (v) =>
     Array.isArray(v) &&
     v.every(
-      (x) => typeof x === "string" && /^([a-z]::)?([fd]\d+|when|tx)$/.test(x),
+      (x) =>
+        typeof x === "string" &&
+        (/^([a-z]::)?([fd]\d+|when|tx)$/.test(x) ||
+          /^derive\.([a-z]::)?d\d+$/.test(x) ||
+          /^z::g[01]$/.test(x)),
     ),
+  /**
+   * A derivation a distributable snapshot can hold (row (bx)'s knock-on,
+   * L12 gate run 4): a fuzz derivation (`derivation`), or `z::h0`, the one
+   * derivation of the module a `module` step registers (diff/fuzz/model.ts
+   * `extraModule`; PR seed 19). Hand-named.
+   */
+  snapshotDerivation: (v) =>
+    typeof v === "string" && /^(([a-z]::)?d\d+|z::h0)$/.test(v),
   /**
    * A distributable snapshot as a watch passes it (L12): `createdAt` and
    * `data`, a plain object, with `version` (a string) and `expiresAt` (an

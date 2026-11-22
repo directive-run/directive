@@ -886,6 +886,8 @@ export interface DivergenceEntry {
   bound?: unknown;
   requires?: unknown;
   by?: unknown;
+  same?: unknown;
+  stale?: unknown;
   afterOp?: unknown;
   repeats?: unknown;
   reason: string;
@@ -915,6 +917,8 @@ const DIVERGENCE_OPTIONAL = [
   "path",
   "repeats",
   "requires",
+  "same",
+  "stale",
   "step",
   "when",
 ];
@@ -1126,9 +1130,11 @@ export function checkDivergences(
         typeof r.kind !== "string" ||
         !["missing", "extra", "changed", "moved"].includes(r.op as string) ||
         Object.keys(r).some(
-          (k) => !["stream", "kind", "op", "bound", "order"].includes(k),
+          (k) =>
+            !["stream", "kind", "op", "bound", "order", "same"].includes(k),
         ) ||
         (r.order !== undefined && r.order !== "any") ||
+        (r.same !== undefined && (typeof r.same !== "string" || !r.same)) ||
         (r.bound !== undefined &&
           !Array.isArray((r.bound as { match?: unknown })?.match))
       ) {
@@ -1156,10 +1162,36 @@ export function checkDivergences(
     }
     if (
       e.by !== undefined &&
-      (e.op !== "moved" || ![1, -1].includes(e.by as number))
+      (e.op !== "moved" || ![1, -1, 0].includes(e.by as number))
     ) {
       fail(
-        `${label} has by, which only a moved entry may have, as 1 (one step later) or -1 (one step earlier)`,
+        `${label} has by, which only a moved entry may have, as 1 (one step later), -1 (one step earlier) or 0 (earlier in the same step)`,
+      );
+    }
+    if (
+      e.same !== undefined &&
+      (e.op !== "moved" || typeof e.same !== "string" || !e.same)
+    ) {
+      fail(
+        `${label} has same, which only a moved entry may have: the path both records must hold equal`,
+      );
+    }
+    if (
+      e.stale !== undefined &&
+      (e.stale !== true || e.scenario !== FUZZ_SCENARIO)
+    ) {
+      fail(
+        `${label} stale must be true, on a fuzz entry only: it covers a derivation's record while the reference's last compute of it threw or never ran`,
+      );
+    }
+    if (
+      e.kind === "*" &&
+      (e.stream !== "notify" ||
+        e.scenario !== FUZZ_SCENARIO ||
+        !Array.isArray((e.bound as { match?: unknown } | undefined)?.match))
+    ) {
+      fail(
+        `${label} has kind "*", which only a fuzz notify entry with a bound may have`,
       );
     }
     if (e.group !== undefined) {

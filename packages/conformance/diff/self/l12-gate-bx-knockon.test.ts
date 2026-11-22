@@ -18,8 +18,10 @@ import {
   readDivergences,
 } from "../scenario.js";
 
-const BX = readDivergences().filter((d) =>
-  ["row-bx", "row-bx-logging"].includes(d.group ?? ""),
+const BX = readDivergences().filter(
+  (d) =>
+    ["row-bx", "row-bx-logging"].includes(d.group ?? "") &&
+    d.reason.includes("(L12 gate run 3)"),
 );
 const IDS = [
   "l12-fuzz-bx-console-warn-distributable-skip-extra",
@@ -28,14 +30,6 @@ const IDS = [
   "l12-fuzz-bx-observe-derivation-compute-moved",
   "l12-fuzz-bx-hook-onDerivationCompute-moved",
   "l12-fuzz-bx-external-watch-extra",
-  "l12-fuzz-bx-external-log-error-extra",
-  "l12-fuzz-bx-external-log-error-recovery-extra",
-  "l12-fuzz-bx-external-log-derivation-compute-moved",
-];
-const LOGGED = [
-  "l12-fuzz-bx-external-log-error-extra",
-  "l12-fuzz-bx-external-log-error-recovery-extra",
-  "l12-fuzz-bx-external-log-derivation-compute-moved",
 ];
 const ON = ["watchIncludesFacts", "distributableWatch"];
 
@@ -115,11 +109,7 @@ describe("row (bx)'s knock-on: the extra read's records, and no other", () => {
       expect(d.reason).toContain(
         '"I approve you for to do everything" (2026-11-15)',
       );
-      expect(d.when).toEqual(
-        LOGGED.includes(d.id)
-          ? ["watchIncludesFacts", "loggingPlugin"]
-          : ["watchIncludesFacts"],
-      );
+      expect(d.when).toEqual(["watchIncludesFacts"]);
       expect(d.approvedBy).toBe("Jason Comes");
     }
   });
@@ -199,64 +189,12 @@ describe("row (bx)'s knock-on: the extra read's records, and no other", () => {
     ]);
   });
 
-  describe("the logging plugin's lines for the same records", () => {
-    const log = (level: string, text: string) =>
-      ({
-        k: "external",
-        data: ["log", level, `[Directive] ${text}`],
-      }) as TraceEntry;
-    const LOG = [...ON, "loggingPlugin"];
-    const errLog = log("error", "error");
-    const recLog = log("warn", "error.recovery");
-    const cmpLog = log("debug", "derivation.compute");
-
-    it("control: each line beside its record is excused", () => {
-      expect(
-        left(
-          [...step(12, []), ...step(13, [cmpLog])],
-          [
-            ...step(12, [
-              cmpLog,
-              errLog,
-              onError(),
-              recLog,
-              onRecovery(),
-              warn(),
-            ]),
-            ...step(13, []),
-          ],
-          LOG,
-        ),
-      ).toEqual([]);
-    });
-
-    it("without the logging plugin, or without the extra hook record, the lines fail", () => {
-      const v2Lines = step(12, [
-        errLog,
-        onError(),
-        recLog,
-        onRecovery(),
-        warn(),
-      ]);
-      expect(left([], v2Lines, ON).sort()).toEqual([
-        "extra external log 12",
-        "extra external log 12",
-      ]);
-      expect(left([], step(12, [errLog, recLog, warn()]), LOG)).toEqual([
-        "extra external log 12",
-        "extra external log 12",
-      ]);
-      // Another log line, or the compute line one step later.
-      expect(
-        left([], step(12, [log("error", "boom"), onError(), warn()]), LOG),
-      ).toEqual(["extra external log 12"]);
-      expect(
-        left(
-          [...step(12, [cmpLog]), ...step(13, [])],
-          [...step(12, []), ...step(13, [cmpLog])],
-          LOG,
-        ).sort(),
-      ).toEqual(["extra external log 13", "missing external log 12"]);
-    });
+  // The run-3 logging twins (group row-bx-logging) are gone (L12 gate run
+  // 4): log lines are checked per engine (diff/log-projection.ts), not
+  // compared, so nothing double-covers. diff/self/l12-gate-run4.test.ts.
+  it("no row-bx-logging entry is left", () => {
+    expect(
+      readDivergences().filter((d) => d.group === "row-bx-logging"),
+    ).toEqual([]);
   });
 });

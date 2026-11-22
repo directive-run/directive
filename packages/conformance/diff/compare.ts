@@ -50,6 +50,7 @@
  * divergence covers and no further (scenario.ts `explain`).
  */
 
+import { isLogLine } from "./log-projection.js";
 import type { Json } from "./normalize.js";
 import type { TraceEntry } from "./record.js";
 
@@ -95,9 +96,17 @@ export interface Difference {
   op: "missing" | "extra" | "changed" | "moved";
   /**
    * For `moved` only: -1 when the engine's record came one step earlier
-   * (in step N - 1); absent when it came one step later, the default.
+   * (in step N - 1), 0 when it came earlier in the same step (L12 gate run
+   * 4); absent when it came one step later, the default.
    */
-  by?: -1;
+  by?: -1 | 0;
+  /**
+   * Set by `markStale` (diff/scenario.ts) on a fuzz difference of a
+   * derivation's record (its compute, invalidation or notify) when, on the
+   * reference at that point, the derivation's last compute threw or it has
+   * never computed. Only an entry with `stale` reads it.
+   */
+  stale?: true;
   /** For `changed`: where inside the entry. */
   path?: string;
   /**
@@ -487,6 +496,12 @@ function kindOf(entry: TraceEntry): [Stream, string] | null {
     case "unhandled":
       return ["error", "unhandled"];
     case "external": {
+      // The logging plugin's lines are checked per engine, against the hook
+      // records they report (diff/log-projection.ts; owner, 2026-11-22:
+      // "Project, don't sign copies (Recommended)"), and not compared here.
+      if (isLogLine(entry)) {
+        return null;
+      }
       const tag = Array.isArray(entry.data) ? entry.data[0] : entry.data;
 
       return ["external", typeof tag === "string" ? tag : "external"];
@@ -987,23 +1002,28 @@ const traceRunText = (k: Keyed, project: (entry: TraceEntry) => Json) =>
     : "";
 
 /**
- * In the external stream, a fuzz logging plugin's record (`["log", level,
- * message]`, diff/fuzz/model.ts) as compared, and "" for every other
- * external: `lcs` breaks ties by it, as for `traceRunText`. Every log line
- * has the kind `log`, so by keys alone a line 2.0 logs and 1.35 does not
- * (row (az)'s `timetravel.jump`, row (bi)'s late `trace.complete`) took the
- * next line's place and every later line in its step and phase was paired
- * with the one before it, a `changed` on its level and message (L12 gate,
- * the census seed's plugin phase). The pairing is still a longest one, so
- * no record that is missing or extra by keys pairs. Self-test:
- * diff/self/l12-gate-classes.test.ts.
+ * A derivation compute's id (`onDerivationCompute`'s first argument, a
+ * `derivation.compute` observation's `id`), and "" for every other record:
+ * `lcs` breaks ties by it, as for `traceRunText`. By keys alone, 1.35's
+ * [b::d0, z::h0] in one step against 2.0's [b::d0] (2.0 computed z::h0 a
+ * step earlier, row (bx)'s knock-on) could pair 1.35's z::h0 with 2.0's
+ * b::d0, a `changed` on every field, and leave 1.35's b::d0 to a move
+ * against 2.0's z::h0 (L12 gate run 3, PR seed 19). The pairing is still a
+ * longest one, so no record that is missing or extra by keys pairs.
+ * Self-test: diff/self/l12-gate-run4.test.ts.
  */
-const logLineText = (k: Keyed, project: (entry: TraceEntry) => Json) =>
-  k.entry.k === "external" &&
-  Array.isArray(k.entry.data) &&
-  k.entry.data[0] === "log"
-    ? JSON.stringify(project(k.entry))
-    : "";
+const computeIdText = (k: Keyed) => {
+  const e = k.entry;
+  const id =
+    e.k === "hook" && e.hook === "onDerivationCompute"
+      ? e.args[0]
+      : e.k === "observe" &&
+          (e.event as { type?: unknown } | null)?.type === "derivation.compute"
+        ? (e.event as { id?: Json }).id
+        : undefined;
+
+  return typeof id === "string" ? `compute ${id}` : "";
+};
 
 /**
  * Longest common subsequence of keys: pairs of matched indexes.
@@ -1369,21 +1389,22 @@ function compareWith(
     const a = left.filter((k) => k.stream === stream);
     const b = right.filter((k) => k.stream === stream);
 
-    const runText = (k: Keyed) => traceRunText(k, project);
+    const runText = (k: Keyed) => traceRunText(k, project) || computeIdText(k);
+    const hasCompute = (list: Keyed[]) =>
+      list.some((k) => computeIdText(k) !== "");
     const text =
       stream === "console"
         ? ([a.map(printed), b.map(printed)] as [string[], string[]])
         : stream === "hook" &&
-            a.some((k) => k.kind === "onTraceComplete") &&
-            b.some((k) => k.kind === "onTraceComplete")
+            ((a.some((k) => k.kind === "onTraceComplete") &&
+              b.some((k) => k.kind === "onTraceComplete")) ||
+              (hasCompute(a) && hasCompute(b)))
           ? ([a.map(runText), b.map(runText)] as [string[], string[]])
-          : stream === "external" &&
-              a.some((k) => logLineText(k, project) !== "") &&
-              b.some((k) => logLineText(k, project) !== "")
-            ? ([
-                a.map((k) => logLineText(k, project)),
-                b.map((k) => logLineText(k, project)),
-              ] as [string[], string[]])
+          : stream === "observe" && hasCompute(a) && hasCompute(b)
+            ? ([a.map(computeIdText), b.map(computeIdText)] as [
+                string[],
+                string[],
+              ])
             : undefined;
 
     return { stream, a, b, pairs: lcs(a.map(keyOf), b.map(keyOf), text) };
