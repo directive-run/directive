@@ -4777,5 +4777,96 @@
         "inserted": []
       }
     }
+  },
+  {
+    "group": "quirk-t-batch-error",
+    "why": "PR seed 17 at L12, its second shrink in run 5 of the L12 gate (diff-notes l12gate/r5/specs/pr17b): row t's error shape where the run that errored is the batch run. The batch call's write starts a single resolver that writes the fact back, and the next pass retracts the batch source's constraint while reporting the batch run's error; 1.35 then also cancels the batch requirement, 2.0 reports the error only (the l12-cand-t-batch-error-* entries, signed in run 5 on the owner's instruction). Pinned so the group stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 0,
+          "value": 1
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": null,
+        "delay": 0,
+        "fails": 1,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": 2
+      },
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": false,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
   }
 ]

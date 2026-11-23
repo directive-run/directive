@@ -50699,5 +50699,93 @@
     "reason": "Row (bx)'s knock-on (L12 gate run 5; found by run 4's rerun and triage 5): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again, which computes the derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty, and with no watch, the same case passes (diff-notes l12gate/r5/replay, the nf and nw replays). Found by deep seed 2 (plugins phase): a `module` unregister step removes the watched derivation. 1.35's watch, which hears only that derivation, goes silent; 2.0's fact subscription still reads on each fact write, and the read prints getDistributableSnapshot's own development warning for a key it no longer knows, \"[Directive] getDistributableSnapshot: Unknown derivation keys ignored: <ids>. Available: <ids>\" (the same text 1.35 prints on such a read: core src/core/engine.ts; core-next src/api/distributable.ts). This covers only that warning, extra on 2.0, word for word (`$text` distributableUnknownKeys, diff/fingerprint.ts). The same case's second difference needs no entry of its own: after a `define` step registers the watched derivation again, 2.0's read on the next fact write computes it, and 1.35's watch, which lost its subscription at the unregister, never does; the signed l12-fuzz-bx-*-retracked-extra entries cover that compute now that markStale (diff/scenario.ts) reads a derivation as never computed from its onDefinitionRegister. Visible effect, for the record: one development warning per fact write for as long as the watched derivation stays unregistered. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), with his \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
     "approvedBy": "Jason Comes",
     "date": "2026-11-22"
+  },
+  {
+    "id": "l12-cand-t-batch-error-hook-onResolverCancel-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "afterError": true,
+    "when": ["writeRetracts", "batched", "batchFails"],
+    "group": "quirk-t-batch-error",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, its error shape (GATE-2: \"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01), where the run that errored is the batch run (L12 gate run 5; PR seed 17's second shrink, diff-notes l12gate/r5/specs/pr17b). The batch call writes a fact and fails its item, a single resolver that write starts writes the fact back, and the pass that follows retracts the batch source's constraint while reporting the batch run's error. Both engines report onError, onErrorRecovery, onResolverError and resolver.error for the batch requirement, abort its signal (\"aborted\") and list it under onReconcileEnd's canceled; 1.35 then also reports onResolverCancel for it, carrying only its id, and 2.0 does not. The signed l9-fuzz-t-disable-* entries name a single resolver's full requirement under the `disable` strategy, and l12-cand-t-batch-completed-* cover a batch cancel only after met; this case has neither. This covers only that record for a batch requirement in the id-only shape, in a case with a failing batch (`when` adds batchFails), and only after the run's own error (`afterError`, diff/scenario.ts markAfterError): both engines' last lifecycle hook of that requirement before the cancel is its onResolverError from the batch resolver, with no create, start, completion, met or cancel of it since. A batch cancel 2.0 lacks for a requirement still in flight, one whose error only 1.35 reported, or one created again after the error stays unexcused. Signed on the owner's instruction: GATE-2 records row t's error shape (\"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01, decisions page row t: \"If all are better or non user facing they are all approved\"), as l9-fuzz-t-disable-* quote it, and asked whether to allow a fifth gate run that signs the run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-cand-t-batch-error-hook-onRequirementCanceled-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterError": true,
+    "when": ["writeRetracts", "batched", "batchFails"],
+    "group": "quirk-t-batch-error",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, its error shape (GATE-2: \"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01), where the run that errored is the batch run (L12 gate run 5; PR seed 17's second shrink, diff-notes l12gate/r5/specs/pr17b). The batch call writes a fact and fails its item, a single resolver that write starts writes the fact back, and the pass that follows retracts the batch source's constraint while reporting the batch run's error. Both engines report onError, onErrorRecovery, onResolverError and resolver.error for the batch requirement, abort its signal (\"aborted\") and list it under onReconcileEnd's canceled; 1.35 then also reports onRequirementCanceled for it, carrying only its id, and 2.0 does not. The signed l9-fuzz-t-disable-* entries name a single resolver's full requirement under the `disable` strategy, and l12-cand-t-batch-completed-* cover a batch cancel only after met; this case has neither. This covers only that record for a batch requirement in the id-only shape, in a case with a failing batch (`when` adds batchFails), and only after the run's own error (`afterError`, diff/scenario.ts markAfterError): both engines' last lifecycle hook of that requirement before the cancel is its onResolverError from the batch resolver, with no create, start, completion, met or cancel of it since. A batch cancel 2.0 lacks for a requirement still in flight, one whose error only 1.35 reported, or one created again after the error stays unexcused. Signed on the owner's instruction: GATE-2 records row t's error shape (\"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01, decisions page row t: \"If all are better or non user facing they are all approved\"), as l9-fuzz-t-disable-* quote it, and asked whether to allow a fifth gate run that signs the run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-cand-t-batch-error-observe-requirement-canceled-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterError": true,
+    "when": ["writeRetracts", "batched", "batchFails"],
+    "group": "quirk-t-batch-error",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row t, its error shape (GATE-2: \"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01), where the run that errored is the batch run (L12 gate run 5; PR seed 17's second shrink, diff-notes l12gate/r5/specs/pr17b). The batch call writes a fact and fails its item, a single resolver that write starts writes the fact back, and the pass that follows retracts the batch source's constraint while reporting the batch run's error. Both engines report onError, onErrorRecovery, onResolverError and resolver.error for the batch requirement, abort its signal (\"aborted\") and list it under onReconcileEnd's canceled; 1.35 then also reports the requirement.canceled observe event for it, carrying only its id, and 2.0 does not. The signed l9-fuzz-t-disable-* entries name a single resolver's full requirement under the `disable` strategy, and l12-cand-t-batch-completed-* cover a batch cancel only after met; this case has neither. This covers only that record for a batch requirement in the id-only shape, in a case with a failing batch (`when` adds batchFails), and only after the run's own error (`afterError`, diff/scenario.ts markAfterError): both engines' last lifecycle hook of that requirement before the cancel is its onResolverError from the batch resolver, with no create, start, completion, met or cancel of it since. A batch cancel 2.0 lacks for a requirement still in flight, one whose error only 1.35 reported, or one created again after the error stays unexcused. Signed on the owner's instruction: GATE-2 records row t's error shape (\"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01, decisions page row t: \"If all are better or non user facing they are all approved\"), as l9-fuzz-t-disable-* quote it, and asked whether to allow a fifth gate run that signs the run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
   }
 ]

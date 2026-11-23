@@ -64,7 +64,7 @@ import {
   excuseFor,
   names,
 } from "./fingerprint.js";
-import { logProjectionProblems } from "./log-projection.js";
+import { isLogLine, logProjectionProblems } from "./log-projection.js";
 import { type Json, normalize } from "./normalize.js";
 import {
   type Recorder,
@@ -559,6 +559,16 @@ export interface Divergence {
    * run, a cancel 1.35 adds after the completion (PR seed 17).
    */
   afterMet?: true;
+  /**
+   * Fuzz only, op `missing` (L12 gate run 5): the entry covers a
+   * requirement's cancel record only after both engines reported that
+   * requirement's run failed (its onResolverError, from the same resolver)
+   * and neither has created, started, completed, met or canceled it since
+   * (`Difference.afterError`, `markAfterError`): row t's error shape for a
+   * batch run, a cancel 1.35 adds after the error (PR seed 17's second
+   * shrink).
+   */
+  afterError?: true;
   reason: string;
   approvedBy: string;
   date: string;
@@ -1433,6 +1443,10 @@ export function covers(
     (div.stale !== true || (name === FUZZ_SCENARIO && d.stale === true)) &&
     (div.afterMet !== true ||
       (name === FUZZ_SCENARIO && d.op === "missing" && d.afterMet === true)) &&
+    (div.afterError !== true ||
+      (name === FUZZ_SCENARIO &&
+        d.op === "missing" &&
+        d.afterError === true)) &&
     (div.bound === undefined || admits(div.bound, d)) &&
     (div.requires === undefined ||
       (name === FUZZ_SCENARIO && meets(div.requires, d, context ?? []))) &&
@@ -2076,6 +2090,135 @@ export function markAfterMet(
   return differences;
 }
 
+/** A cancel's three records, in the order 1.35 makes them (`markAfterError`). */
+const CANCEL_ORDER = [
+  "onResolverCancel",
+  "onRequirementCanceled",
+  "requirement.canceled",
+];
+
+/** A record's kind as a difference names it: its hook, or its event's type. */
+function kindOf(e: TraceEntry | undefined): string | undefined {
+  if (e?.k === "hook") {
+    return e.hook;
+  }
+  const type =
+    e?.k === "observe"
+      ? (e.event as { type?: unknown } | null)?.type
+      : undefined;
+
+  return typeof type === "string" ? type : undefined;
+}
+
+/**
+ * Each requirement's lifecycle hooks in `trace`, in order, by id: every
+ * onRequirement* hook (the requirement is its first argument) and every
+ * onResolver* hook (its second), each with the resolver an onResolverError
+ * names, or null for any other hook.
+ */
+function runTimeline(
+  trace: TraceEntry[],
+): Map<string, [number, string | null][]> {
+  const out = new Map<string, [number, string | null][]>();
+  for (const [i, e] of trace.entries()) {
+    if (e.k !== "hook") {
+      continue;
+    }
+    const requirement = e.hook.startsWith("onRequirement")
+      ? e.args[0]
+      : e.hook.startsWith("onResolver")
+        ? e.args[1]
+        : undefined;
+    const id = (requirement as { id?: unknown } | null | undefined)?.id;
+    if (typeof id === "string") {
+      const resolver = e.hook === "onResolverError" ? e.args[0] : null;
+      const list = out.get(id) ?? [];
+      list.push([i, typeof resolver === "string" ? resolver : null]);
+      out.set(id, list);
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Mark `Difference.afterError` (L12 gate run 5, row t's error shape for a
+ * batch run): a cancel record the engine lacks (op `missing`) whose
+ * requirement's last lifecycle hook, on both engines, is its
+ * onResolverError from the same resolver, with no later create, start,
+ * completion, met or cancel of it, just before the record: on the
+ * reference before the cancel's first record (the cancel's own earlier
+ * records, right before this one in 1.35's order, are the same cancel and
+ * do not count; only the logging plugin's lines, a per-engine projection,
+ * may sit between them: PR seed 17's third shrink), on the engine through
+ * the last paired record before it.
+ * An onResolverCancel must also name that resolver. Returns `differences`,
+ * marked in place.
+ */
+export function markAfterError(
+  differences: Difference[],
+  reference: TraceEntry[],
+  candidate: TraceEntry[],
+): Difference[] {
+  let timelines:
+    | [
+        Map<string, [number, string | null][]>,
+        Map<string, [number, string | null][]>,
+      ]
+    | undefined;
+  const erroredBefore = (
+    list: [number, string | null][] | undefined,
+    before: number,
+  ) => {
+    let resolver: string | null = null;
+    for (const [i, r] of list ?? []) {
+      if (i >= before) {
+        break;
+      }
+      resolver = r;
+    }
+
+    return resolver;
+  };
+  for (const d of differences) {
+    const id = d.op === "missing" ? canceledIdOf(d.reference) : undefined;
+    const at = d.at.reference;
+    if (id === undefined || at === undefined) {
+      continue;
+    }
+    let before = at;
+    for (let rank = CANCEL_ORDER.indexOf(d.kind) - 1; rank >= 0; rank--) {
+      let i = before - 1;
+      while (i >= 0 && isLogLine(reference[i] as TraceEntry)) {
+        i--;
+      }
+      const own = reference[i];
+      if (
+        kindOf(own) !== CANCEL_ORDER[rank] ||
+        canceledIdOf(own as unknown as Json) !== id
+      ) {
+        break;
+      }
+      before = i;
+    }
+    timelines ??= [runTimeline(reference), runTimeline(candidate)];
+    const resolver = erroredBefore(timelines[0].get(id), before);
+    const named =
+      d.kind === "onResolverCancel"
+        ? (d.reference as { args?: Json[] } | undefined)?.args?.[0]
+        : resolver;
+    if (
+      resolver !== null &&
+      named === resolver &&
+      erroredBefore(timelines[1].get(id), d.shared.candidate + 1) === resolver
+    ) {
+      d.afterError = true;
+    }
+  }
+
+  return differences;
+}
+
 /** How many unpaired extras of a step `fileMoves` tries for one missing record. */
 export const MOVE_SCAN = 32;
 
@@ -2370,8 +2513,12 @@ export async function runScenario(
   const advisories: string[] = [];
   const steps = stepOps(first);
   for (const [engine, trace] of Object.entries(theirs)) {
-    const compared = markAfterMet(
-      markStale(compareContract(first, trace, engine), first),
+    const compared = markAfterError(
+      markAfterMet(
+        markStale(compareContract(first, trace, engine), first),
+        first,
+        trace,
+      ),
       first,
       trace,
     );

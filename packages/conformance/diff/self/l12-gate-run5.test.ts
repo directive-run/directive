@@ -9,6 +9,9 @@
 //   `pairedHalf`);
 // - row t's cancel of a completed batch run (PR seed 17), only after both
 //   engines reported the requirement met (`afterMet`, `markAfterMet`);
+// - row t's error shape for a batch run (PR seed 17's second shrink): the
+//   cancel 1.35 adds after the run's own error, only after both engines
+//   reported that error (`afterError`, `markAfterError`);
 // - row (bx)'s compute inside a trace run (deep seed 1,
 //   `PAIR.traceRunRecomputeInserted`);
 // - row (bx)'s unknown-key warning and the re-registered derivation (deep
@@ -28,6 +31,7 @@ import {
   FUZZ_SCENARIO,
   explain,
   fileMoves,
+  markAfterError,
   markAfterMet,
   markStale,
   pairedHalf,
@@ -45,6 +49,11 @@ const T_IDS = [
   "l12-cand-t-batch-completed-hook-onResolverCancel-missing",
   "l12-cand-t-batch-completed-hook-onRequirementCanceled-missing",
   "l12-cand-t-batch-completed-observe-requirement-canceled-missing",
+];
+const TE_IDS = [
+  "l12-cand-t-batch-error-hook-onResolverCancel-missing",
+  "l12-cand-t-batch-error-hook-onRequirementCanceled-missing",
+  "l12-cand-t-batch-error-observe-requirement-canceled-missing",
 ];
 const BX_IDS = [
   "l12-fuzz-bx-hook-onError-repaired-changed",
@@ -85,8 +94,12 @@ const left = (
 ) => {
   const diffs = fileMoves(
     FUZZ_SCENARIO,
-    markAfterMet(
-      markStale(compareContract(reference, candidate, "v2"), reference),
+    markAfterError(
+      markAfterMet(
+        markStale(compareContract(reference, candidate, "v2"), reference),
+        reference,
+        candidate,
+      ),
       reference,
       candidate,
     ),
@@ -492,6 +505,229 @@ describe("row t: a completed batch run's cancel, only after met (PR seed 17)", (
   });
 });
 
+describe("row t's error shape: an errored batch run's cancel, only after its own error (PR seed 17's second shrink)", () => {
+  const TE_ON = ["writeRetracts", "batched", "batchFails"];
+  const ID = 'AB:{"item":"0.0"}';
+  const OTHER = 'AB:{"item":"0.1"}';
+  const full = (id: string) => ({
+    fromConstraint: "a::b0",
+    id,
+    requirement: { item: id === ID ? "0.0" : "0.1", type: "AB" },
+  });
+  const hook = (name: string, args: Json[]) =>
+    ({ k: "hook", hook: name, args }) as TraceEntry;
+  const observe = (event: Json) => ({ k: "observe", event }) as TraceEntry;
+  const created = (id = ID) => [
+    hook("onRequirementCreated", [full(id)]),
+    observe({ id, requirementType: "AB", type: "requirement.created" }),
+  ];
+  const failure = { $error: { name: "Error", message: "a.rb 0.0 attempt 1" } };
+  const errored = (id = ID, resolver = "a::rb") => [
+    hook("onResolverError", [resolver, full(id), failure]),
+    observe({
+      error: failure,
+      requirementId: id,
+      resolver,
+      type: "resolver.error",
+    }),
+  ];
+  const cancel = (resolver = "a::rb") => [
+    hook("onResolverCancel", [resolver, { id: ID }]),
+    hook("onRequirementCanceled", [{ id: ID }]),
+    observe({ id: ID, type: "requirement.canceled" }),
+  ];
+  const end = hook("onReconcileEnd", [{ canceled: [{ id: ID }] }]);
+  const CANCELS = [
+    "missing hook onRequirementCanceled 2",
+    "missing hook onResolverCancel 2",
+    "missing observe requirement.canceled 2",
+  ];
+
+  it("each entry is op missing with afterError, in a case with a failing batch", () => {
+    for (const id of TE_IDS) {
+      expect(byId(id).afterError).toBe(true);
+      expect(byId(id).afterMet).toBeUndefined();
+      expect(byId(id).op).toBe("missing");
+      expect(byId(id).when).toEqual(TE_ON);
+    }
+  });
+
+  it("control: after both engines reported the run's error, 1.35's cancel is excused", () => {
+    const v1 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), ...cancel(), end]),
+    ];
+    const v2 = [...step(1, created()), ...step(2, [...errored(), end])];
+    expect(left(v1, v2, TE_ON)).toEqual([]);
+  });
+
+  it("the same cancel without the preceding error on that run fails", () => {
+    const v1 = [...step(1, created()), ...step(2, [...cancel(), end])];
+    const v2 = [...step(1, created()), ...step(2, [end])];
+    expect(left(v1, v2, TE_ON)).toEqual(CANCELS);
+  });
+
+  it("an error of another batch run, not the canceled one's own, fails", () => {
+    const both = [...created(), ...created(OTHER)];
+    const v1 = [
+      ...step(1, both),
+      ...step(2, [...errored(OTHER), ...cancel(), end]),
+    ];
+    const v2 = [...step(1, both), ...step(2, [...errored(OTHER), end])];
+    expect(left(v1, v2, TE_ON)).toEqual(CANCELS);
+  });
+
+  it("the error on 1.35 only fails", () => {
+    const v1 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), ...cancel(), end]),
+    ];
+    const v2 = [...step(1, created()), ...step(2, [end])];
+    // Quirk b's signed batch entries (l7-fuzz-b-*-batchFails) cover the
+    // error 2.0 lacks and end the case there, so the cancel is judged here
+    // by its marker and by the row-t error entries alone.
+    const diffs = markAfterError(compareContract(v1, v2, "v2"), v1, v2);
+    expect(diffs.every((d) => d.afterError === undefined)).toBe(true);
+    const own = TE_IDS.map(byId);
+    expect(
+      explain(FUZZ_SCENARIO, diffs, own, TE_ON).unexplained.map(brief).sort(),
+    ).toEqual(expect.arrayContaining(CANCELS));
+    expect(explain(FUZZ_SCENARIO, diffs, ALL, TE_ON).used).toEqual(
+      expect.arrayContaining([
+        "l7-fuzz-b-hook-onResolverError-missing-batchFails",
+      ]),
+    );
+  });
+
+  it("created again after the error, on both engines, fails", () => {
+    const v1 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), ...created(), ...cancel(), end]),
+    ];
+    const v2 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), ...created(), end]),
+    ];
+    expect(left(v1, v2, TE_ON)).toEqual(CANCELS);
+  });
+
+  it("a second cancel after one both engines reported fails", () => {
+    const v1 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), ...cancel(), end]),
+      ...step(3, [...cancel(), end]),
+    ];
+    const v2 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), ...cancel(), end]),
+      ...step(3, [end]),
+    ];
+    expect(left(v1, v2, TE_ON)).toEqual(
+      CANCELS.map((x) => x.replace(/2$/, "3")),
+    );
+  });
+
+  it("the logging plugin's lines between the cancel's records change nothing", () => {
+    const line = (text: string) =>
+      ({ k: "external", data: ["log", "debug", text] }) as TraceEntry;
+    const [resolverCancel, requirementCanceled, canceled] = cancel();
+    const logged = [
+      line("[Directive] resolver.cancel"),
+      resolverCancel,
+      line("[Directive] requirement.canceled"),
+      requirementCanceled,
+      canceled,
+    ] as TraceEntry[];
+    const v1 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), ...logged, end]),
+    ];
+    const v2 = [...step(1, created()), ...step(2, [...errored(), end])];
+    const marked = markAfterError(compareContract(v1, v2, "v2"), v1, v2);
+    expect(marked.map((d) => [d.kind, d.afterError])).toEqual([
+      ["onResolverCancel", true],
+      ["onRequirementCanceled", true],
+      ["requirement.canceled", true],
+    ]);
+    // Any other record between them is another cancel's or another run's.
+    const apart = [
+      resolverCancel,
+      hook("onReconcileStart", [{}]),
+      requirementCanceled,
+      canceled,
+    ] as TraceEntry[];
+    const w1 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), ...apart, end]),
+    ];
+    const w2 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), hook("onReconcileStart", [{}]), end]),
+    ];
+    const split = markAfterError(compareContract(w1, w2, "v2"), w1, w2);
+    expect(split.map((d) => [d.kind, d.afterError])).toEqual([
+      ["onResolverCancel", true],
+      ["onRequirementCanceled", undefined],
+      ["requirement.canceled", undefined],
+    ]);
+  });
+
+  it("an onResolverCancel naming another resolver than the error's fails", () => {
+    const v1 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), ...cancel("b::rb"), end]),
+    ];
+    const v2 = [...step(1, created()), ...step(2, [...errored(), end])];
+    expect(left(v1, v2, TE_ON)).toContain("missing hook onResolverCancel 2");
+  });
+
+  it("without a failing batch in the case it fails", () => {
+    const v1 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), ...cancel(), end]),
+    ];
+    const v2 = [...step(1, created()), ...step(2, [...errored(), end])];
+    expect(left(v1, v2, ["writeRetracts", "batched"])).toEqual(CANCELS);
+    expect(left(v1, v2, ["batched", "batchFails"])).toEqual(CANCELS);
+  });
+
+  it("markAfterError marks only a missing cancel record after the error", () => {
+    const v1 = [
+      ...step(1, created()),
+      ...step(2, [...errored(), ...cancel(), end]),
+    ];
+    const v2 = [...step(1, created()), ...step(2, [...errored(), end])];
+    const marked = markAfterError(compareContract(v1, v2, "v2"), v1, v2);
+    expect(marked.map((d) => [d.kind, d.afterError, d.afterMet])).toEqual([
+      ["onResolverCancel", true, undefined],
+      ["onRequirementCanceled", true, undefined],
+      ["requirement.canceled", true, undefined],
+    ]);
+    // The other way round (2.0 cancels, 1.35 does not) is an extra: unmarked.
+    const extra = markAfterError(compareContract(v2, v1, "v2"), v2, v1);
+    expect(extra.every((d) => d.afterError === undefined)).toBe(true);
+    // A cancel after met is row t's third path, not its error shape.
+    const metV1 = [
+      ...step(1, created()),
+      ...step(2, [
+        hook("onRequirementMet", [full(ID), "a::rb"]),
+        ...cancel(),
+        end,
+      ]),
+    ];
+    const metV2 = [
+      ...step(1, created()),
+      ...step(2, [hook("onRequirementMet", [full(ID), "a::rb"]), end]),
+    ];
+    const met = markAfterError(
+      compareContract(metV1, metV2, "v2"),
+      metV1,
+      metV2,
+    );
+    expect(met.every((d) => d.afterError === undefined)).toBe(true);
+  });
+});
+
 describe("row (bx)'s compute pairing (PR seed 11, deep seed 24301), and no other", () => {
   const record = (id: string, value: Json) => ({
     k: "hook",
@@ -828,7 +1064,7 @@ describe("the census validates the run-5 fields", () => {
   };
 
   it("accepts every run-5 entry as signed", () => {
-    const ids = [...B_IDS, ...T_IDS, ...BX_IDS];
+    const ids = [...B_IDS, ...T_IDS, ...TE_IDS, ...BX_IDS];
     expect(census(ids.map(byId), ids)).toBe("");
   });
 
@@ -844,6 +1080,20 @@ describe("the census validates the run-5 fields", () => {
     expect(
       census([{ ...entry, scenario: "hand", when: undefined }], used),
     ).toMatch(/afterMet must be true/);
+  });
+
+  it("afterError must be true, on a fuzz entry of op missing", () => {
+    const entry = byId(TE_IDS[0] as string);
+    const used = [entry.id];
+    expect(census([{ ...entry, afterError: false }], used)).toMatch(
+      /afterError must be true/,
+    );
+    expect(census([{ ...entry, op: "extra" }], used)).toMatch(
+      /afterError must be true/,
+    );
+    expect(
+      census([{ ...entry, scenario: "hand", when: undefined }], used),
+    ).toMatch(/afterError must be true/);
   });
 
   it("a pair class the harness lacks is rejected", () => {

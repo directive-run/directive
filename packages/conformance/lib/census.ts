@@ -889,6 +889,7 @@ export interface DivergenceEntry {
   same?: unknown;
   stale?: unknown;
   afterMet?: unknown;
+  afterError?: unknown;
   afterOp?: unknown;
   repeats?: unknown;
   reason: string;
@@ -906,6 +907,7 @@ const DIVERGENCE_REQUIRED = [
   "stream",
 ];
 const DIVERGENCE_OPTIONAL = [
+  "afterError",
   "afterMet",
   "afterOp",
   "bound",
@@ -1194,6 +1196,16 @@ export function checkDivergences(
     ) {
       fail(
         `${label} afterMet must be true, on a fuzz entry of op "missing" only: it covers a requirement's cancel record only after both engines reported the requirement met`,
+      );
+    }
+    if (
+      e.afterError !== undefined &&
+      (e.afterError !== true ||
+        e.scenario !== FUZZ_SCENARIO ||
+        e.op !== "missing")
+    ) {
+      fail(
+        `${label} afterError must be true, on a fuzz entry of op "missing" only: it covers a requirement's cancel record only after both engines reported the requirement's run failed`,
       );
     }
     if (

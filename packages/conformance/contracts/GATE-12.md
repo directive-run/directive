@@ -15,7 +15,8 @@ differences, check the planted-bug results in CI and open the gate PR, he
 answered: "Yes, run 5 (Recommended)". Claude signs the entries for approved
 rows on his behalf (GATE-2.md, rule 1). This record covers gate runs 1 to
 5; any further run goes back to him. **Run 5 is not green:
-20 of the 21 PR seeds pass; PR seed 17 is a stop (below).**
+20 of the 21 PR seeds pass. PR seed 17's first stop is closed by row t's
+signed error shape; its next case is a new stop (below).**
 
 ## What the L12 gate does
 
@@ -77,7 +78,9 @@ covered move, and computes pair by derivation id in the aligner (seed 19);
 tightened from its draft, with the harness each needs (below: "Run 5: the
 six entries"). Every check passes but one PR seed: seed 17's
 next shrink is a shape the row-t entries, now stating "after met", do not
-cover (Stops (run 5)).
+cover. Run 5 then closes that shape with row t's error-shape entries for a
+batch run ("Run 5's last entry"), and seed 17's rerun finds a different
+case no approved row covers (Stops (run 5)).
 
 ## The L12 decisions
 
@@ -160,7 +163,38 @@ Two findings from the tightening. The quirk-b draft, which had no
 batch timeout error before quirk p's stop, with no batch error unpaired on
 1.35. It is not quirk b's shape and stays unexcused (a batched,
 report-mode case; follow-ups). And the row-t draft, which did not say
-"after met", hid a second shape of PR seed 17: see Stops (run 5).
+"after met", hid a second shape of PR seed 17: the next section.
+
+## Run 5's last entry: row t's error shape for a batch run
+
+Run 5 first reported PR seed 17's second shrink (`$G/r5/specs/pr17b.json`)
+as a stop: a batch run that errored, then is canceled. It is row t's error
+shape, already signed for a single run (`l9-fuzz-t-disable-*`, quoting
+GATE-2: "1.35 reports the error and then a cancel for the same run, 2.0 the
+error only"; owner-approved 2026-11-01). The traces
+(`$G/r5/replay/e2-pr17b.v1.jsonl`, `.v2.jsonl`) confirm the match: the
+batch requirement's own run reports onError, onErrorRecovery "skip",
+onResolverError and resolver.error on both engines; the same pass retracts
+it; 1.35 then adds onResolverCancel, onRequirementCanceled and
+requirement.canceled for that requirement, and nothing else differs but the
+teardown timer count `l3-quirk-z-fuzz-timers-teardown-changed` already
+covers.
+
+| Entries | Row | Narrowest form | Proof (replay, 0 unexplained) | Another shape that still fails (self-test) |
+| --- | --- | --- | --- | --- |
+| row t, batch errored then cancel (3): `l12-cand-t-batch-error-*`, group `quirk-t-batch-error` | row t, its error shape (GATE-2) | The id-only cancel records of a batch requirement missing on 2.0, in a case with a failing batch (`when` writeRetracts, batched, batchFails), only **after the run's own error**: both engines' last lifecycle hook of that requirement is its `onResolverError` from the batch resolver, with no create, start, completion, met or cancel since (`afterError`) | PR seed 17's second and third shrinks (`pr17b`; `pr17c`, the same with the logging plugin on); its first shrink (`pr17`) stays at 0 | The same cancel without the preceding error on that run; an error of another batch run; the error on 1.35 only; created again after the error; a second cancel; an onResolverCancel naming another resolver; no failing batch in the case |
+
+Signed "on the owner's instruction", quoting GATE-2's row-t error-shape
+approval (2026-11-01) and "Yes, run 5 (Recommended)" (2026-11-22). Harness:
+
+- **`afterError`** (`diff/scenario.ts` `markAfterError`,
+  `Difference.afterError`; the census validates it: true, fuzz, op
+  missing). Between a cancel's own three records only the logging plugin's
+  lines may sit (`isLogLine`, the per-engine projection): any other record
+  there leaves the later ones unmarked (self-tested).
+- One more pinned case (`diff/fuzz/pinned.json`): `pr17b`, for the new
+  group.
+- Self-tests: 12 more in `diff/self/l12-gate-run5.test.ts` (49).
 
 ## Deep batched cases (run 4's report, triaged in run 5)
 
@@ -238,37 +272,43 @@ coordinator dispatches after pushing.
 
 | Check | Exit | Result |
 | --- | --- | --- |
-| `pnpm census` | 0 | 10 projects, 15,693 tests; the census-seed fuzz compares 422 cases, all on v2 too |
+| `pnpm census` | 0 | 10 projects, 15,705 tests; the census-seed fuzz compares 422 cases, all on v2 too |
 | `check:expects` | 0 | |
 | `oracle:update` | 0 | after the last harness edit |
 | `conformance:checks` | 0 | 253 passed |
-| diff self-tests | 0 | 645 tests (37 new, `l12-gate-run5.test.ts`) |
+| diff self-tests | 0 | 657 tests (49 new in run 5, `l12-gate-run5.test.ts`) |
 | Root biome | 0 | |
 | `ratchet --update` | 0 | +0, none lost; 3,046 |
-| `pnpm -r --filter './packages/*' typecheck` | 1 | only the known gap (`ai-harness`, `cli`, `mcp`); core, core-next, conformance pass |
+| `pnpm -r --filter './packages/*' typecheck` | 1 | only the known gap (`ai-harness`, `cli`, `mcp`); core, core-next, conformance pass. Not rerun after the last entry; conformance's own `tsc --noEmit` exits 0 |
 | The 21 PR seeds at L12, one at a time, 8 GB heap, on the final harness | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (120 s limit); 7, 9, 11 exit 0 (1,800 s limit; 365, 466 and 579 s); **17 exits 1** (Stops (run 5)) |
-| Replays of the hard failures | 0 | PR 6, 11, 15 (both shrinks), 17 (first shrink), deep 1, 2, 24301: 0 unexplained each; the no-facts and no-watch twins: 0 differences |
+| PR seed 17 again, after the last entry (twice) | 1 | first rerun: its third shrink `pr17c`, the logging plugin's lines between the cancel's records, a gap in the new marker, fixed; second rerun: **exits 1** on a different case, `pr17d` (Stops (run 5)). The other 20 seeds were not rerun after the last entry |
+| Replays of the hard failures | 0 | PR 6, 11, 15 (both shrinks), 17 (first shrink), deep 1, 2, 24301: 0 unexplained each; the no-facts and no-watch twins: 0 differences. After the last entry: `pr17`, `pr17b`, `pr17c` 0 unexplained each (`$G/r5/replay/g2-*`) |
 | Deep seeds 1, 2, 24301 | — | not rerun (run 5's brief). Run 4's report: each exited 1 on one hard failure, now covered (above), and reported 5, 7 and 5 batched cases (triaged above and in the follow-ups) |
 
 ## Stops (run 5)
 
-- **PR seed 17 (plugin phase, no plugin on): a batch run that errored,
-  then is canceled.** Not matched by an approved row as written. The draft
-  entry for row t covered it only because it did not say "after met".
-  Shrunk case `$G/r5/specs/pr17b.json` (PR seed 17's first shrink with the
-  batch handler "results", `fails` 1); traces
-  `$G/r5/replay/e2-pr17b.v1.jsonl`, `.v2.jsonl`. The batch call writes a
-  fact and fails; both engines report its onError, onErrorRecovery "skip"
-  and onResolverError. The pass that follows retracts the batch source's
-  constraint. Both engines abort the call's signal and list the requirement
-  under onReconcileEnd's canceled; 1.35 then also reports onResolverCancel,
-  onRequirementCanceled and requirement.canceled for it (id only), and 2.0
-  does not: 3 differences. Row t is worded for a run that "reported
-  complete"; quirk b for a cancel followed by an error. This is an error
-  followed by a cancel. 2.0's rule is the same (one outcome per run), but
-  no row names this order. Owner call: read row t (or quirk b) as covering
-  it, which needs one more narrow entry ("after the run's error"), or
-  change 2.0. No engine code was changed.
+- **PR seed 17, its fourth case (plugin phase, no plugin on): 1.35 cancels
+  a completed batch requirement twice, 2.0 once.** Not matched by an
+  approved row. Found by seed 17's rerun after the last entry. Shrunk case
+  `$G/r5/specs/pr17d.json` (history on; a batch write, a set, `goTo` 0, a
+  publish, a settle; batch handler "batch", `fails` 0, `maxSize` 1, `delay`
+  5); traces `$G/r5/replay/g3-pr17d.v1.jsonl`, `.v2.jsonl`. Nothing errors
+  in it, so it is not row t's error shape. The batch requirement is created
+  before the `goTo` and again after it, and two batch calls start for it.
+  The pass after the first call's write reports the run complete and the
+  requirement met, and aborts both calls' signals. Both engines then report
+  one cancel of the requirement (1.35 with its id only, 2.0 in full:
+  `l7-fuzz-aq-*`); 1.35 reports the cancel a second time (onResolverCancel,
+  onRequirementCanceled, requirement.canceled) and 2.0 does not: 3
+  differences. The `afterMet` entries do not cover it, by design: a cancel
+  both engines reported sits between the met and the missing one (the
+  self-test "a second cancel after one both engines reported fails").
+  Owner call: read it under row t's third path or row (av)'s repeated
+  cancel, which needs its own narrow entry, or change 2.0. No engine code
+  was changed.
+
+Closed in run 5: PR seed 17's second shrink (a batch run that errored, then
+is canceled; `pr17b`), by the row-t error-shape entries above.
 
 Run 4's two stops are closed: PR seed 6 by the (bx) error-pairing entries,
 PR seed 15 by quirk b's batch-pairing entries.
@@ -307,7 +347,7 @@ PR seed 15 by quirk b's batch-pairing entries.
 
 ## Follow-ups
 
-- Decide run 5's stop (owner): PR seed 17's errored-then-canceled batch run.
+- Decide run 5's stop (owner): PR seed 17's twice-canceled completed batch requirement (`pr17d`).
 - A gate=L12 mutation run on this branch to confirm the 18 entries killed only locally (the coordinator dispatches it after pushing).
 - Deep seeds 1, 2 and 24301 in full once seed 17 is decided.
 - The reported batched cases of run 4's deep seeds, one line each (run-5 replays, `$G/r5/replay/cases-*`; none has an entry in this PR):
