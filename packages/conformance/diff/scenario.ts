@@ -551,6 +551,14 @@ export interface Divergence {
    * has never computed (`Difference.stale`, `markStale`).
    */
   stale?: true;
+  /**
+   * Fuzz only, op `missing` (L12 gate run 5): the entry covers a
+   * requirement's cancel record only after both engines reported that
+   * requirement met and neither has created or canceled it since
+   * (`Difference.afterMet`, `markAfterMet`): row t's third path for a batch
+   * run, a cancel 1.35 adds after the completion (PR seed 17).
+   */
+  afterMet?: true;
   reason: string;
   approvedBy: string;
   date: string;
@@ -572,7 +580,10 @@ export interface Requirement {
    * A path (`data[1].version`, `args[0]`) the other difference's record
    * must hold equal to the covered one's (L12 gate run 4): a watch callback
    * 2.0 lacks is excused only by its own earlier delivery of the same
-   * snapshot version.
+   * snapshot version. For a covered `changed` difference, a pairing of two
+   * records, the record read is 1.35's whole one (L12 gate run 5,
+   * `pairedHalf`): the entry covers the pairing only where the engine made
+   * 1.35's record again, unpaired.
    */
   same?: string;
 }
@@ -1370,6 +1381,16 @@ const ownRecord = (d: Difference): Json | undefined =>
   d.op === "extra" ? d.candidate : d.reference;
 
 /**
+ * What `requires.same` reads on the covered difference `d`: its own record,
+ * or for a `changed` difference (two records the comparison paired) 1.35's
+ * whole record (`Difference.record`), the half an unpaired record of the
+ * engine would have paired with. A changed difference without it (a hand
+ * scenario's) reads as undefined, and so is never covered.
+ */
+export const pairedHalf = (d: Difference): Json | undefined =>
+  d.op === "changed" ? d.record : ownRecord(d);
+
+/**
  * Whether `div` covers difference `d` of scenario `name`. An entry with
  * `when` covers only in a fuzz case whose `triggers` include every one it
  * lists: never in a hand scenario, nor in a case without a trigger set.
@@ -1410,6 +1431,8 @@ export function covers(
         JSON.stringify(valueAt(d.reference, div.same)) ===
           JSON.stringify(valueAt(d.candidate, div.same)))) &&
     (div.stale !== true || (name === FUZZ_SCENARIO && d.stale === true)) &&
+    (div.afterMet !== true ||
+      (name === FUZZ_SCENARIO && d.op === "missing" && d.afterMet === true)) &&
     (div.bound === undefined || admits(div.bound, d)) &&
     (div.requires === undefined ||
       (name === FUZZ_SCENARIO && meets(div.requires, d, context ?? []))) &&
@@ -1436,7 +1459,7 @@ export function meets(
   if (req.same !== undefined) {
     // Scanned, not memoized as below: only an entry with `same` reads it,
     // and it covers a few watch or compute records a case.
-    const want = valueAt(ownRecord(d), req.same);
+    const want = valueAt(pairedHalf(d), req.same);
     if (want === undefined) {
       return false;
     }
@@ -1868,7 +1891,8 @@ function derivationIdOf(e: Json | undefined): string | undefined {
  * the reference just before it (a missing or moved record: before its own
  * index; an extra: through the last paired record before it), had never
  * computed or last threw (a `notify` of a thrown value, or an `onError`
- * from that derivation). Returns `differences`, marked in place.
+ * from that derivation), or was registered and has not computed since (its
+ * `onDefinitionRegister`). Returns `differences`, marked in place.
  */
 export function markStale(
   differences: Difference[],
@@ -1912,9 +1936,20 @@ export function markStale(
           (next.event as { id?: unknown }).id === ok
             ? i + 1
             : i;
+        // A derivation registered (again, after an unregister: deep seed 2,
+        // L12 gate run 5) is a new one: it has not computed since, so from
+        // its onDefinitionRegister it reads as never computed.
+        const registered =
+          e.k === "hook" &&
+          e.hook === "onDefinitionRegister" &&
+          e.args[0] === "derivation" &&
+          typeof e.args[1] === "string"
+            ? e.args[1]
+            : undefined;
         for (const [who, fresh, where] of [
           [ok, true, at],
           [threw, false, i],
+          [registered, false, i],
         ] as const) {
           if (typeof who === "string") {
             const list = timeline.get(who) ?? [];
@@ -1935,6 +1970,106 @@ export function markStale(
     }
     if (!fresh) {
       d.stale = true;
+    }
+  }
+
+  return differences;
+}
+
+/** The requirement id a cancel record names (`markAfterMet`). */
+function canceledIdOf(record: Json | undefined): string | undefined {
+  if (record === null || typeof record !== "object" || Array.isArray(record)) {
+    return undefined;
+  }
+  const r = record as Record<string, Json>;
+  const args = r.args as Json[] | undefined;
+  const id =
+    r.k === "hook" && r.hook === "onResolverCancel"
+      ? (args?.[1] as Record<string, Json> | null | undefined)?.id
+      : r.k === "hook" && r.hook === "onRequirementCanceled"
+        ? (args?.[0] as Record<string, Json> | null | undefined)?.id
+        : r.k === "observe" &&
+            (r.event as Record<string, Json> | null)?.type ===
+              "requirement.canceled"
+          ? (r.event as Record<string, Json>).id
+          : undefined;
+
+  return typeof id === "string" ? id : undefined;
+}
+
+/**
+ * Each requirement's lifecycle hooks in `trace`, in order, by id: where it
+ * was created or canceled (not met) and where it was reported met.
+ */
+function metTimeline(trace: TraceEntry[]): Map<string, [number, boolean][]> {
+  const out = new Map<string, [number, boolean][]>();
+  for (const [i, e] of trace.entries()) {
+    if (
+      e.k !== "hook" ||
+      (e.hook !== "onRequirementCreated" &&
+        e.hook !== "onRequirementMet" &&
+        e.hook !== "onRequirementCanceled")
+    ) {
+      continue;
+    }
+    const id = (e.args[0] as { id?: unknown } | null)?.id;
+    if (typeof id === "string") {
+      const list = out.get(id) ?? [];
+      list.push([i, e.hook === "onRequirementMet"]);
+      out.set(id, list);
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Mark `Difference.afterMet` (L12 gate run 5, row t's third path for a
+ * batch run): a cancel record the engine lacks (op `missing`) whose
+ * requirement both engines had reported met, with no later create or cancel
+ * of it, just before the record: on the reference before the record's own
+ * index (an observe record's own onRequirementCanceled hook, the record
+ * right before it, is the same cancel and does not count), on the engine
+ * through the last paired record before it. Returns `differences`, marked
+ * in place.
+ */
+export function markAfterMet(
+  differences: Difference[],
+  reference: TraceEntry[],
+  candidate: TraceEntry[],
+): Difference[] {
+  let timelines:
+    | [Map<string, [number, boolean][]>, Map<string, [number, boolean][]>]
+    | undefined;
+  const metBefore = (list: [number, boolean][] | undefined, before: number) => {
+    let met = false;
+    for (const [i, m] of list ?? []) {
+      if (i >= before) {
+        break;
+      }
+      met = m;
+    }
+
+    return met;
+  };
+  for (const d of differences) {
+    const id = d.op === "missing" ? canceledIdOf(d.reference) : undefined;
+    const at = d.at.reference;
+    if (id === undefined || at === undefined) {
+      continue;
+    }
+    timelines ??= [metTimeline(reference), metTimeline(candidate)];
+    const own = reference[at - 1];
+    const sameCancel =
+      d.stream === "observe" &&
+      own?.k === "hook" &&
+      own.hook === "onRequirementCanceled" &&
+      (own.args[0] as { id?: unknown } | null)?.id === id;
+    if (
+      metBefore(timelines[0].get(id), sameCancel ? at - 1 : at) &&
+      metBefore(timelines[1].get(id), d.shared.candidate + 1)
+    ) {
+      d.afterMet = true;
     }
   }
 
@@ -2235,7 +2370,11 @@ export async function runScenario(
   const advisories: string[] = [];
   const steps = stepOps(first);
   for (const [engine, trace] of Object.entries(theirs)) {
-    const compared = markStale(compareContract(first, trace, engine), first);
+    const compared = markAfterMet(
+      markStale(compareContract(first, trace, engine), first),
+      first,
+      trace,
+    );
     const contractDiffs = fileMoves(
       def.name,
       compared,

@@ -107,6 +107,14 @@ export interface Difference {
    * never computed. Only an entry with `stale` reads it.
    */
   stale?: true;
+  /**
+   * Set by `markAfterMet` (diff/scenario.ts) on a fuzz difference of a
+   * requirement's cancel record the engine lacks (onResolverCancel,
+   * onRequirementCanceled, requirement.canceled) when, just before it, the
+   * requirement's last lifecycle record on both engines reported it met.
+   * Only an entry with `afterMet` reads it.
+   */
+  afterMet?: true;
   /** For `changed`: where inside the entry. */
   path?: string;
   /**

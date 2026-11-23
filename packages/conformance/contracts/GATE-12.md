@@ -9,10 +9,13 @@ miss: "No, accept the gap for now (Recommended)". On 2026-11-22, asked
 whether the (bx) exception should cover its knock-on effects, he answered:
 "Yes, widen (bx) to its knock-on effects (Recommended)". Later on
 2026-11-22 he allowed a run 4: "Yes, run 4 (Recommended)", and for the
-logging plugin's lines: "Project, don't sign copies (Recommended)". Claude
-signs the entries for approved rows on his behalf (GATE-2.md, rule 1). This
-record covers gate runs 1 to 4; any further run goes back to him. **Run 4
-is not green: two PR-seed cases are stops (below).**
+logging plugin's lines: "Project, don't sign copies (Recommended)". Asked,
+also on 2026-11-22, whether to allow a 5th gate run to sign the six run-4
+differences, check the planted-bug results in CI and open the gate PR, he
+answered: "Yes, run 5 (Recommended)". Claude signs the entries for approved
+rows on his behalf (GATE-2.md, rule 1). This record covers gate runs 1 to
+5; any further run goes back to him. **Run 5 is not green:
+20 of the 21 PR seeds pass; PR seed 17 is a stop (below).**
 
 ## What the L12 gate does
 
@@ -70,6 +73,12 @@ derivation), `fileMoves` tries up to 32 unpaired extras of the step for a
 covered move, and computes pair by derivation id in the aligner (seed 19);
 `requires.same`; census validates `by` 0, `same`, `stale`, kind "*".
 
+**Run 5** signs the six differences run 4's rerun and triage 5 left, each
+tightened from its draft, with the harness each needs (below: "Run 5: the
+six entries"). Every check passes but one PR seed: seed 17's
+next shrink is a shape the row-t entries, now stating "after met", do not
+cover (Stops (run 5)).
+
 ## The L12 decisions
 
 | Row | What it decides | Outcome |
@@ -92,6 +101,11 @@ covered move, and computes pair by derivation id in the aligner (seed 19);
 | 3 | (bx) knock-on, group `row-bx`, `when` watchIncludesFacts | the getDistributableSnapshot skip warning, onError and onErrorRecovery "skip" extra (the hooks `requires` the warning), derivation.compute observe and onDerivationCompute moved one step earlier (`by` -1), the extra "watch" callback |
 | 3 | (bx) knock-on, group `row-bx-logging`, `when` watchIncludesFacts + loggingPlugin | the logging plugin's "[Directive] error" and "[Directive] error.recovery" extra (each `requires` its hook's extra) and "[Directive] derivation.compute" moved |
 
+| 4 | (bx) knock-on, group `row-bx` | the nine entries listed under run 4 above (earlier delivery of a watch callback, same-step compute moves, the re-tracked derivation's records) |
+| 5 | quirk b, group `quirk-b-batch-pairing` | `l12-fuzz-b-batch-pair-*-changed` (onError, onErrorRecovery, onResolverError, resolver.error) |
+| 5 | row t, group `quirk-t-batch-completed` | `l12-cand-t-batch-completed-*-missing` (onResolverCancel, onRequirementCanceled, requirement.canceled) |
+| 5 | (bx) knock-on, group `row-bx`, `when` watchIncludesFacts | `l12-fuzz-bx-hook-onError-repaired-changed`, `...-onErrorRecovery-repaired-changed`; `l12-fuzz-bx-hook-onDerivationCompute-repaired-changed`, `...-observe-derivation-compute-repaired-changed`; `l12-fuzz-bx-hook-onTraceComplete-recompute-inserted`, `...-state-settle-trace-...`, `...-state-end-trace-...`; `l12-fuzz-bx-console-warn-distributable-unknown-keys-extra` |
+
 The new trigger `watchIncludesFacts` is a watch with `includeFacts`
 (diff/fuzz/model.ts). New hand-named classes: `distributableSkipped`,
 `derivationThrown`, `derivationThrownMessage`, `derivedValue`,
@@ -104,6 +118,81 @@ source, recovery, warning, a later move, or a log line without its hook.
 plugin case 13 and the census seed's logging shrink (`specs/c3.json`)
 replay ok with 0 unexplained; `shrunk-nofacts`, a1 and a2 stay ok.
 
+## Run 5: the six entries
+
+Each is signed "on the owner's instruction", quoting its row's own approval
+and "Yes, run 5 (Recommended)" (2026-11-22); the (bx) entries also quote
+"Yes, widen (bx) to its knock-on effects (Recommended)" (2026-11-22). Only
+quirk b's end a case, as that row's other entries do. Self-tests: `diff/self/l12-gate-run5.test.ts` (37).
+
+| Entries | Row | Narrowest form | Proof (replay, 0 unexplained) | Another shape that still fails (self-test) |
+| --- | --- | --- | --- | --- |
+| quirk-b batch pairing (4) | GATE-1 quirk b | A single run's error changed field by field into a batch run's, only where 1.35 also made a batch error of that kind that 2.0 lacks (`requires` op missing, the `l7-fuzz-b-*-batchFails` bound), in a case with a failing batch (`when` adds batchFails). It ends the case, as quirk b's other entries do: with two batch items the shift pairs each later batch error with the next item's | PR seed 15, both shrinks (`pr15`, `pr15b`) | No batch error unpaired on 1.35; only a single run's error unpaired; batch to single; no failing batch in the case |
+| (bx) error pairing (2) | (bx) | A derivation error's message and id changed to another fuzz derivation's, in a recoverable derivation error record, only where 2.0 also made, unpaired, an extra record equal to 1.35's half (`requires` op extra, `same`) | PR seed 6's shrunk case (16 covered) | No fact-including watch; no extra error equal to 1.35's; an error of another source |
+| row t, batch completed then cancel (3) | row t | The id-only cancel records of a batch requirement missing on 2.0, only **after met**: both engines' last lifecycle record of that requirement is its `onRequirementMet`, with no create or cancel since (`afterMet`) | PR seed 17 | Still in flight; met on 1.35 only; created again after met; a second cancel; no batch |
+| (bx) compute pairing (2) | (bx) | A snapshot derivation's compute value changed, only where 2.0 also made, unpaired, an extra compute equal to 1.35's whole record: same derivation, 1.35's value and dependencies (`requires` op extra, `same`) | PR seed 11, deep seed 24301 | No fact-including watch; an extra compute of another derivation or value; none; not a snapshot derivation |
+| (bx) trace run (3) | (bx) | 2.0's runs are 1.35's with compute entries of snapshot derivations inserted and one "<id> recomputed" chain link each, nothing else (`pair` traceRunRecomputeInserted), after an extra watch snapshot | Deep seed 1 | No fact-including watch; no extra watch; any other run field, a removed or changed entry, another derivation, another chain link |
+| (bx) unknown derivation (1) | (bx) | getDistributableSnapshot's unknown-key warning, word for word, extra on 2.0 (`$text` distributableUnknownKeys). The re-registered derivation's compute needs no entry: `markStale` reads a derivation as never computed from its `onDefinitionRegister`, and the run-4 `retracked-extra` entries cover it | Deep seed 2 | No fact-including watch; any other warning text; a derivation not registered again, another derivation's or kind's register, or one that computed since |
+
+Every (bx) case also replays with 0 differences with the watch's facts
+empty and with no watch (`nf-*`, `nw-*`). Specs and replays:
+`$G/r5/specs`, `$G/r5/replay/e1-*` (`$G` is diff-notes `l12gate/`).
+
+Harness additions (run 5), each with its self-test in the same file:
+
+- **`requires.same` reads a changed pair** (`diff/scenario.ts` `pairedHalf`):
+  for a covered `changed` difference it reads 1.35's whole record, so the
+  entry holds only where 2.0 made that record again, unpaired. No earlier
+  entry had `same` on a changed difference, so none changes.
+- **`afterMet`** (`markAfterMet`, `Difference.afterMet`; the census
+  validates it: true, fuzz, op missing).
+- **`PAIR.traceRunRecomputeInserted`** and **`TEXT.distributableUnknownKeys`**
+  (`diff/fingerprint.ts`). The prototype patch was reviewed line by line and
+  rewritten: typed, key-order independent, the warning's key lists checked
+  id by id.
+- **`markStale`'s register rule**: a derivation's `onDefinitionRegister`
+  resets it to never computed.
+- Two pinned cases (`diff/fuzz/pinned.json`): PR seed 15's and 17's shrunk
+  specs, for the two new groups.
+
+Two findings from the tightening. The quirk-b draft, which had no
+`requires`, also hid deep case 2/3: a single run's error paired with a
+batch timeout error before quirk p's stop, with no batch error unpaired on
+1.35. It is not quirk b's shape and stays unexcused (a batched,
+report-mode case; follow-ups). And the row-t draft, which did not say
+"after met", hid a second shape of PR seed 17: see Stops (run 5).
+
+## Deep batched cases (run 4's report, triaged in run 5)
+
+Run 4's deep seeds each exited 1 on one hard failure and reported batched
+cases (Jason, 2026-11-09: "Gate on short seeds; deep runs report
+(Recommended)"). The three hard failures are the run-5 entries' cases
+(deep 1: trace run; deep 2: unknown derivation; deep 24301: compute
+pairing) and replay with 0 unexplained. The deep seeds were not rerun in
+run 5. The two cases run 5 was asked to read:
+
+- **24301/1 (24 differences): row (as), not a 2.0 bug.** In a `settle` step
+  a batch call's write queues three more items while that call is still
+  running. 2.0 starts their call at once, before the running call's
+  completion is reported; 1.35 reports the completion, makes its pass, then
+  starts it. Both engines make the same records, calls and passes: the 12
+  completion and met records sit before a pass on 2.0 and after it on 1.35
+  (12 extra, 12 missing). With the `settle` step replaced by an `advance`
+  the case passes (`$G/r5/replay/var-c24301-1-adv`), so it is `settle()`
+  waiting for a running batch and running the queues at each settled
+  change. No signed entry has this shape (the flush twin needs `maxSize`).
+- **2/6 (3 differences): row (at) with quirk g, not a 2.0 bug.** In a `twin`
+  step with a fallback handler (resolve() only), one item's retry writes a
+  fact that retracts the batch source. 2.0 aborts the other item's run and
+  does not retry it; 1.35, whose fallback runs are private resolve() runs
+  nothing cancels, starts the retry and writes again. The twins' final
+  facts are equal. With a `resolveBatch` handler the case passes
+  (`$G/r5/replay/var-c2-6-batch`).
+
+Both are evidence from one variant each, not a public-API probe; each
+needs its own narrow entry and probe in a follow-up slice. Traces:
+`$G/r5/replay/deep-c24301-1.v{1,2}.jsonl`, `deep-c2-6.v{1,2}.jsonl`.
+
 ## The mutation conversion
 
 28 L12 `feature-layer` entries in `engine.ts` (4135 to 4256) are now
@@ -112,8 +201,9 @@ replay ok with 0 unexplained; `shrunk-nofacts`, a1 and a2 stay ok.
 Survived or NoCoverage there; run 3's six "L12 gate mutation pins" (the
 full unknown-key warnings, "(none)", exclusions in a snapshot and a watch,
 metadata) kill them in a local Stryker run at ceiling L12
-(`mutate:file engine.ts:4135-4260`). None is left. A gate=L12 CI run
-should confirm the 18.
+(`mutate:file engine.ts:4135-4260`). None is left. **CI confirmation of
+the 18 is pending**: a gate=L12 mutation run on this branch, which the
+coordinator dispatches after pushing.
 
 ## Results (run 3)
 
@@ -143,6 +233,45 @@ should confirm the 18.
 | `ratchet --update` | 0 | +0; 3,046 |
 | typecheck | 1 | only the known gap (`ai-harness`, `cli`, `mcp`) |
 | PR seeds, one at a time, 8 GB heap | 1 | on 13fa776c: d, 1, 2, 3, 4, 10, 12, 13, 18, 19 pass; 5, 8, 14, 16, 17, 20 failed on shapes the run-4 fixes then covered (replays 0 unexplained); 6 and 15 are stops. Not re-run on the fix commit; 7, 9, 11 and the deep seeds not run in run 4 |
+
+## Results (run 5)
+
+| Check | Exit | Result |
+| --- | --- | --- |
+| `pnpm census` | 0 | 10 projects, 15,693 tests; the census-seed fuzz compares 422 cases, all on v2 too |
+| `check:expects` | 0 | |
+| `oracle:update` | 0 | after the last harness edit |
+| `conformance:checks` | 0 | 253 passed |
+| diff self-tests | 0 | 645 tests (37 new, `l12-gate-run5.test.ts`) |
+| Root biome | 0 | |
+| `ratchet --update` | 0 | +0, none lost; 3,046 |
+| `pnpm -r --filter './packages/*' typecheck` | 1 | only the known gap (`ai-harness`, `cli`, `mcp`); core, core-next, conformance pass |
+| The 21 PR seeds at L12, one at a time, 8 GB heap, on the final harness | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (120 s limit); 7, 9, 11 exit 0 (1,800 s limit; 365, 466 and 579 s); **17 exits 1** (Stops (run 5)) |
+| Replays of the hard failures | 0 | PR 6, 11, 15 (both shrinks), 17 (first shrink), deep 1, 2, 24301: 0 unexplained each; the no-facts and no-watch twins: 0 differences |
+| Deep seeds 1, 2, 24301 | — | not rerun (run 5's brief). Run 4's report: each exited 1 on one hard failure, now covered (above), and reported 5, 7 and 5 batched cases (triaged above and in the follow-ups) |
+
+## Stops (run 5)
+
+- **PR seed 17 (plugin phase, no plugin on): a batch run that errored,
+  then is canceled.** Not matched by an approved row as written. The draft
+  entry for row t covered it only because it did not say "after met".
+  Shrunk case `$G/r5/specs/pr17b.json` (PR seed 17's first shrink with the
+  batch handler "results", `fails` 1); traces
+  `$G/r5/replay/e2-pr17b.v1.jsonl`, `.v2.jsonl`. The batch call writes a
+  fact and fails; both engines report its onError, onErrorRecovery "skip"
+  and onResolverError. The pass that follows retracts the batch source's
+  constraint. Both engines abort the call's signal and list the requirement
+  under onReconcileEnd's canceled; 1.35 then also reports onResolverCancel,
+  onRequirementCanceled and requirement.canceled for it (id only), and 2.0
+  does not: 3 differences. Row t is worded for a run that "reported
+  complete"; quirk b for a cancel followed by an error. This is an error
+  followed by a cancel. 2.0's rule is the same (one outcome per run), but
+  no row names this order. Owner call: read row t (or quirk b) as covering
+  it, which needs one more narrow entry ("after the run's error"), or
+  change 2.0. No engine code was changed.
+
+Run 4's two stops are closed: PR seed 6 by the (bx) error-pairing entries,
+PR seed 15 by quirk b's batch-pairing entries.
 
 ## Stops (run 4)
 
@@ -178,7 +307,22 @@ should confirm the 18.
 
 ## Follow-ups
 
-- Decide run 4's two stops (owner), then the PR seeds in full, 7, 9, 11 and the deep seeds.
-- A gate=L12 mutation run to confirm the 18 entries killed only locally (the coordinator dispatches it).
-- Deep seeds 1, 2 and 24301 in full, after the PR seeds pass.
+- Decide run 5's stop (owner): PR seed 17's errored-then-canceled batch run.
+- A gate=L12 mutation run on this branch to confirm the 18 entries killed only locally (the coordinator dispatches it after pushing).
+- Deep seeds 1, 2 and 24301 in full once seed 17 is decided.
+- The reported batched cases of run 4's deep seeds, one line each (run-5 replays, `$G/r5/replay/cases-*`; none has an entry in this PR):
+  - 1/1, 2/2, 24301/1, 24301/4: completion and met records on the other side of a reconcile pass in a `settle` step (the same records, extra and missing). Row (as), as 24301/1 above; needs its entry and probe.
+  - 2/6: row (at) with quirk g in a `twin` step, as above; needs its entry and probe.
+  - 24301/2: quirk b's batch pairing; the run-5 entries cover it (0 unexplained).
+  - 2/3: a single run's error paired with a batch timeout error just before quirk p's stop (6 onError changes), no batch error unpaired on 1.35. Untriaged.
+  - 1/2: one batch `start` changed after quirk g's stop (`l7-fuzz-g-after-*`). Untriaged.
+  - 1/3: 9 changes in history steps after quirk h's stop. Untriaged.
+  - 1/4: batch `start` and `wrote` changed in an `advance` step after quirk b's batch stop. Untriaged.
+  - 1/5: three reconcile passes missing on 2.0 after quirk g's stop. Untriaged.
+  - 2/1: two fallback `start` changes after quirk p's stop. Untriaged.
+  - 2/4 (up to L12): one batch `start` missing and three `onReconcileEnd` changes in a `settle` step. Untriaged.
+  - 2/5 (data forms): one `onResolverRetry` extra and one missing in a `settle` step. Untriaged.
+  - 2/7 (plugins, with a fact-including watch): 11 changes in a `ledger` step's record. Untriaged; (az)'s or (bx)'s ledger echo is the first thing to check.
+  - 24301/3: one batch `wrote` missing after quirk g's stop. Untriaged.
+  - 24301/5 (up to L12): one `onReconcileEnd` extra and one missing after quirk a's stop. Untriaged.
 - `/principal` on L12 (the RFC's gate row).

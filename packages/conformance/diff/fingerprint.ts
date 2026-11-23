@@ -498,6 +498,37 @@ export const TEXT: Record<string, (v: Json | undefined) => boolean> = {
       v,
     ),
   /**
+   * Row (bx)'s knock-on (L12 gate run 5, deep seed 2): the development
+   * warning a distributable-snapshot read prints for an `includeDerivations`
+   * key it does not know, word for word (core-next api/distributable.ts;
+   * core engine.ts prints the same text on such a read):
+   * `[Directive] getDistributableSnapshot: Unknown derivation keys ignored:
+   * d0. Available: d1`. The unknown keys are derivations a fuzz watch can
+   * hold (`snapshotDerivation`); the available ones are derivation ids of a
+   * fuzz case (`dynamicDerivation`, or module z's `h0`), or `(none)`.
+   * Hand-named.
+   */
+  distributableUnknownKeys: (v) => {
+    const m =
+      typeof v === "string"
+        ? /^\[Directive\] getDistributableSnapshot: Unknown derivation keys ignored: (.+)\. Available: (.+)$/.exec(
+            v,
+          )
+        : null;
+    if (m === null) {
+      return false;
+    }
+    const available = (id: string) =>
+      /^(([a-z]::)?(d\d+|z[01]|zin)|(z::)?h0)$/.test(id);
+
+    return (
+      (m[1] as string)
+        .split(", ")
+        .every((id) => LIKE.snapshotDerivation?.(id) === true) &&
+      (m[2] === "(none)" || (m[2] as string).split(", ").every(available))
+    );
+  },
+  /**
    * The error that warning carries: a fuzz derivation's own thrown error,
    * exactly `{ $error: { name: "Error", message: "a.d2 throws at 4" } }`
    * (an effect's, `a.x0 throws at 4`, is outside it). Hand-named.
@@ -746,6 +777,106 @@ export const PAIR: Record<
   string,
   (reference: Json | undefined, candidate: Json | undefined) => boolean
 > = {
+  /**
+   * Row (bx)'s knock-on in a trace run (L12 gate run 5, deep seed 1): 2.0's
+   * extra distributable-snapshot read computes a derivation inside a run,
+   * so its record of the run lists that compute where 1.35's does not. The
+   * two records (onTraceComplete's one run, or a state record's
+   * `inspect.trace` runs) hold the same runs in the same order, and each
+   * run that differs differs only so: 2.0's `derivationsRecomputed` is
+   * 1.35's, in order, with entries of derivations a snapshot can hold
+   * (`snapshotDerivation`) inserted, and 2.0's `causalChain` is 1.35's
+   * with one "<id> recomputed" link per inserted entry and nothing else.
+   * At least one entry is inserted. Any other field of a run differing, an
+   * entry removed or changed, another derivation, or a chain that differs
+   * in any other link is outside it. Added on the owner's instruction,
+   * under row (bx)'s approval and "Yes, widen (bx) to its knock-on effects
+   * (Recommended)" (2026-11-22).
+   */
+  traceRunRecomputeInserted: (referenceRecord, candidateRecord) => {
+    const runsOf = (r: Json | undefined): Json[] | undefined => {
+      if (r === null || typeof r !== "object" || Array.isArray(r)) {
+        return undefined;
+      }
+      const o = r as Record<string, Json>;
+      if (o.k === "hook") {
+        return o.hook === "onTraceComplete" &&
+          Array.isArray(o.args) &&
+          o.args.length === 1
+          ? [o.args[0] as Json]
+          : undefined;
+      }
+      const trace =
+        o.k === "state"
+          ? (o.inspect as Record<string, Json> | null | undefined)?.trace
+          : undefined;
+
+      return Array.isArray(trace) ? trace : undefined;
+    };
+    const reference = runsOf(referenceRecord);
+    const candidate = runsOf(candidateRecord);
+    if (
+      reference === undefined ||
+      candidate === undefined ||
+      reference.length !== candidate.length
+    ) {
+      return false;
+    }
+    const plain = (run: Json | undefined): run is Record<string, Json> =>
+      run !== null && typeof run === "object" && !Array.isArray(run);
+    const rest = (run: Record<string, Json>) =>
+      canonicalJson({
+        ...run,
+        causalChain: undefined,
+        derivationsRecomputed: undefined,
+      } as unknown as Json);
+    const LINK = " \u2192 ";
+    let inserted = 0;
+    for (const [n, r] of reference.entries()) {
+      const c = candidate[n];
+      if (canonicalJson(r) === canonicalJson(c)) {
+        continue;
+      }
+      if (
+        !plain(r) ||
+        !plain(c) ||
+        rest(r) !== rest(c) ||
+        !Array.isArray(r.derivationsRecomputed) ||
+        !Array.isArray(c.derivationsRecomputed) ||
+        typeof r.causalChain !== "string" ||
+        typeof c.causalChain !== "string"
+      ) {
+        return false;
+      }
+      const links = c.causalChain.split(LINK);
+      let i = 0;
+      for (const e of c.derivationsRecomputed) {
+        if (
+          i < r.derivationsRecomputed.length &&
+          canonicalJson(r.derivationsRecomputed[i]) === canonicalJson(e)
+        ) {
+          i += 1;
+          continue;
+        }
+        const id = plain(e) ? e.id : undefined;
+        const at =
+          typeof id === "string" ? links.indexOf(`${id} recomputed`) : -1;
+        if (LIKE.snapshotDerivation?.(id) !== true || at < 0) {
+          return false;
+        }
+        links.splice(at, 1);
+        inserted += 1;
+      }
+      if (
+        i !== r.derivationsRecomputed.length ||
+        links.join(LINK) !== r.causalChain
+      ) {
+        return false;
+      }
+    }
+
+    return inserted > 0;
+  },
   /**
    * Row (az) in the audit ledger (L12c): 2.0's `replay()` and `import()`
    * call `onHistoryNavigate`, which the ledger records as a
