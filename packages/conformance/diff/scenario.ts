@@ -570,14 +570,18 @@ export interface Divergence {
    */
   afterError?: true;
   /**
-   * Fuzz only, op `missing` (L12 gate run 5): the entry covers a
-   * requirement's cancel record only after both engines reported that
-   * requirement's run's outcome (complete and the requirement met, or its
-   * error) and then one cancel of it, in that order and from the same
+   * Fuzz only, op `missing` or `changed` (L12 gate run 5): the entry
+   * covers a requirement's cancel record only after both engines reported
+   * that requirement's run's outcome (complete and the requirement met, or
+   * its error) and then one cancel of it, in that order and from the same
    * resolver, with no other lifecycle hook of it since but 1.35's own
    * further cancels (`Difference.afterCancel`, `markAfterCancel`): the
    * further cancels 1.35 reports for a batch run that finished or failed
-   * (PR seed 17's fourth and fifth shrinks).
+   * (PR seed 17's fourth and fifth shrinks). On an op `changed` entry (the
+   * mispaired form, PR seed 17's seventh case): the pair's 1.35 record is
+   * such a further cancel, and the engine's record is a cancel of another
+   * requirement that 1.35 also cancels in the same step and phase, as many
+   * times as the engine does.
    */
   afterCancel?: true;
   reason: string;
@@ -1460,7 +1464,7 @@ export function covers(
         d.afterError === true)) &&
     (div.afterCancel !== true ||
       (name === FUZZ_SCENARIO &&
-        d.op === "missing" &&
+        (d.op === "missing" || d.op === "changed") &&
         d.afterCancel === true)) &&
     (div.bound === undefined || admits(div.bound, d)) &&
     (div.requires === undefined ||
@@ -2333,6 +2337,36 @@ function lifecycleOf(trace: TraceEntry[]): Map<string, LifecycleHook[]> {
 }
 
 /**
+ * How many cancel records of each kind each requirement has in each step
+ * and phase of `trace`, by `<segment>|<kind>|<id>` (`markAfterCancel`, the
+ * mispaired form; segments as `lifecycleOf` files them).
+ */
+function cancelCounts(trace: TraceEntry[]): Map<string, number> {
+  const out = new Map<string, number>();
+  let step = -1;
+  let phase: "setup" | "sync" | "async" = "setup";
+  for (const e of trace) {
+    if (e.k === "step") {
+      step = e.i;
+      phase = "sync";
+      continue;
+    }
+    if (e.k === "async") {
+      phase = "async";
+      continue;
+    }
+    const kind = kindOf(e);
+    const id = canceledIdOf(e as unknown as Json);
+    if (kind !== undefined && id !== undefined) {
+      const key = `${segmentRank(step, phase)}|${kind}|${id}`;
+      out.set(key, (out.get(key) ?? 0) + 1);
+    }
+  }
+
+  return out;
+}
+
+/**
  * Mark `Difference.afterCancel` (L12 gate run 5, the further cancels 1.35
  * reports for a batch run whose outcome and one cancel both engines
  * reported; PR seed 17's fourth, fifth and sixth cases): a cancel record
@@ -2358,6 +2392,19 @@ function lifecycleOf(trace: TraceEntry[]): Map<string, LifecycleHook[]> {
  *   with the outcome and exactly one cancel.
  * The outcome must be the same on both engines, and every outcome hook and
  * onResolverCancel, the difference's own too, must name the same resolver.
+ *
+ * The mispaired form (PR seed 17's seventh case, `pr17g`; the owner's
+ * 2026-11-24 answer): where the same pass also cancels another requirement
+ * on both engines, the alignment pairs 1.35's further cancel with the
+ * engine's cancel of that other requirement, so it shows as op `changed`.
+ * Such a pair is marked too, by the same rule read on 1.35's whole record
+ * (`Difference.record`), and only where the engine's record
+ * (`Difference.candidateRecord`) is a cancel of a different requirement
+ * that 1.35 also cancels, with a record of the same kind, in the pair's
+ * step and phase, as many times as the engine does (`cancelCounts`): a
+ * cancel the engine makes of a requirement 1.35 never cancels, or more
+ * often than 1.35, stays unmarked. 1.35's own cancel of the other
+ * requirement, left unpaired, is never marked.
  * Returns `differences`, marked in place.
  */
 export function markAfterCancel(
@@ -2368,6 +2415,7 @@ export function markAfterCancel(
   let timelines:
     | [Map<string, LifecycleHook[]>, Map<string, LifecycleHook[]>]
     | undefined;
+  let counts: [Map<string, number>, Map<string, number>] | undefined;
   /**
    * How a run that ended and was then canceled ends, as the first `count`
    * hooks of `all` end, `again` allowing more than one cancel: its outcome
@@ -2407,10 +2455,33 @@ export function markAfterCancel(
       : null;
   };
   for (const d of differences) {
-    const id = d.op === "missing" ? canceledIdOf(d.reference) : undefined;
+    // 1.35's cancel record: the difference's own, or 1.35's half of a pair.
+    const own =
+      d.op === "missing"
+        ? d.reference
+        : d.op === "changed"
+          ? d.record
+          : undefined;
+    const id = canceledIdOf(own);
     const at = d.at.reference;
     if (id === undefined || at === undefined) {
       continue;
+    }
+    if (d.op === "changed") {
+      // The mispaired form: the engine's half is a cancel of another
+      // requirement, which 1.35 cancels as often in this step and phase.
+      const other = canceledIdOf(d.candidateRecord);
+      counts ??= [cancelCounts(reference), cancelCounts(candidate)];
+      const key = `${segmentRank(d.step, d.phase)}|${d.kind}|${other}`;
+      const also = counts[0].get(key) ?? 0;
+      if (
+        other === undefined ||
+        other === id ||
+        also === 0 ||
+        also !== (counts[1].get(key) ?? 0)
+      ) {
+        continue;
+      }
     }
     timelines ??= [lifecycleOf(reference), lifecycleOf(candidate)];
     const mine = timelines[0].get(id) ?? [];
@@ -2423,7 +2494,7 @@ export function markAfterCancel(
     const ended = canceledAfterOutcome(mine, count, true);
     const named =
       d.kind === "onResolverCancel"
-        ? (d.reference as { args?: Json[] } | undefined)?.args?.[0]
+        ? (own as { args?: Json[] } | undefined)?.args?.[0]
         : undefined;
     if (
       ended === null ||

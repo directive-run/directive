@@ -1,6 +1,6 @@
 # Phase 3 gate decisions: the L12 gate
 
-Date: 2026-11-21 to 2026-11-23. Jason approved the L12 plugins RFC
+Date: 2026-11-21 to 2026-11-24. Jason approved the L12 plugins RFC
 (`rfc-l12-plugins.md`) on 2026-11-15 with "I approve you for to do
 everything"; each row was taken as its "Option taken" says, and (bw) is
 declined. Row (az) is an L8 row: "Approve all as recommended
@@ -18,17 +18,25 @@ in flight is cancelled once on both engines, and then 1.35 cancels it a
 second time), he answered: "2.0's single cancel; sign it (Recommended)".
 Asked next, also on 2026-11-23, whether to widen those second-cancel
 entries from a finished run to any outcome, he answered: "Widen to any
-outcome (Recommended)".
+outcome (Recommended)". On 2026-11-24, asked how to close `pr17g` (both
+engines also cancel another request, and the comparison pairs 1.35's extra
+second cancel with 2.0's cancel of that other request), he answered:
+"Extend the exception, not the pairing (Recommended)".
 Claude signs the entries for approved rows on his behalf (GATE-2.md, rule
 1). This record covers gate runs 1 to 5; any further run goes back to him.
-**Run 5 is not green: PR seed 17 still exits 1, on a seventh case. Every
+**Run 5 is not green: PR seed 17 still exits 1, on an eighth case. Every
 check exits 0 and the other 20 PR seeds exit 0 on the final tree. Seed 17's
-sixth case, `pr17f`, was a gap in a harness marker inside the shape his two
-2026-11-23 answers approve; run 5 closes it in the harness, with no new
-entry and no new owner decision ("Run 5, `pr17f`", below). Its six cases so
-far replay with 0 unexplained. Its seventh, `pr17g`, is a new stop (below):
-the engines again do what those answers cover, and the comparison pairs
-1.35's second cancel with another requirement's cancel.**
+sixth case, `pr17f`, was a gap in a
+harness marker inside the shape his two 2026-11-23 answers approve; run 5
+closed it in the harness, with no new entry and no new owner decision
+("Run 5, `pr17f`", below). Its seventh, `pr17g`, is that shape where the
+comparison pairs 1.35's second cancel with another requirement's cancel;
+on his 2026-11-24 answer run 5 signs that mispaired form as twins of the
+second-cancel entries and leaves the comparison alone ("Run 5, the owner's
+answer on `pr17g`", below). Its seven cases so far replay with 0
+unexplained. Its eighth, `pr17h`, is a new stop (below): the same
+mispairing in another approved group, row t's cancel of a finished batch
+run with no `goTo`, which his 2026-11-24 answer does not name.**
 
 ## What the L12 gate does
 
@@ -104,10 +112,16 @@ owner's answer on `pr17d`"). All 21 PR seeds then run on that tree:
 pairings cross and the marker left one record of 1.35's second cancel
 unexplained. That is a harness gap inside the approved shape, so run 5
 fixes the marker ("Run 5, `pr17f`: the marker reads each engine's own
-record order"). All 21 PR seeds then run on the final tree: 20 exit 0, and
-seed 17 stops on `pr17g`, the same shape with another requirement's cancel
-right after it, which the comparison pairs with 1.35's second cancel
-(Stops (run 5)).
+record order"). All 21 PR seeds then run on that tree: 20 exit 0, and
+seed 17 finds `pr17g`, the same shape with another requirement's cancel
+right after it, which the comparison pairs with 1.35's second cancel. A
+change to the pairing was tried and reverted: it moved three signed
+results. On the owner's "Extend the exception, not the pairing
+(Recommended)" (2026-11-24) run 5 leaves the comparison alone and signs
+the mispaired form ("Run 5, the owner's answer on `pr17g`"). All 21 PR
+seeds then run on the final tree: 20 exit 0, and seed 17 stops on `pr17h`,
+the same mispairing for row t's cancel of a finished batch run, with no
+`goTo` (Stops (run 5)).
 
 ## The L12 decisions
 
@@ -136,6 +150,7 @@ right after it, which the comparison pairs with 1.35's second cancel
 | 5 | row t, group `quirk-t-batch-completed` | `l12-cand-t-batch-completed-*-missing` (onResolverCancel, onRequirementCanceled, requirement.canceled) |
 | 5 | row t, its error shape, group `quirk-t-batch-error` | `l12-cand-t-batch-error-*-missing` (the same three records) |
 | 5 | row t and row (av), the owner's 2026-11-23 answer, group `quirk-t-batch-second-cancel` | `l12-cand-t-batch-second-cancel-*-missing` (the same three records, 1.35's further copies; widened to any outcome on his second 2026-11-23 answer) |
+| 5 | the same group, its mispaired form, the owner's 2026-11-24 answer | `l12-cand-t-batch-second-cancel-*-changed` (the same three records, where 1.35's further cancel is paired with 2.0's cancel of another requirement both engines cancel) and `l12-cand-t-batch-second-cancel-*-unpaired-missing` (1.35's own cancel of that other requirement, left unpaired) |
 | 5 | (bx) knock-on, group `row-bx`, `when` watchIncludesFacts | `l12-fuzz-bx-hook-onError-repaired-changed`, `...-onErrorRecovery-repaired-changed`; `l12-fuzz-bx-hook-onDerivationCompute-repaired-changed`, `...-observe-derivation-compute-repaired-changed`; `l12-fuzz-bx-hook-onTraceComplete-recompute-inserted`, `...-state-settle-trace-...`, `...-state-end-trace-...`; `l12-fuzz-bx-console-warn-distributable-unknown-keys-extra` |
 
 The new trigger `watchIncludesFacts` is a watch with `includeFacts`
@@ -359,6 +374,57 @@ the event's shared point is before 2.0's cancel), and that nothing is left
 unexplained, after a finished run and after a failed one. On the marker as
 it was (6de52109) that control fails; the 66 earlier tests pass on both.
 
+## Run 5, the owner's answer on `pr17g`: the mispaired form
+
+Seed 17's seventh case was `pr17g` (`$G/r5/specs/pr17g.json`; traces
+`$G/r5/replay/u2-pr17g.v1.jsonl`, `.v2.jsonl`): `pr17d` with another
+constraint in module b, where the same pass also retracts b's requirement
+`B0` while its resolver is in flight. Both engines report the batch run
+complete, the requirement `AB` met and one cancel of it, and both cancel
+`B0` once, in the same shape; 1.35 reports `AB`'s cancel a second time in
+between (v1 136 to 138). The engines do nothing new. The comparison pairs
+a stream's records by kind, step and phase, not by requirement, so 1.35's
+three cancels (`AB`, `AB`, `B0`) pair in order with 2.0's two (`AB`,
+`B0`): 1.35's second `AB` cancel is paired with 2.0's `B0` cancel, 8
+`changed` differences, and 1.35's own `B0` cancel is left missing.
+
+A change to the pairing was tried first and reverted, with no commit
+(`$G/r9/compare-cancel-id.patch`, not applied): breaking pairing ties by a
+cancel record's requirement id explains `pr17g`, but 3 of the 679 diff
+self-tests changed result, because the signed L11 row-t batch-pairing
+twins and the L7 U2 pin are written for the pairing as it is.
+
+Jason was then asked in chat how to close `pr17g`, where both engines also
+cancel another request and the comparison pairs 1.35's extra second cancel
+with 2.0's cancel of that other request. He answered: **"Extend the
+exception, not the pairing (Recommended)"** (2026-11-24). The option he
+picked leaves the comparison alone and lets the second-cancel exception
+also accept the mispaired form, where 1.35's extra cancel shows up as
+'changed' against 2.0's cancel of another request that both engines
+cancelled; the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle
+the same mispairing this way. Self-tests: a real wrong-request cancel on
+2.0 still fails. `diff/compare.ts` is unchanged.
+
+| Entries | Row | Narrow form | Proof | Still fails (self-test) |
+| --- | --- | --- | --- | --- |
+| The pair (3): `l12-cand-t-batch-second-cancel-*-changed`, group `quirk-t-batch-second-cancel` | row t and row (av), on the owner's 2026-11-24 answer, next to his two of 2026-11-23 | A `changed` cancel record (onResolverCancel, onRequirementCanceled, requirement.canceled) whose 1.35 record is a batch requirement's cancel in the id-only shape (`record`), changed only from the batch classes to a single resolver's (resolver, constraint, requirement id and type); the group's `when` (batched, navigated, navigatedBusy) and `afterOp` goTo; and `afterCancel`: `markAfterCancel` marks the pair only where **1.35's side is the approved further cancel**, by the same per-engine rule as the `-missing` entries (the same outcome on both engines, then exactly one cancel on 2.0 and one or more on 1.35 before this record), and **2.0's side is a cancel of a different requirement that 1.35 also cancels**, with a record of the same kind, in the same step and phase, as many times as 2.0 does | `pr17g`: the 8 changed differences (`$G/r5/replay/z1-pr17g.json`); `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e`, `pr17f` stay at 0 (`$G/r5/replay/z1-*`) | 2.0 canceling a requirement 1.35 never cancels (a real wrong-request cancel: all 8 stay unexplained); 2.0 canceling the other requirement more often than 1.35; the same mispairing where 1.35's batch cancel is its first, where its run had no outcome, or where 2.0 never canceled the batch requirement; no goTo; an unmarked pair; a pair between two batch requirements; 1.35's record in the whole-requirement shape; the pair the other way round; no navigation that can run while work is in flight |
+| The cancel left unpaired (3): `l12-cand-t-batch-second-cancel-*-unpaired-missing`, the same group | the same | 1.35's own cancel of the other requirement, a single resolver's whole requirement, missing on 2.0; the group's `when` and `afterOp` goTo; and only where the case's 2.0 differences hold, at or before it, the pair above (`requires`, with that entry's bound), as the L11 twins' `-missing` entries do | Self-test only: `pr17g`'s shape without the `writeRetracts` trigger. In `pr17g` itself row t's third path (`l3-cand-t-fuzz-*`, earlier in the file) takes these three records first | A single resolver's cancel 2.0 lacks with no such pair; with a pair the changed twins do not excuse, the case still fails on the pair; no goTo |
+
+- The harness: `markAfterCancel` (`diff/scenario.ts`) also reads a
+  `changed` cancel pair (1.35's whole record, `Difference.record`; 2.0's,
+  `Difference.candidateRecord`) and counts each requirement's cancel
+  records per step and phase on both engines (`cancelCounts`); `covers`
+  lets an `afterCancel` entry cover a `changed` difference; the census
+  accepts `afterCancel` on an op `changed` entry (`lib/census.ts`), and on
+  no other op. 1.35's unpaired cancel of the other requirement is never
+  marked. Every `missing` mark is decided as before.
+- Self-tests: 10 new (81 in `diff/self/l12-gate-run5.test.ts`): the
+  signatures; `pr17g`'s shape explained, the pair by the changed twins and
+  the unpaired cancel by its own twin where row t's third path does not
+  apply; the failures in the table; the census rule.
+- One more pinned case (`diff/fuzz/pinned.json`): `pr17g`, so the changed
+  twins stay reached when the census seed draws no such case.
+
 ## Deep batched cases (run 4's report, triaged in run 5)
 
 Run 4's deep seeds each exited 1 on one hard failure and reported batched
@@ -435,54 +501,51 @@ coordinator dispatches after pushing.
 
 | Check | Exit | Result |
 | --- | --- | --- |
-| `pnpm census` | 0 | 10 projects, 15,727 tests; the census-seed fuzz compares 422 cases, all on v2 too |
+| `pnpm census` | 0 | 10 projects, 15,737 tests; the census-seed fuzz compares its cases on v2 too |
 | `check:expects` | 0 | |
 | `oracle:update` | 0 | after the last harness edit |
 | `conformance:checks` | 0 | 253 passed |
-| diff self-tests | 0 | 679 tests (71 new in run 5, `l12-gate-run5.test.ts`) |
+| diff self-tests | 0 | 689 tests (81 new in run 5, `l12-gate-run5.test.ts`) |
 | Root biome | 0 | |
 | `ratchet --update` | 0 | +0, none lost; 3,046 |
-| `pnpm -r --filter './packages/*' typecheck` | 1 | only the known gap (`ai-harness`, `cli`, `mcp`); core, core-next, conformance pass. Not rerun after the last four groups of changes; conformance's own `tsc --noEmit` exits 0 on the final tree |
-| **All 21 PR seeds at L12 on the final tree** (after the `pr17f` marker fix; one at a time, nohup, 8 GB heap) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (120 s limit; `$G/r5/pr8-seeds.exit`); 7, 9, 11 exit 0 (1,800 s limit; 350, 464 and 581 s); **17 exits 1** in 76 s on `pr17g`, 8 differences (Stops (run 5); `$G/r5/slow8-seeds.exit`, `$G/r5/slow8-seed-17.log`) |
+| `pnpm -r --filter './packages/*' typecheck` | 1 | only the known gap (`ai-harness`, `cli`, `mcp`); core, core-next, conformance pass. Not rerun after the last five groups of changes; conformance's own `tsc --noEmit` exits 0 on the final tree |
+| **All 21 PR seeds at L12 on the final tree** (after the `pr17g` twins; one at a time, nohup, 8 GB heap) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (120 s limit; `$G/r5/pr9-seeds.exit`); 7, 9, 11 exit 0 (1,800 s limit; 398, 528 and 609 s); **17 exits 1** in 64 s on `pr17h`, 8 differences (Stops (run 5); `$G/r5/slow9-seeds.exit`, `$G/r5/slow9-seed-17.log`) |
+| All 21 PR seeds at L12 on 06ca4e30 (after the `pr17f` marker fix, before the `pr17g` twins; one at a time, nohup, 8 GB heap) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (120 s limit; `$G/r5/pr8-seeds.exit`); 7, 9, 11 exit 0 (1,800 s limit; 350, 464 and 581 s); **17 exits 1** in 76 s on `pr17g`, 8 differences (closed by the twins, above; `$G/r5/slow8-seeds.exit`, `$G/r5/slow8-seed-17.log`) |
 | PR seed 17 at L12 on 6de52109 (after the widening, before the marker fix; nohup, 8 GB heap) | 1 | at the 120 s limit: timed out with no difference reported (`$G/r5/pr7-seed-17.log`); again at the 1,800 s limit: **exits 1** in 104 s on `pr17f`, 1 difference (closed by the marker fix, above; `$G/r5/slow7-seed-17.log`). The other 20 seeds were not rerun: the widening changes only `markAfterCancel` and the three entries' reasons |
 | All 21 PR seeds at L12, one at a time, 8 GB heap, on d29001ab (after the `pr17d` entries, before the widening; nohup) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (120 s limit); **17 exits 1** on `pr17e` (closed by the widening, above); 7, 9, 11 exit 0 (1,800 s limit; 374, 496 and 604 s) |
 | PR seed 17's reruns between the entries | 1 | after the error-shape entries: its third shrink `pr17c` (the logging plugin's lines between the cancel's records, a marker gap, fixed), then `pr17d` (signed on the owner's 2026-11-23 answer, above); after the `pr17d` entries: exits 1 on `pr17e` (widened on the owner's second 2026-11-23 answer, above); after the widening: exits 1 on `pr17f` (the marker gap, fixed: "Run 5, `pr17f`", above) |
-| Replays of the hard failures | 0 | PR 6, 11, 15 (both shrinks), 17 (first shrink), deep 1, 2, 24301: 0 unexplained each; the no-facts and no-watch twins: 0 differences. On the final tree: `pr17d`, `pr17`, `pr17b`, `pr17c` 0 unexplained each (`$G/r5/replay/k1-*`); `pr17e` 3 unexplained (`k2-*`). On the final tree, after the widening: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e` 0 unexplained each (`$G/r5/replay/q1-*`); `pr17f` 1 unexplained (`q2-*`). On the final tree, after the marker fix: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e`, `pr17f` 0 unexplained each (`$G/r5/replay/u1-*`); `pr17g` 8 unexplained (`u2-*`, the stop) |
+| Replays of the hard failures | 0 | PR 6, 11, 15 (both shrinks), 17 (first shrink), deep 1, 2, 24301: 0 unexplained each; the no-facts and no-watch twins: 0 differences. On the final tree: `pr17d`, `pr17`, `pr17b`, `pr17c` 0 unexplained each (`$G/r5/replay/k1-*`); `pr17e` 3 unexplained (`k2-*`). On the final tree, after the widening: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e` 0 unexplained each (`$G/r5/replay/q1-*`); `pr17f` 1 unexplained (`q2-*`). On the final tree, after the marker fix: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e`, `pr17f` 0 unexplained each (`$G/r5/replay/u1-*`); `pr17g` 8 unexplained (`u2-*`). On the final tree, after the `pr17g` twins: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e`, `pr17f`, `pr17g` 0 unexplained each (`$G/r5/replay/z1-*`); `pr17h` 8 unexplained (`z2-*`, the stop) |
 | Deep seeds 1, 2, 24301 | — | not rerun (run 5's brief). Run 4's report: each exited 1 on one hard failure, now covered (above), and reported 5, 7 and 5 batched cases (triaged above and in the follow-ups) |
 
 ## Stops (run 5)
 
-- **PR seed 17, its seventh case (plugin phase, no plugin on, trace off):
-  `pr17d`'s shape again, with another requirement canceled right after, and
-  the comparison pairs 1.35's second cancel with that other cancel.** Found
-  by seed 17's run on the final tree, after the marker fix. Shrunk case
-  `$G/r5/specs/pr17g.json` (8 differences); traces
-  `$G/r5/replay/u2-pr17g.v1.jsonl`, `.v2.jsonl`. It is `pr17d` with another
-  constraint in module b (`crossAtLeast` 1), and here the same pass also
-  retracts b's requirement `B0` while its resolver is in flight.
-  After the `goTo`, both engines report the batch run complete, the
-  requirement `AB` met and one cancel of it (v1 and v2 133 to 135), and
-  both cancel `B0` once, in the same shape (v1 139 to 142, v2 136 to 139).
-  1.35 reports `AB`'s cancel a second time in between (v1 136 to 138).
-  That is the engines' behaviour the owner's two 2026-11-23 answers cover,
-  with one more cancel both engines make; the engines do nothing new.
-  The comparison pairs records of a stream by kind, step and phase, not by
-  requirement: 1.35's three cancels (`AB`, `AB`, `B0`) against 2.0's two
-  (`AB`, `B0`) pair in order, so 1.35's second `AB` cancel is paired with
-  2.0's `B0` cancel, 8 `changed` differences (the resolver, the
-  requirement and its id), and 1.35's own `B0` cancel is the one left
-  missing, which row t's single-resolver entries (`l3-cand-t-fuzz-*`) then
-  cover for the wrong reason. No entry covers a cancel paired with another
-  requirement's, and none should. `markAfterCancel` is not involved: no
-  second-cancel record is missing, so there is nothing for it to mark, and
-  the case fails the same way on the marker as it was (by reading; not
-  rerun on 6de52109). Closing it means changing the alignment, not a
-  marker: for example breaking pairing ties by a cancel record's
-  requirement id, as `computeIdText` does for computes (`diff/compare.ts`),
-  after which 1.35's second `AB` cancel would be the missing record and the
-  second-cancel entries would cover it (by reading; not tried). That is
-  harness code every case passes through, with all 21 PR seeds to rerun.
-  Coordinator or owner call. No engine code was changed.
+- **PR seed 17, its eighth case (no history, no plugin on, trace off): the
+  same mispairing in another approved group, row t's cancel of a finished
+  batch run, with no `goTo`.** Found by seed 17's run on the final tree,
+  after the `pr17g` twins. Shrunk case `$G/r5/specs/pr17h.json` (8
+  differences); traces `$G/r5/replay/z2-pr17h.v1.jsonl`, `.v2.jsonl`. In
+  step 4, a `settle`, both engines report the batch run complete and the
+  requirement `AB` met, and both cancel the single requirement `A0` once, in
+  the same shape (v1 170 to 172, v2 167 to 169). 1.35 then also cancels the
+  met `AB` (v1 174 to 176, id-only); 2.0 does not cancel it at all. That
+  extra cancel is row t's third path for a batch run, which the
+  `l12-cand-t-batch-completed-*` entries (`afterMet`) cover where it is left
+  missing, as they do in step 2 of this same case. Here the comparison
+  pairs it with 2.0's `A0` cancel, 8 `changed` differences, and leaves
+  1.35's own `A0` cancel missing (taken by `l3-cand-t-fuzz-*`). It is not
+  the second-cancel shape: the case has no history and no `goTo`, and 2.0
+  reports no cancel of `AB`, so `markAfterCancel` rightly leaves the pair
+  unmarked and the `pr17g` twins (`afterOp` goTo, `when` navigated) do not
+  apply. The engines do nothing new. The owner's 2026-11-24 answer names
+  the second-cancel exception; giving the batch-completed group the same
+  `-changed` twins (`afterMet` read on 1.35's record of a pair) is the same
+  kind of step, but a new widening he has not been asked about. Owner call.
+  Not fixed, as run 5's brief says; no engine code was changed.
+
+The seventh case, `pr17g`, was reported as a stop (the second-cancel shape,
+mispaired by the comparison with another requirement's cancel) and is
+closed on the owner's 2026-11-24 answer ("Run 5, the owner's answer on
+`pr17g`", above).
 
 Closed in run 5, all from PR seed 17:
 
@@ -496,7 +559,11 @@ Closed in run 5, all from PR seed 17:
   (2026-11-23);
 - its sixth case (`pr17d`'s shape with the trace option on, where the hook
   and observe pairings cross; `pr17f`), by the marker fix: a harness gap
-  inside the approved shape, with no new entry and no new owner decision.
+  inside the approved shape, with no new entry and no new owner decision;
+- its seventh case (`pr17d`'s shape where both engines also cancel another
+  requirement, and the comparison pairs 1.35's second cancel with it;
+  `pr17g`), by the changed twins signed on his "Extend the exception, not
+  the pairing (Recommended)" (2026-11-24), with the comparison unchanged.
 
 Run 4's two stops are closed: PR seed 6 by the (bx) error-pairing entries,
 PR seed 15 by quirk b's batch-pairing entries.
@@ -554,3 +621,12 @@ PR seed 15 by quirk b's batch-pairing entries.
   - 24301/3: one batch `wrote` missing after quirk g's stop. Untriaged.
   - 24301/5 (up to L12): one `onReconcileEnd` extra and one missing after quirk a's stop. Untriaged.
 - `/principal` on L12 (the RFC's gate row).
+- `diff/compare.ts`'s note on `Difference.afterCancel` still says the marker
+  reads a cancel record the engine lacks; since the `pr17g` twins it also
+  marks a `changed` cancel pair (`diff/scenario.ts` `markAfterCancel` says
+  so). The file was left untouched on the owner's 2026-11-24 answer; fix
+  the note with the next change to it.
+- The three `l12-cand-t-batch-second-cancel-*-unpaired-missing` entries are
+  reached only by their self-tests: in `pr17g` row t's third path
+  (`l3-cand-t-fuzz-*`) takes the unpaired cancel first. If a seed draws the
+  mispaired form without `writeRetracts`, pin it.

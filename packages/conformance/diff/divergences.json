@@ -50878,5 +50878,544 @@
     "reason": "Row t and row (av): 1.35's further cancels of a batch run after a history goTo, once both engines reported the run's outcome and one cancel of it (L12 gate run 5; PR seed 17's fourth and fifth shrinks, diff-notes l12gate/r5/specs/pr17d and pr17e). A goTo restores the batch source's fact while a batch call is in flight, which retracts the batch requirement without ending the call; the call's late write raises the requirement again and a second call starts; the pass that follows retracts the batch source's constraint while reporting the batch run's outcome, with both calls in flight: finished (onResolverComplete and onRequirementMet; pr17d) or failed (onResolverError; pr17e, a failing batch). Both engines report that outcome, abort both calls' signals (\"aborted\") and cancel the requirement once (onResolverCancel, onRequirementCanceled, requirement.canceled; 1.35 in its id-only shape, row (aq)). 1.35 then reports the same cancel again; 2.0, as with row (av)'s requirement that 1.35 holds twice, reports it once. This covers only the requirement.canceled observe event of such a further cancel, for a batch requirement in the id-only shape, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a goTo step (`afterOp`), and only after the outcome and a cancel both engines reported (`afterCancel`, diff/scenario.ts markAfterCancel): on both engines the requirement's lifecycle hooks before the record end with its run's outcome, the same on both (its onResolverComplete and its onRequirementMet, or its onResolverError), and then its cancel (onResolverCancel and onRequirementCanceled), exactly one cancel on 2.0 and one or more on 1.35, all naming the same batch resolver, with no create, start or other lifecycle hook of it since. Each engine's side is read in its own record order, not from the pairing: 2.0's cancel is the one right after the same outcome in 2.0's own hooks, by the end of the record's step and phase, so the excuse holds whichever of 1.35's cancels each stream's pairing leaves unpaired (PR seed 17's sixth case, diff-notes l12gate/r5/specs/pr17f: pr17d's shape with the trace option on, where the hook stream pairs 2.0's cancel with 1.35's second cancel and the observe stream with its first). A further cancel where 2.0 reported no cancel before it, one in a case without a goTo, one of a run with no outcome reported (still in flight), an extra cancel on 2.0 instead of 1.35, and any other record that differs all stay unexcused. Signed on the owner's instruction: asked about pr17d (after a history goTo, a finished batched requirement with two calls in flight is cancelled once on both engines, and then 1.35 cancels it a second time), he answered \"2.0's single cancel; sign it (Recommended)\" (2026-11-23), the option that treats it as row t / (av): 1.35's second cancel of an already-cancelled finished run is an extra report, signed as a narrow entry that requires a goTo, a finished batch run and a cancel already reported on both engines, with a self-test. Asked then whether to widen these entries from a finished run to any outcome (pr17e: the same case with a batch run that failed), he answered \"Widen to any outcome (Recommended)\" (2026-11-23), the option that signs one rule: after a goTo, once both engines have reported a batched request's outcome (finished or failed) and one cancel, 1.35's further cancels of it are extra reports; self-tests: no prior cancel, no goTo, or a different difference still fail. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
     "approvedBy": "Jason Comes",
     "date": "2026-11-23"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onResolverCancel-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args",
+    "afterCancel": true,
+    "afterOp": "goTo",
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0]",
+          "from": {
+            "$like": "batchResolver"
+          },
+          "to": {
+            "$like": "resolver"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onResolverCancel",
+            "args": [
+              {
+                "$like": "batchResolver"
+              },
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "path": "args[1].fromConstraint",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "$like": "constraint"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onResolverCancel",
+            "args": [
+              {
+                "$like": "batchResolver"
+              },
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "path": "args[1].id",
+          "from": {
+            "$like": "batchRequirementId"
+          },
+          "to": {
+            "$like": "requirementId"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onResolverCancel",
+            "args": [
+              {
+                "$like": "batchResolver"
+              },
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "path": "args[1].requirement",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "type": {
+              "$like": "requirementType"
+            }
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onResolverCancel",
+            "args": [
+              {
+                "$like": "batchResolver"
+              },
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the onResolverCancel hook call of that pairing: 1.35's whole record is a batch requirement's cancel in the id-only shape (`record`), `from` names only the batch classes and `to` only a single resolver's (its resolver, constraint, requirement id and type), in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a goTo step (`afterOp`), and only where (`afterCancel`, diff/scenario.ts markAfterCancel) 1.35's side is the approved further cancel, by the same per-engine rule as the `-missing` entries (on both engines the batch requirement's lifecycle hooks end with its run's outcome, the same on both, then its cancel, exactly one on 2.0 and one or more on 1.35 before this record, all naming the same batch resolver, each engine's side read in its own record order), and 2.0's side is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the same step and phase, as many times as 2.0 does. A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels less often, the same pairing where 1.35's batch cancel is its first, where its run had no outcome or where 2.0 reported no cancel of the batch requirement, a pairing in a case without a goTo, and a change between two batch requirements or two single runs all stay unexcused. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onRequirementCanceled-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0]",
+    "afterCancel": true,
+    "afterOp": "goTo",
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].fromConstraint",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "$like": "constraint"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onRequirementCanceled",
+            "args": [
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "path": "args[0].id",
+          "from": {
+            "$like": "batchRequirementId"
+          },
+          "to": {
+            "$like": "requirementId"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onRequirementCanceled",
+            "args": [
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "path": "args[0].requirement",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "type": {
+              "$like": "requirementType"
+            }
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onRequirementCanceled",
+            "args": [
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the onRequirementCanceled hook call of that pairing: 1.35's whole record is a batch requirement's cancel in the id-only shape (`record`), `from` names only the batch classes and `to` only a single resolver's (its resolver, constraint, requirement id and type), in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a goTo step (`afterOp`), and only where (`afterCancel`, diff/scenario.ts markAfterCancel) 1.35's side is the approved further cancel, by the same per-engine rule as the `-missing` entries (on both engines the batch requirement's lifecycle hooks end with its run's outcome, the same on both, then its cancel, exactly one on 2.0 and one or more on 1.35 before this record, all naming the same batch resolver, each engine's side read in its own record order), and 2.0's side is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the same step and phase, as many times as 2.0 does. A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels less often, the same pairing where 1.35's batch cancel is its first, where its run had no outcome or where 2.0 reported no cancel of the batch requirement, a pairing in a case without a goTo, and a change between two batch requirements or two single runs all stay unexcused. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-observe-requirement-canceled-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event.id",
+    "afterCancel": true,
+    "afterOp": "goTo",
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "event.id",
+          "from": {
+            "$like": "batchRequirementId"
+          },
+          "to": {
+            "$like": "requirementId"
+          },
+          "record": {
+            "k": "observe",
+            "event": {
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "type": "requirement.canceled"
+            }
+          }
+        }
+      ]
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the requirement.canceled observe event of that pairing: 1.35's whole record is a batch requirement's cancel in the id-only shape (`record`), `from` names only the batch classes and `to` only a single resolver's (its resolver, constraint, requirement id and type), in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a goTo step (`afterOp`), and only where (`afterCancel`, diff/scenario.ts markAfterCancel) 1.35's side is the approved further cancel, by the same per-engine rule as the `-missing` entries (on both engines the batch requirement's lifecycle hooks end with its run's outcome, the same on both, then its cancel, exactly one on 2.0 and one or more on 1.35 before this record, all naming the same batch resolver, each engine's side read in its own record order), and 2.0's side is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the same step and phase, as many times as 2.0 does. A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels less often, the same pairing where 1.35's batch cancel is its first, where its run had no outcome or where 2.0 reported no cancel of the batch requirement, a pairing in a case without a goTo, and a change between two batch requirements or two single runs all stay unexcused. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onResolverCancel-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "afterOp": "goTo",
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "requirementId"
+              },
+              "requirement": {
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "hook",
+      "kind": "onResolverCancel",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "args[0]",
+            "from": {
+              "$like": "batchResolver"
+            },
+            "to": {
+              "$like": "resolver"
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onResolverCancel",
+              "args": [
+                {
+                  "$like": "batchResolver"
+                },
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "path": "args[1].fromConstraint",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "$like": "constraint"
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onResolverCancel",
+              "args": [
+                {
+                  "$like": "batchResolver"
+                },
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "path": "args[1].id",
+            "from": {
+              "$like": "batchRequirementId"
+            },
+            "to": {
+              "$like": "requirementId"
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onResolverCancel",
+              "args": [
+                {
+                  "$like": "batchResolver"
+                },
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "path": "args[1].requirement",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "type": {
+                "$like": "requirementType"
+              }
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onResolverCancel",
+              "args": [
+                {
+                  "$like": "batchResolver"
+                },
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the onResolverCancel hook call of the other requirement's cancel left unpaired on 1.35's side, a single resolver's whole requirement, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a goTo step (`afterOp`), and only where the case's 2.0 differences hold, at or before it, the batch-to-single change of `l12-cand-t-batch-second-cancel-hook-onResolverCancel-changed` (`requires`, with that entry's bound): the cancel of that requirement 2.0 does report was paired with 1.35's further batch cancel, so a single resolver's cancel 2.0 really lacks, with no such pairing, stays unexcused by this entry, and a case whose pairing that entry does not excuse still fails on the pairing. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onRequirementCanceled-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterOp": "goTo",
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "requirementId"
+              },
+              "requirement": {
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "hook",
+      "kind": "onRequirementCanceled",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "args[0].fromConstraint",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "$like": "constraint"
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onRequirementCanceled",
+              "args": [
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "path": "args[0].id",
+            "from": {
+              "$like": "batchRequirementId"
+            },
+            "to": {
+              "$like": "requirementId"
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onRequirementCanceled",
+              "args": [
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "path": "args[0].requirement",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "type": {
+                "$like": "requirementType"
+              }
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onRequirementCanceled",
+              "args": [
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the onRequirementCanceled hook call of the other requirement's cancel left unpaired on 1.35's side, a single resolver's whole requirement, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a goTo step (`afterOp`), and only where the case's 2.0 differences hold, at or before it, the batch-to-single change of `l12-cand-t-batch-second-cancel-hook-onRequirementCanceled-changed` (`requires`, with that entry's bound): the cancel of that requirement 2.0 does report was paired with 1.35's further batch cancel, so a single resolver's cancel 2.0 really lacks, with no such pairing, stays unexcused by this entry, and a case whose pairing that entry does not excuse still fails on the pairing. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-observe-requirement-canceled-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterOp": "goTo",
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "requirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "requires": {
+      "stream": "observe",
+      "kind": "requirement.canceled",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "event.id",
+            "from": {
+              "$like": "batchRequirementId"
+            },
+            "to": {
+              "$like": "requirementId"
+            },
+            "record": {
+              "k": "observe",
+              "event": {
+                "id": {
+                  "$like": "batchRequirementId"
+                },
+                "type": "requirement.canceled"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the requirement.canceled observe event of the other requirement's cancel left unpaired on 1.35's side, a single resolver's whole requirement, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a goTo step (`afterOp`), and only where the case's 2.0 differences hold, at or before it, the batch-to-single change of `l12-cand-t-batch-second-cancel-observe-requirement-canceled-changed` (`requires`, with that entry's bound): the cancel of that requirement 2.0 does report was paired with 1.35's further batch cancel, so a single resolver's cancel 2.0 really lacks, with no such pairing, stays unexcused by this entry, and a case whose pairing that entry does not excuse still fails on the pairing. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
   }
 ]

@@ -1214,10 +1214,10 @@ export function checkDivergences(
       e.afterCancel !== undefined &&
       (e.afterCancel !== true ||
         e.scenario !== FUZZ_SCENARIO ||
-        e.op !== "missing")
+        (e.op !== "missing" && e.op !== "changed"))
     ) {
       fail(
-        `${label} afterCancel must be true, on a fuzz entry of op "missing" only: it covers a requirement's cancel record only after both engines reported the requirement's run's outcome (complete and met, or its error) and one cancel of it`,
+        `${label} afterCancel must be true, on a fuzz entry of op "missing" or "changed" only: it covers a requirement's cancel record (or, changed, its pairing with another requirement's cancel that both engines made) only after both engines reported the requirement's run's outcome (complete and met, or its error) and one cancel of it`,
       );
     }
     if (
