@@ -129,8 +129,9 @@ export interface Difference {
    * requirement's cancel record the engine lacks (onResolverCancel,
    * onRequirementCanceled, requirement.canceled) when, just before it, the
    * requirement's lifecycle hooks on both engines end with its run's
-   * completion, its met and one cancel of it, from the same resolver. Only
-   * an entry with `afterCancel` reads it.
+   * outcome (its completion and its met, or its error) and one cancel of
+   * it (one or more on the reference), from the same resolver. Only an
+   * entry with `afterCancel` reads it.
    */
   afterCancel?: true;
   /** For `changed`: where inside the entry. */

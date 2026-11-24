@@ -16,11 +16,16 @@ answered: "Yes, run 5 (Recommended)". On 2026-11-23, asked about run 5's
 stop (after a history `goTo`, a finished batched requirement with two calls
 in flight is cancelled once on both engines, and then 1.35 cancels it a
 second time), he answered: "2.0's single cancel; sign it (Recommended)".
+Asked next, also on 2026-11-23, whether to widen those second-cancel
+entries from a finished run to any outcome, he answered: "Widen to any
+outcome (Recommended)".
 Claude signs the entries for approved rows on his behalf (GATE-2.md, rule
 1). This record covers gate runs 1 to 5; any further run goes back to him.
-**Run 5 is not green: 20 of the 21 PR seeds pass on the final tree. PR
-seed 17's stops so far are closed (row t's signed error shape; the owner's
-2026-11-23 answer); its next case is a new stop (below).**
+**Run 5 is not green: PR seed 17 still exits 1. Its five cases so far
+replay with 0 unexplained on the final tree; its sixth, `pr17f`, is a new
+stop (below). The other 20 PR seeds passed on the commit before (d29001ab)
+and were not rerun: the last change touches only the second-cancel entries
+and their matcher.**
 
 ## What the L12 gate does
 
@@ -87,9 +92,14 @@ batch run ("Run 5's last entry"), and seed 17's rerun finds a different
 case, `pr17d`: 1.35 cancels a finished batch requirement twice after a
 `goTo`, 2.0 once. On the owner's "2.0's single cancel; sign it
 (Recommended)" (2026-11-23) run 5 signs that too, narrowly ("Run 5, the
-owner's answer on `pr17d`"). All 21 PR seeds then run on the final tree:
+owner's answer on `pr17d`"). All 21 PR seeds then run on that tree:
 20 pass, and seed 17 finds the same shape for a batch run that errored
-(`pr17e`), which no approved row covers (Stops (run 5)).
+(`pr17e`). On the owner's "Widen to any outcome (Recommended)"
+(2026-11-23) run 5 widens the second-cancel entries to either outcome
+("Run 5, the owner's answer on `pr17e`"). Seed 17's rerun then stops on
+`pr17f`: `pr17d`'s shape with the trace option on, where the streams'
+pairings cross and one record of 1.35's second cancel stays unexplained
+(Stops (run 5)).
 
 ## The L12 decisions
 
@@ -117,7 +127,7 @@ owner's answer on `pr17d`"). All 21 PR seeds then run on the final tree:
 | 5 | quirk b, group `quirk-b-batch-pairing` | `l12-fuzz-b-batch-pair-*-changed` (onError, onErrorRecovery, onResolverError, resolver.error) |
 | 5 | row t, group `quirk-t-batch-completed` | `l12-cand-t-batch-completed-*-missing` (onResolverCancel, onRequirementCanceled, requirement.canceled) |
 | 5 | row t, its error shape, group `quirk-t-batch-error` | `l12-cand-t-batch-error-*-missing` (the same three records) |
-| 5 | row t and row (av), the owner's 2026-11-23 answer, group `quirk-t-batch-second-cancel` | `l12-cand-t-batch-second-cancel-*-missing` (the same three records, 1.35's second copy) |
+| 5 | row t and row (av), the owner's 2026-11-23 answer, group `quirk-t-batch-second-cancel` | `l12-cand-t-batch-second-cancel-*-missing` (the same three records, 1.35's further copies; widened to any outcome on his second 2026-11-23 answer) |
 | 5 | (bx) knock-on, group `row-bx`, `when` watchIncludesFacts | `l12-fuzz-bx-hook-onError-repaired-changed`, `...-onErrorRecovery-repaired-changed`; `l12-fuzz-bx-hook-onDerivationCompute-repaired-changed`, `...-observe-derivation-compute-repaired-changed`; `l12-fuzz-bx-hook-onTraceComplete-recompute-inserted`, `...-state-settle-trace-...`, `...-state-end-trace-...`; `l12-fuzz-bx-console-warn-distributable-unknown-keys-extra` |
 
 The new trigger `watchIncludesFacts` is a watch with `includeFacts`
@@ -246,6 +256,45 @@ row t's approval (2026-11-01) and row (av)'s "Approve: once (Recommended)"
   file's `left` helper now judges as `runScenario` does: every marker, and
   the steps' ops (which `afterOp` reads).
 
+## Run 5, the owner's answer on `pr17e`: one rule for any outcome
+
+The section above describes the second-cancel entries as first signed.
+Seed 17's next case was `pr17e` (`$G/r5/specs/pr17e.json`; traces
+`$G/r5/replay/k2-pr17e.v1.jsonl`, `.v2.jsonl`): `pr17d` with a failing
+batch (handler "results", `fails` 1). The pass after the first call's
+write reports the run's error on both engines instead of a completion.
+Both engines cancel the requirement once, and 1.35 a second time: the same
+3 differences, after an error instead of a completion and met.
+
+Jason was asked in chat on 2026-11-23 whether to widen the second-cancel
+entries from a finished run to any outcome, and answered: **"Widen to any
+outcome (Recommended)"**. The option he picked: sign one rule. After a
+goTo, once both engines have reported a batched request's outcome
+(finished or failed) and one cancel, 1.35's further cancels of it are
+extra reports. Self-tests: no prior cancel, no goTo, or a different
+difference still fail.
+
+| Entries | Row | Narrowest form | Proof (replay, 0 unexplained) | Another shape that still fails (self-test) |
+| --- | --- | --- | --- | --- |
+| The same three, `l12-cand-t-batch-second-cancel-*`, group `quirk-t-batch-second-cancel`; no new entry | row t and row (av), on the owner's two 2026-11-23 answers | Unchanged: the id-only cancel records of a batch requirement missing on 2.0, `when` batched, navigated, navigatedBusy, in a step **after a goTo step** (`afterOp` goTo), `afterCancel`. Widened, in `markAfterCancel` only: on both engines the requirement's lifecycle hooks before the record end with **its run's outcome, the same on both** (its `onResolverComplete` and its `onRequirementMet`, **or its `onResolverError`**), then its cancel (`onResolverCancel`, `onRequirementCanceled`): **exactly one cancel on 2.0, one or more on 1.35**, every hook naming the same batch resolver, with no create, start or other lifecycle hook since | `pr17e` (the three entries and row (aq)'s two changed pairs); `pr17`, `pr17b`, `pr17c`, `pr17d` stay at 0 (`$G/r5/replay/q1-*`) | After either outcome, a second cancel with no cancel reported before it on 2.0 (the first is row t's own path, the second stays unexplained); no navigation, a navigation that never ran while work was in flight, a `back`, a goTo only after the cancel's step; an extra cancel on 2.0 instead of 1.35 (2.0 twice and 1.35 once; 2.0 twice and 1.35 three times); another record that differs (1.35 creating the requirement again, 1.35's extra error records, 2.0 lacking the run's error, the second cancel in the whole-requirement shape); a run still in flight; different outcomes on the two engines; an outcome from another resolver; created again after the first cancel; another requirement's cancel; an `onResolverCancel` naming another resolver |
+
+Two shapes that failed under the first answer are now excused, as the
+option he picked says: a batch run that **failed** ("finished or failed"),
+and 1.35's **third** cancel ("further cancels").
+
+Signed "on the owner's instruction": each entry's reason now quotes both
+2026-11-23 answers with their dates, next to row t's approval (2026-11-01)
+and row (av)'s "Approve: once (Recommended)" (2026-11-07). Harness:
+
+- **`markAfterCancel`** (`diff/scenario.ts`) only: `RUN_OUTCOMES` (finished
+  or failed) and `CANCEL_HOOKS` replace the one fixed list of four hooks.
+  The field's notes (`diff/compare.ts`, `diff/scenario.ts`) and the census
+  rule's message say the same. No other matcher, marker or entry changed,
+  and no case was pinned (`pr17d` keeps the group in use).
+- Self-tests: `diff/self/l12-gate-run5.test.ts` has 66 (7 new; "a third
+  cancel fails" and the errored half of "on a run that did not complete it
+  fails" became controls).
+
 ## Deep batched cases (run 4's report, triaged in run 5)
 
 Run 4's deep seeds each exited 1 on one hard failure and reported batched
@@ -322,50 +371,56 @@ coordinator dispatches after pushing.
 
 | Check | Exit | Result |
 | --- | --- | --- |
-| `pnpm census` | 0 | 10 projects, 15,716 tests; the census-seed fuzz compares 422 cases, all on v2 too |
+| `pnpm census` | 0 | 10 projects, 15,722 tests; the census-seed fuzz compares 422 cases, all on v2 too |
 | `check:expects` | 0 | |
 | `oracle:update` | 0 | after the last harness edit |
 | `conformance:checks` | 0 | 253 passed |
-| diff self-tests | 0 | 668 tests (60 new in run 5, `l12-gate-run5.test.ts`) |
+| diff self-tests | 0 | 674 tests (66 new in run 5, `l12-gate-run5.test.ts`) |
 | Root biome | 0 | |
 | `ratchet --update` | 0 | +0, none lost; 3,046 |
-| `pnpm -r --filter './packages/*' typecheck` | 1 | only the known gap (`ai-harness`, `cli`, `mcp`); core, core-next, conformance pass. Not rerun after the last two groups of entries; conformance's own `tsc --noEmit` exits 0 on the final tree |
-| All 21 PR seeds at L12, one at a time, 8 GB heap, on the final tree (after the `pr17d` entries; nohup) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (120 s limit); **17 exits 1** on `pr17e` (Stops (run 5)); 7, 9, 11 exit 0 (1,800 s limit; 374, 496 and 604 s) |
-| PR seed 17's reruns between the entries | 1 | after the error-shape entries: its third shrink `pr17c` (the logging plugin's lines between the cancel's records, a marker gap, fixed), then `pr17d` (signed on the owner's 2026-11-23 answer, above); after the `pr17d` entries: **exits 1** on `pr17e` (Stops (run 5)) |
-| Replays of the hard failures | 0 | PR 6, 11, 15 (both shrinks), 17 (first shrink), deep 1, 2, 24301: 0 unexplained each; the no-facts and no-watch twins: 0 differences. On the final tree: `pr17d`, `pr17`, `pr17b`, `pr17c` 0 unexplained each (`$G/r5/replay/k1-*`); `pr17e` 3 unexplained (`k2-*`, the stop) |
+| `pnpm -r --filter './packages/*' typecheck` | 1 | only the known gap (`ai-harness`, `cli`, `mcp`); core, core-next, conformance pass. Not rerun after the last three groups of changes; conformance's own `tsc --noEmit` exits 0 on the final tree |
+| PR seed 17 at L12 on the final tree (after the widening; nohup, 8 GB heap) | 1 | at the 120 s limit: timed out with no difference reported (`$G/r5/pr7-seed-17.log`); again at the 1,800 s limit: **exits 1** in 104 s on `pr17f`, 1 difference (Stops (run 5); `$G/r5/slow7-seed-17.log`). The other 20 seeds were not rerun: the widening changes only `markAfterCancel` and the three entries' reasons |
+| All 21 PR seeds at L12, one at a time, 8 GB heap, on d29001ab (after the `pr17d` entries, before the widening; nohup) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (120 s limit); **17 exits 1** on `pr17e` (closed by the widening, above); 7, 9, 11 exit 0 (1,800 s limit; 374, 496 and 604 s) |
+| PR seed 17's reruns between the entries | 1 | after the error-shape entries: its third shrink `pr17c` (the logging plugin's lines between the cancel's records, a marker gap, fixed), then `pr17d` (signed on the owner's 2026-11-23 answer, above); after the `pr17d` entries: exits 1 on `pr17e` (widened on the owner's second 2026-11-23 answer, above); after the widening: exits 1 on `pr17f` (Stops (run 5)) |
+| Replays of the hard failures | 0 | PR 6, 11, 15 (both shrinks), 17 (first shrink), deep 1, 2, 24301: 0 unexplained each; the no-facts and no-watch twins: 0 differences. On the final tree: `pr17d`, `pr17`, `pr17b`, `pr17c` 0 unexplained each (`$G/r5/replay/k1-*`); `pr17e` 3 unexplained (`k2-*`). On the final tree, after the widening: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e` 0 unexplained each (`$G/r5/replay/q1-*`); `pr17f` 1 unexplained (`q2-*`, the stop) |
 | Deep seeds 1, 2, 24301 | — | not rerun (run 5's brief). Run 4's report: each exited 1 on one hard failure, now covered (above), and reported 5, 7 and 5 batched cases (triaged above and in the follow-ups) |
 
 ## Stops (run 5)
 
-- **PR seed 17, its fifth case (plugin phase, no plugin on): after a
-  `goTo`, a batch run that errored, with two calls in flight, is canceled
-  once on both engines and a second time on 1.35.** Not matched by an
-  approved row. Found by seed 17's run on the final tree, after the `pr17d`
-  entries. Shrunk case `$G/r5/specs/pr17e.json`: `pr17d` with the batch
-  handler "results" and `fails` 1 instead of "batch" and 0; traces
-  `$G/r5/replay/k2-pr17e.v1.jsonl`, `.v2.jsonl`. The steps are the same (a
-  batch write, a set, `goTo` 0, a publish, a settle), and two batch calls
-  are in flight for the requirement. The pass after the first call's write
-  reports the run's error on both engines (onError, onErrorRecovery "skip",
-  onResolverError, resolver.error) instead of a completion, and aborts both
-  calls' signals. Both engines then report one cancel of the requirement
-  (1.35 with its id only, 2.0 in full: `l7-fuzz-aq-*`); 1.35 reports the
-  cancel a second time (onResolverCancel, onRequirementCanceled,
-  requirement.canceled) and 2.0 does not: 3 differences, nothing else. No
-  signed entry covers it, each by design: the owner's 2026-11-23 answer
-  names a finished batch run, and the `pr17d` entries require the run's
-  completion and met (the self-test "on a run that did not complete it
-  fails" is this shape); row t's error-shape entries require the run's
-  error with no cancel since (the self-test "a second cancel after one both
-  engines reported fails"). Owner call: read it as the same second cancel
-  for an errored run (row t's error shape with (av)'s repeat), which needs
-  its own narrow entry, or change 2.0. No engine code was changed.
+- **PR seed 17, its sixth case (plugin phase, no plugin on, the trace
+  option on): `pr17d`'s shape, with one record of 1.35's second cancel left
+  unexplained because the streams' pairings cross.** Found by seed 17's
+  rerun on the final tree, after the widening. Shrunk case
+  `$G/r5/specs/pr17f.json` (1 difference); traces
+  `$G/r5/replay/q2-pr17f.v1.jsonl`, `.v2.jsonl`. After a `goTo`, both
+  engines report the batch run complete, the requirement met and one cancel
+  of it (v2 143 to 145); 1.35 reports the cancel twice (v1 142 to 144 and
+  145 to 147). That is the shape the owner's two 2026-11-23 answers cover;
+  the engines do nothing new here. The comparison aligns each stream on its
+  own, and in this case the two cross. The hook stream pairs 2.0's cancel
+  hooks with the hooks of 1.35's *second* cancel, so the first cancel's two
+  hooks are missing and row t's `l12-cand-t-batch-completed-*` covers them
+  (after met). The observe stream pairs 2.0's requirement.canceled with
+  1.35's *first*, so 1.35's second requirement.canceled (v1 147) is
+  missing. No shared match point is set inside a crossing, so that record's
+  point is (141, 142), before 2.0's cancel. `markAfterCancel` reads 2.0's
+  lifecycle through that point, finds no cancel on 2.0, and leaves the
+  record unmarked: 1 unexplained. The 2.0-side bound is the same as before
+  the widening, so the gap was there on d29001ab too (by reading; that
+  commit was not rerun on this case). Closing it means reading 2.0's side
+  past a crossing: harness code beyond this entry's matcher, with all 21
+  PR seeds to rerun. Coordinator or owner call. No engine code was changed.
 
-Closed in run 5: PR seed 17's second shrink (a batch run that errored, then
-is canceled; `pr17b`), by the row-t error-shape entries; and its fourth
-case (a finished batch run canceled twice on 1.35 after a `goTo`; `pr17d`),
-by the entries signed on the owner's "2.0's single cancel; sign it
-(Recommended)" (2026-11-23).
+Closed in run 5, all from PR seed 17:
+
+- its second shrink (a batch run that errored, then is canceled; `pr17b`),
+  by the row-t error-shape entries;
+- its fourth case (a finished batch run canceled twice on 1.35 after a
+  `goTo`; `pr17d`), by the entries signed on the owner's "2.0's single
+  cancel; sign it (Recommended)" (2026-11-23);
+- its fifth case (the same after a batch run that errored; `pr17e`), by
+  widening those entries on his "Widen to any outcome (Recommended)"
+  (2026-11-23).
 
 Run 4's two stops are closed: PR seed 6 by the (bx) error-pairing entries,
 PR seed 15 by quirk b's batch-pairing entries.
@@ -404,7 +459,8 @@ PR seed 15 by quirk b's batch-pairing entries.
 
 ## Follow-ups
 
-- Decide run 5's stop (owner): PR seed 17's errored batch requirement canceled twice on 1.35 after a `goTo` (`pr17e`).
+- Decide run 5's stop: PR seed 17's `pr17f`, the approved second-cancel shape where the hook and observe pairings cross (a gap in `markAfterCancel`'s 2.0-side bound; harness only).
+- All 21 PR seeds on the final tree: locally 20 ran on d29001ab and only seed 17 after the widening.
 - A gate=L12 mutation run on this branch to confirm the 18 entries killed only locally (the coordinator dispatches it after pushing).
 - Deep seeds 1, 2 and 24301 in full once seed 17 is decided.
 - The reported batched cases of run 4's deep seeds, one line each (run-5 replays, `$G/r5/replay/cases-*`; none has an entry in this PR):

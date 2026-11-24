@@ -747,7 +747,7 @@ describe("row t's error shape: an errored batch run's cancel, only after its own
   });
 });
 
-describe("1.35's second cancel of a finished batch run after a goTo (PR seed 17's fourth shrink), and no other", () => {
+describe("1.35's further cancels of a finished or failed batch run after a goTo (PR seed 17's fourth and fifth shrinks), and no other", () => {
   // pr17d's own triggers.
   const TC_ON = [
     "settleStop",
@@ -757,6 +757,14 @@ describe("1.35's second cancel of a finished batch run after a goTo (PR seed 17'
     "navigated",
     "navigatedBusy",
     "ignoresAbort",
+  ];
+  // pr17e's own triggers: pr17d's, with a failing batch.
+  const TC_FAILS = [
+    ...TC_ON,
+    "resolverRejects",
+    "batchWithResults",
+    "batchFails",
+    "batchAllFail",
   ];
   const ID = 'AB:{"item":"0.0"}';
   const OTHER = 'AB:{"item":"0.1"}';
@@ -803,12 +811,12 @@ describe("1.35's second cancel of a finished batch run after a goTo (PR seed 17'
     observe({ id, type: "requirement.canceled" }),
   ];
   const failure = { $error: { name: "Error", message: "a.rb 0.0 attempt 1" } };
-  const errored = [
-    hook("onResolverError", ["a::rb", full(ID), failure]),
+  const errored = (resolver = "a::rb") => [
+    hook("onResolverError", [resolver, full(ID), failure]),
     observe({
       error: failure,
       requirementId: ID,
-      resolver: "a::rb",
+      resolver,
       type: "resolver.error",
     }),
   ];
@@ -818,6 +826,20 @@ describe("1.35's second cancel of a finished batch run after a goTo (PR seed 17'
     "missing hook onResolverCancel 3",
     "missing observe requirement.canceled 3",
   ];
+  const CANCEL_KINDS = [
+    "onResolverCancel",
+    "onRequirementCanceled",
+    "requirement.canceled",
+  ];
+  /** A case of three steps: a goTo, the requirement created, then `records`. */
+  const caseOf = (records: TraceEntry[]) => [
+    ...goTo(),
+    ...step(2, created()),
+    ...step(3, [...records, end]),
+  ];
+  /** pr17e's shape: a goTo, then the failed run canceled once, and again on 1.35. */
+  const e1 = caseOf([...errored(), ...cancel(), ...cancel()]);
+  const e2 = caseOf([...errored(), ...cancel2()]);
   /** pr17d's shape: a goTo, then the finished run canceled once, and again on 1.35. */
   const v1 = [
     ...goTo(),
@@ -837,8 +859,29 @@ describe("1.35's second cancel of a finished batch run after a goTo (PR seed 17'
     )
       .filter((d) => d.op === "missing")
       .map((d) => [d.kind, d.afterCancel]);
+  const YES = CANCEL_KINDS.map((kind) => [kind, true]);
+  /** The records 2.0 lacks that the three entries alone leave unexplained. */
+  const missingByOwn = (
+    reference: TraceEntry[],
+    candidate: TraceEntry[],
+    triggers: string[],
+  ) =>
+    explain(
+      FUZZ_SCENARIO,
+      markAfterCancel(
+        compareContract(reference, candidate, "v2"),
+        reference,
+        candidate,
+      ),
+      TC_IDS.map(byId),
+      triggers,
+      stepOps(reference),
+    )
+      .unexplained.filter((d) => d.op === "missing")
+      .map(brief)
+      .sort();
 
-  it("each entry is signed on the owner's answer, next to rows t and (av)", () => {
+  it("each entry is signed on the owner's two answers, next to rows t and (av)", () => {
     for (const id of TC_IDS) {
       const d = byId(id);
       expect(d.approvedBy).toBe("Jason Comes");
@@ -855,6 +898,9 @@ describe("1.35's second cancel of a finished batch run after a goTo (PR seed 17'
       expect(d.reason).toContain("Signed on the owner's instruction");
       expect(d.reason).toContain(
         '"2.0\'s single cancel; sign it (Recommended)" (2026-11-23)',
+      );
+      expect(d.reason).toContain(
+        '"Widen to any outcome (Recommended)" (2026-11-23)',
       );
       expect(d.reason).toContain("Row t was owner-approved 2026-11-01");
       expect(d.reason).toContain('"Approve: once (Recommended)" (2026-11-07)');
@@ -875,6 +921,148 @@ describe("1.35's second cancel of a finished batch run after a goTo (PR seed 17'
       ...step(3, [...finished(), ...cancel(), end]),
     ];
     expect(left(v1, same, TC_ON)).toEqual([]);
+  });
+
+  it("control: the same after a run that failed (pr17e), 1.35's second cancel is excused", () => {
+    expect(marks(e1, e2)).toEqual(YES);
+    expect(left(e1, e2, TC_FAILS)).toEqual([]);
+    // The run failed twice: its last error, then the cancel.
+    const twice1 = caseOf([
+      ...errored(),
+      ...errored(),
+      ...cancel(),
+      ...cancel(),
+    ]);
+    const twice2 = caseOf([...errored(), ...errored(), ...cancel2()]);
+    expect(marks(twice1, twice2)).toEqual(YES);
+    expect(left(twice1, twice2, TC_FAILS)).toEqual([]);
+  });
+
+  it("1.35's third cancel is excused as its second is, after either outcome", () => {
+    const third = caseOf([
+      ...finished(),
+      ...cancel(),
+      ...cancel(),
+      ...cancel(),
+    ]);
+    expect(marks(third, v2)).toEqual([...YES, ...YES]);
+    expect(left(third, v2, TC_ON)).toEqual([]);
+    const thirdFailed = caseOf([
+      ...errored(),
+      ...cancel(),
+      ...cancel(),
+      ...cancel(),
+    ]);
+    expect(marks(thirdFailed, e2)).toEqual([...YES, ...YES]);
+    expect(left(thirdFailed, e2, TC_FAILS)).toEqual([]);
+  });
+
+  it("after a failed run, a second cancel with no cancel reported before it on 2.0 fails", () => {
+    const none = caseOf(errored());
+    // 2.0 lacks both cancels. The first is row t's error shape (after the
+    // error, l12-cand-t-batch-error-*); the second stays unexplained.
+    expect(marks(e1, none).map(([, mark]) => mark)).toEqual(
+      new Array(6).fill(undefined),
+    );
+    expect(left(e1, none, TC_FAILS)).toEqual(CANCELS);
+    const own = TC_IDS.map(byId);
+    const diffs = markAfterCancel(compareContract(e1, none, "v2"), e1, none);
+    expect(
+      explain(FUZZ_SCENARIO, diffs, own, TC_FAILS, stepOps(e1)).unexplained,
+    ).toHaveLength(6);
+  });
+
+  it("after a failed run, without a goTo it fails", () => {
+    // No navigation in the case.
+    const off = TC_FAILS.filter((t) => !t.startsWith("navigated"));
+    expect(left(e1, e2, off)).toEqual(CANCELS);
+    // No goTo step before the cancels' step.
+    expect(left(e1.slice(2), e2.slice(2), TC_FAILS)).toEqual(CANCELS);
+    // Another navigation than a goTo.
+    const back = history(1, { op: "back", steps: 1 });
+    expect(
+      left([...back, ...e1.slice(2)], [...back, ...e2.slice(2)], TC_FAILS),
+    ).toEqual(CANCELS);
+  });
+
+  it("an extra cancel on 2.0 instead of 1.35 fails", () => {
+    // 2.0 cancels twice, 1.35 once: extras on 2.0, which nothing marks.
+    for (const [once, twice, on] of [
+      [v2, v1, TC_ON],
+      [e2, e1, TC_FAILS],
+    ] as [TraceEntry[], TraceEntry[], string[]][]) {
+      const extra = markAfterCancel(
+        compareContract(once, twice, "v2"),
+        once,
+        twice,
+      );
+      expect(extra.every((d) => d.afterCancel === undefined)).toBe(true);
+      expect(
+        left(once, twice, on).filter((line) => line.startsWith("extra ")),
+      ).toHaveLength(3);
+    }
+    // 2.0 cancels twice and 1.35 three times: 2.0 reported more than one.
+    const three = caseOf([...errored(), ...cancel(), ...cancel(), ...cancel()]);
+    const two = caseOf([...errored(), ...cancel2(), ...cancel2()]);
+    expect(marks(three, two).map(([, mark]) => mark)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect(left(three, two, TC_FAILS)).toEqual(CANCELS);
+  });
+
+  it("any other record that differs fails", () => {
+    // 1.35 creates the requirement again after its second cancel: the
+    // cancels are excused, the create's records are not.
+    const again = caseOf([
+      ...finished(),
+      ...cancel(),
+      ...cancel(),
+      ...created(),
+    ]);
+    expect(left(again, v2, TC_ON)).toEqual([
+      "missing hook onRequirementCreated 3",
+      "missing observe requirement.created 3",
+    ]);
+    // 1.35 reports the run's error once more after its second cancel: the
+    // three entries cover the cancel's records and never the error's.
+    const more = caseOf([...errored(), ...cancel(), ...cancel(), ...errored()]);
+    expect(missingByOwn(more, e2, TC_FAILS)).toEqual([
+      "missing hook onResolverError 3",
+      "missing observe resolver.error 3",
+    ]);
+    // 2.0 lacks the run's error: no outcome on 2.0, so the cancel fails too.
+    const silent = caseOf(cancel2());
+    expect(missingByOwn(e1, silent, TC_FAILS)).toEqual(
+      [
+        ...CANCELS,
+        "missing hook onResolverError 3",
+        "missing observe resolver.error 3",
+      ].sort(),
+    );
+    // 1.35's second cancel in 2.0's whole-requirement shape: not the id-only record.
+    const whole = caseOf([...errored(), ...cancel(), ...cancel2()]);
+    expect(left(whole, e2, TC_FAILS)).toEqual(CANCELS.slice(0, 2));
+  });
+
+  it("the outcome must be the same on both engines, from the resolver the cancel names", () => {
+    // Failed on 1.35, finished on 2.0.
+    const ofCancels = marks(e1, v2).filter(([kind]) =>
+      CANCEL_KINDS.includes(kind as string),
+    );
+    expect(ofCancels.map(([, mark]) => mark)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect(missingByOwn(e1, v2, TC_FAILS)).toEqual(
+      expect.arrayContaining(CANCELS),
+    );
+    // Failed in another resolver than the one the cancels name.
+    const other1 = caseOf([...errored("b::rb"), ...cancel(), ...cancel()]);
+    const other2 = caseOf([...errored("b::rb"), ...cancel2()]);
+    expect(left(other1, other2, TC_FAILS)).toEqual(CANCELS);
   });
 
   it("a second cancel with no cancel reported before it on 2.0 fails", () => {
@@ -920,7 +1108,7 @@ describe("1.35's second cancel of a finished batch run after a goTo (PR seed 17'
     ).toEqual(CANCELS);
   });
 
-  it("on a run that did not complete it fails", () => {
+  it("on a run with no outcome reported, or one from another resolver, it fails", () => {
     // Still in flight: canceled once on both engines, again on 1.35.
     const flight1 = [
       ...goTo(),
@@ -938,18 +1126,7 @@ describe("1.35's second cancel of a finished batch run after a goTo (PR seed 17'
       undefined,
     ]);
     expect(left(flight1, flight2, TC_ON)).toEqual(CANCELS);
-    // Errored, not completed.
-    const error1 = [
-      ...goTo(),
-      ...step(2, created()),
-      ...step(3, [...errored, ...cancel(), ...cancel(), end]),
-    ];
-    const error2 = [
-      ...goTo(),
-      ...step(2, created()),
-      ...step(3, [...errored, ...cancel2(), end]),
-    ];
-    expect(left(error1, error2, [...TC_ON, "batchFails"])).toEqual(CANCELS);
+    expect(left(flight1, flight2, TC_FAILS)).toEqual(CANCELS);
     // Completed by another resolver than the one the cancel names.
     const other1 = [
       ...goTo(),
@@ -976,23 +1153,6 @@ describe("1.35's second cancel of a finished batch run after a goTo (PR seed 17'
       ...step(3, [...finished(), ...cancel2(), ...created(), end]),
     ];
     expect(left(again1, again2, TC_ON)).toEqual(CANCELS);
-  });
-
-  it("a third cancel fails", () => {
-    const third = [
-      ...goTo(),
-      ...step(2, created()),
-      ...step(3, [...finished(), ...cancel(), ...cancel(), ...cancel(), end]),
-    ];
-    expect(marks(third, v2)).toEqual([
-      ["onResolverCancel", true],
-      ["onRequirementCanceled", true],
-      ["requirement.canceled", true],
-      ["onResolverCancel", undefined],
-      ["onRequirementCanceled", undefined],
-      ["requirement.canceled", undefined],
-    ]);
-    expect(left(third, v2, TC_ON)).toEqual(CANCELS);
   });
 
   it("another requirement's cancel, whose own run did not finish, fails", () => {

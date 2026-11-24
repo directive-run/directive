@@ -1217,7 +1217,7 @@ export function checkDivergences(
         e.op !== "missing")
     ) {
       fail(
-        `${label} afterCancel must be true, on a fuzz entry of op "missing" only: it covers a requirement's cancel record only after both engines reported the requirement's run complete, the requirement met and one cancel of it`,
+        `${label} afterCancel must be true, on a fuzz entry of op "missing" only: it covers a requirement's cancel record only after both engines reported the requirement's run's outcome (complete and met, or its error) and one cancel of it`,
       );
     }
     if (
