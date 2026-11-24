@@ -569,6 +569,16 @@ export interface Divergence {
    * shrink).
    */
   afterError?: true;
+  /**
+   * Fuzz only, op `missing` (L12 gate run 5): the entry covers a
+   * requirement's cancel record only after both engines reported that
+   * requirement's run complete, the requirement met and then one cancel of
+   * it, in that order and from the same resolver, with no other lifecycle
+   * hook of it since (`Difference.afterCancel`, `markAfterCancel`): the
+   * second cancel 1.35 reports for a finished batch run (PR seed 17's
+   * fourth shrink).
+   */
+  afterCancel?: true;
   reason: string;
   approvedBy: string;
   date: string;
@@ -1447,6 +1457,10 @@ export function covers(
       (name === FUZZ_SCENARIO &&
         d.op === "missing" &&
         d.afterError === true)) &&
+    (div.afterCancel !== true ||
+      (name === FUZZ_SCENARIO &&
+        d.op === "missing" &&
+        d.afterCancel === true)) &&
     (div.bound === undefined || admits(div.bound, d)) &&
     (div.requires === undefined ||
       (name === FUZZ_SCENARIO && meets(div.requires, d, context ?? []))) &&
@@ -2142,6 +2156,38 @@ function runTimeline(
 }
 
 /**
+ * Where the cancel that the record at `at` (of `kind`, for requirement
+ * `id`) belongs to starts on the reference: the cancel's own earlier
+ * records, right before this one in 1.35's order (`CANCEL_ORDER`), are the
+ * same cancel; only the logging plugin's lines, a per-engine projection,
+ * may sit between them.
+ */
+function cancelStart(
+  reference: TraceEntry[],
+  at: number,
+  kind: string,
+  id: string,
+): number {
+  let before = at;
+  for (let rank = CANCEL_ORDER.indexOf(kind) - 1; rank >= 0; rank--) {
+    let i = before - 1;
+    while (i >= 0 && isLogLine(reference[i] as TraceEntry)) {
+      i--;
+    }
+    const own = reference[i];
+    if (
+      kindOf(own) !== CANCEL_ORDER[rank] ||
+      canceledIdOf(own as unknown as Json) !== id
+    ) {
+      break;
+    }
+    before = i;
+  }
+
+  return before;
+}
+
+/**
  * Mark `Difference.afterError` (L12 gate run 5, row t's error shape for a
  * batch run): a cancel record the engine lacks (op `missing`) whose
  * requirement's last lifecycle hook, on both engines, is its
@@ -2186,21 +2232,7 @@ export function markAfterError(
     if (id === undefined || at === undefined) {
       continue;
     }
-    let before = at;
-    for (let rank = CANCEL_ORDER.indexOf(d.kind) - 1; rank >= 0; rank--) {
-      let i = before - 1;
-      while (i >= 0 && isLogLine(reference[i] as TraceEntry)) {
-        i--;
-      }
-      const own = reference[i];
-      if (
-        kindOf(own) !== CANCEL_ORDER[rank] ||
-        canceledIdOf(own as unknown as Json) !== id
-      ) {
-        break;
-      }
-      before = i;
-    }
+    const before = cancelStart(reference, at, d.kind, id);
     timelines ??= [runTimeline(reference), runTimeline(candidate)];
     const resolver = erroredBefore(timelines[0].get(id), before);
     const named =
@@ -2213,6 +2245,121 @@ export function markAfterError(
       erroredBefore(timelines[1].get(id), d.shared.candidate + 1) === resolver
     ) {
       d.afterError = true;
+    }
+  }
+
+  return differences;
+}
+
+/**
+ * The lifecycle hooks of a requirement whose run finished and was then
+ * canceled once, in order (`markAfterCancel`).
+ */
+const FINISHED_THEN_CANCELED = [
+  "onResolverComplete",
+  "onRequirementMet",
+  "onResolverCancel",
+  "onRequirementCanceled",
+];
+
+/** One lifecycle hook of a requirement: its index, name and resolver. */
+type LifecycleHook = [number, string, string | null];
+
+/**
+ * Each requirement's lifecycle hooks in `trace`, in order, by id: every
+ * onRequirement* hook (the requirement is its first argument) and every
+ * onResolver* hook (its second), each with its name and the resolver it
+ * names (an onResolver* hook's first argument, an onRequirementMet's
+ * second), or null.
+ */
+function lifecycleOf(trace: TraceEntry[]): Map<string, LifecycleHook[]> {
+  const out = new Map<string, LifecycleHook[]>();
+  for (const [i, e] of trace.entries()) {
+    if (e.k !== "hook") {
+      continue;
+    }
+    const ofResolver = e.hook.startsWith("onResolver");
+    const requirement = e.hook.startsWith("onRequirement")
+      ? e.args[0]
+      : ofResolver
+        ? e.args[1]
+        : undefined;
+    const id = (requirement as { id?: unknown } | null | undefined)?.id;
+    if (typeof id === "string") {
+      const resolver = ofResolver
+        ? e.args[0]
+        : e.hook === "onRequirementMet"
+          ? e.args[1]
+          : null;
+      const list = out.get(id) ?? [];
+      list.push([i, e.hook, typeof resolver === "string" ? resolver : null]);
+      out.set(id, list);
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Mark `Difference.afterCancel` (L12 gate run 5, the second cancel 1.35
+ * reports for a finished batch run; PR seed 17's fourth shrink): a cancel
+ * record the engine lacks (op `missing`) whose requirement's lifecycle
+ * hooks, on both engines, end just before the record with exactly its
+ * run's completion, its met and one cancel (`FINISHED_THEN_CANCELED`), the
+ * first three naming the same resolver, with no create, start, error or
+ * further cancel of it since: on the reference before the second cancel's
+ * first record (`cancelStart`), on the engine through the last paired
+ * record before it. An onResolverCancel must also name that resolver.
+ * Returns `differences`, marked in place.
+ */
+export function markAfterCancel(
+  differences: Difference[],
+  reference: TraceEntry[],
+  candidate: TraceEntry[],
+): Difference[] {
+  let timelines:
+    | [Map<string, LifecycleHook[]>, Map<string, LifecycleHook[]>]
+    | undefined;
+  const canceledOnce = (list: LifecycleHook[] | undefined, before: number) => {
+    const all = list ?? [];
+    let n = 0;
+    while (n < all.length && (all[n] as LifecycleHook)[0] < before) {
+      n++;
+    }
+    const past = all.slice(Math.max(0, n - FINISHED_THEN_CANCELED.length), n);
+    const resolver = past[0]?.[2] ?? null;
+
+    return past.length === FINISHED_THEN_CANCELED.length &&
+      resolver !== null &&
+      past.every(
+        ([, hook, named], rank) =>
+          hook === FINISHED_THEN_CANCELED[rank] &&
+          (rank === 3 || named === resolver),
+      )
+      ? resolver
+      : null;
+  };
+  for (const d of differences) {
+    const id = d.op === "missing" ? canceledIdOf(d.reference) : undefined;
+    const at = d.at.reference;
+    if (id === undefined || at === undefined) {
+      continue;
+    }
+    timelines ??= [lifecycleOf(reference), lifecycleOf(candidate)];
+    const resolver = canceledOnce(
+      timelines[0].get(id),
+      cancelStart(reference, at, d.kind, id),
+    );
+    const named =
+      d.kind === "onResolverCancel"
+        ? (d.reference as { args?: Json[] } | undefined)?.args?.[0]
+        : resolver;
+    if (
+      resolver !== null &&
+      named === resolver &&
+      canceledOnce(timelines[1].get(id), d.shared.candidate + 1) === resolver
+    ) {
+      d.afterCancel = true;
     }
   }
 
@@ -2513,9 +2660,13 @@ export async function runScenario(
   const advisories: string[] = [];
   const steps = stepOps(first);
   for (const [engine, trace] of Object.entries(theirs)) {
-    const compared = markAfterError(
-      markAfterMet(
-        markStale(compareContract(first, trace, engine), first),
+    const compared = markAfterCancel(
+      markAfterError(
+        markAfterMet(
+          markStale(compareContract(first, trace, engine), first),
+          first,
+          trace,
+        ),
         first,
         trace,
       ),

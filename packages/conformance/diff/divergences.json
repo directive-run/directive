@@ -50787,5 +50787,96 @@
     "reason": "Row t, its error shape (GATE-2: \"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01), where the run that errored is the batch run (L12 gate run 5; PR seed 17's second shrink, diff-notes l12gate/r5/specs/pr17b). The batch call writes a fact and fails its item, a single resolver that write starts writes the fact back, and the pass that follows retracts the batch source's constraint while reporting the batch run's error. Both engines report onError, onErrorRecovery, onResolverError and resolver.error for the batch requirement, abort its signal (\"aborted\") and list it under onReconcileEnd's canceled; 1.35 then also reports the requirement.canceled observe event for it, carrying only its id, and 2.0 does not. The signed l9-fuzz-t-disable-* entries name a single resolver's full requirement under the `disable` strategy, and l12-cand-t-batch-completed-* cover a batch cancel only after met; this case has neither. This covers only that record for a batch requirement in the id-only shape, in a case with a failing batch (`when` adds batchFails), and only after the run's own error (`afterError`, diff/scenario.ts markAfterError): both engines' last lifecycle hook of that requirement before the cancel is its onResolverError from the batch resolver, with no create, start, completion, met or cancel of it since. A batch cancel 2.0 lacks for a requirement still in flight, one whose error only 1.35 reported, or one created again after the error stays unexcused. Signed on the owner's instruction: GATE-2 records row t's error shape (\"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01, decisions page row t: \"If all are better or non user facing they are all approved\"), as l9-fuzz-t-disable-* quote it, and asked whether to allow a fifth gate run that signs the run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22).",
     "approvedBy": "Jason Comes",
     "date": "2026-11-22"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onResolverCancel-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "afterCancel": true,
+    "afterOp": "goTo",
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t and row (av): 1.35's second cancel of a finished batch run after a history goTo (L12 gate run 5; PR seed 17's fourth shrink, diff-notes l12gate/r5/specs/pr17d). A goTo restores the batch source's fact while a batch call is in flight, which retracts the batch requirement without ending the call; the call's late write raises the requirement again and a second call starts; the pass that follows retracts the batch source's constraint while reporting the batch run complete, with both calls in flight. Both engines report onResolverComplete and onRequirementMet for the batch requirement, abort both calls' signals (\"aborted\") and cancel the requirement once (onResolverCancel, onRequirementCanceled, requirement.canceled; 1.35 in its id-only shape, row (aq)). 1.35 then reports the same cancel a second time; 2.0, as with row (av)'s requirement that 1.35 holds twice, reports it once. This covers only onResolverCancel of that second cancel, for a batch requirement in the id-only shape, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a goTo step (`afterOp`), and only after a cancel both engines reported for the finished run (`afterCancel`, diff/scenario.ts markAfterCancel): on both engines the requirement's lifecycle hooks before the record end with exactly its onResolverComplete, its onRequirementMet and one onResolverCancel and onRequirementCanceled, the first three naming the same batch resolver, with no create, start, error or further cancel of it since. A second cancel where 2.0 reported no cancel before it, one in a case without a goTo, one of a run that did not complete, and a third cancel all stay unexcused. Signed on the owner's instruction: asked about this case (after a history goTo, a finished batched requirement with two calls in flight is cancelled once on both engines, and then 1.35 cancels it a second time), he answered \"2.0's single cancel; sign it (Recommended)\" (2026-11-23), the option that treats it as row t / (av): 1.35's second cancel of an already-cancelled finished run is an extra report, signed as a narrow entry that requires a goTo, a finished batch run and a cancel already reported on both engines, with a self-test. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-23"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onRequirementCanceled-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterCancel": true,
+    "afterOp": "goTo",
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t and row (av): 1.35's second cancel of a finished batch run after a history goTo (L12 gate run 5; PR seed 17's fourth shrink, diff-notes l12gate/r5/specs/pr17d). A goTo restores the batch source's fact while a batch call is in flight, which retracts the batch requirement without ending the call; the call's late write raises the requirement again and a second call starts; the pass that follows retracts the batch source's constraint while reporting the batch run complete, with both calls in flight. Both engines report onResolverComplete and onRequirementMet for the batch requirement, abort both calls' signals (\"aborted\") and cancel the requirement once (onResolverCancel, onRequirementCanceled, requirement.canceled; 1.35 in its id-only shape, row (aq)). 1.35 then reports the same cancel a second time; 2.0, as with row (av)'s requirement that 1.35 holds twice, reports it once. This covers only onRequirementCanceled of that second cancel, for a batch requirement in the id-only shape, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a goTo step (`afterOp`), and only after a cancel both engines reported for the finished run (`afterCancel`, diff/scenario.ts markAfterCancel): on both engines the requirement's lifecycle hooks before the record end with exactly its onResolverComplete, its onRequirementMet and one onResolverCancel and onRequirementCanceled, the first three naming the same batch resolver, with no create, start, error or further cancel of it since. A second cancel where 2.0 reported no cancel before it, one in a case without a goTo, one of a run that did not complete, and a third cancel all stay unexcused. Signed on the owner's instruction: asked about this case (after a history goTo, a finished batched requirement with two calls in flight is cancelled once on both engines, and then 1.35 cancels it a second time), he answered \"2.0's single cancel; sign it (Recommended)\" (2026-11-23), the option that treats it as row t / (av): 1.35's second cancel of an already-cancelled finished run is an extra report, signed as a narrow entry that requires a goTo, a finished batch run and a cancel already reported on both engines, with a self-test. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-23"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-observe-requirement-canceled-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterCancel": true,
+    "afterOp": "goTo",
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row t and row (av): 1.35's second cancel of a finished batch run after a history goTo (L12 gate run 5; PR seed 17's fourth shrink, diff-notes l12gate/r5/specs/pr17d). A goTo restores the batch source's fact while a batch call is in flight, which retracts the batch requirement without ending the call; the call's late write raises the requirement again and a second call starts; the pass that follows retracts the batch source's constraint while reporting the batch run complete, with both calls in flight. Both engines report onResolverComplete and onRequirementMet for the batch requirement, abort both calls' signals (\"aborted\") and cancel the requirement once (onResolverCancel, onRequirementCanceled, requirement.canceled; 1.35 in its id-only shape, row (aq)). 1.35 then reports the same cancel a second time; 2.0, as with row (av)'s requirement that 1.35 holds twice, reports it once. This covers only the requirement.canceled observe event of that second cancel, for a batch requirement in the id-only shape, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a goTo step (`afterOp`), and only after a cancel both engines reported for the finished run (`afterCancel`, diff/scenario.ts markAfterCancel): on both engines the requirement's lifecycle hooks before the record end with exactly its onResolverComplete, its onRequirementMet and one onResolverCancel and onRequirementCanceled, the first three naming the same batch resolver, with no create, start, error or further cancel of it since. A second cancel where 2.0 reported no cancel before it, one in a case without a goTo, one of a run that did not complete, and a third cancel all stay unexcused. Signed on the owner's instruction: asked about this case (after a history goTo, a finished batched requirement with two calls in flight is cancelled once on both engines, and then 1.35 cancels it a second time), he answered \"2.0's single cancel; sign it (Recommended)\" (2026-11-23), the option that treats it as row t / (av): 1.35's second cancel of an already-cancelled finished run is an extra report, signed as a narrow entry that requires a goTo, a finished batch run and a cancel already reported on both engines, with a self-test. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-23"
   }
 ]

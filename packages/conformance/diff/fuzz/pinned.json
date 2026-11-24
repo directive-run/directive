@@ -4868,5 +4868,112 @@
         "inserted": []
       }
     }
+  },
+  {
+    "group": "quirk-t-batch-second-cancel",
+    "why": "PR seed 17 at L12, its fourth shrink in run 5 of the L12 gate (diff-notes l12gate/r5/specs/pr17d): a goTo while a batch call is in flight, the call's late write raises the batch requirement again, and the next pass reports the batch run complete and retracts it with two calls in flight. Both engines cancel the requirement once; 1.35 reports the cancel a second time, 2.0 does not (the l12-cand-t-batch-second-cancel-* entries, signed on the owner's instruction, 2026-11-23). Pinned so the group stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": true,
+      "trace": false,
+      "steps": [
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[0, 0]]
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 0,
+          "value": 1
+        },
+        {
+          "op": "goTo",
+          "position": 0
+        },
+        {
+          "op": "publish",
+          "event": "own",
+          "value": 0
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": 1,
+        "delay": 5,
+        "fails": 0,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": 2
+      },
+      "maxSnapshots": 3,
+      "respectsAbort": false,
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": false,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
   }
 ]
