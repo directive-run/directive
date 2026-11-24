@@ -16,7 +16,9 @@
 //   fourth shrink; the owner's "2.0's single cancel; sign it (Recommended)",
 //   2026-11-23): only after a goTo step, and only after both engines
 //   reported the run complete, the requirement met and one cancel of it
-//   (`afterCancel`, `markAfterCancel`);
+//   (`afterCancel`, `markAfterCancel`), each engine read in its own record
+//   order, so the trace option's crossed pairings (PR seed 17's sixth case,
+//   `pr17f`) are explained as well;
 // - row (bx)'s compute inside a trace run (deep seed 1,
 //   `PAIR.traceRunRecomputeInserted`);
 // - row (bx)'s unknown-key warning and the re-registered derivation (deep
@@ -1177,6 +1179,138 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
       ...step(3, [...finished(), ...cancel(), ...cancel(ID, "b::rb"), end]),
     ];
     expect(left(named, v2, TC_ON)).toContain("missing hook onResolverCancel 3");
+  });
+
+  describe("with the trace on, where the hook and observe pairings cross (PR seed 17's sixth case, pr17f)", () => {
+    // pr17f's own triggers: pr17d's, with the trace on and a ring of 3.
+    const TC_TRACE = [...TC_ON, "traceRing"];
+    const run = (chain: string, resolvers: Json[]) =>
+      hook("onTraceComplete", [
+        {
+          causalChain: chain,
+          constraintsHit: [],
+          derivationsRecomputed: [],
+          duration: 1,
+          effectErrors: [],
+          effectsRun: [],
+          factChanges: [],
+          id: 1,
+          requirementsAdded: [],
+          requirementsRemoved: [],
+          resolversCompleted: resolvers.map((r) => ({
+            ...(r as Record<string, Json>),
+            duration: 1,
+          })),
+          resolversErrored: [],
+          resolversStarted: resolvers,
+          status: "settled",
+          timestamp: 0,
+        },
+      ]);
+    /** A run both engines report, after the cancels. */
+    const reported = run("a::f0 changed", []);
+    /** Row (bi)'s run, which only 2.0 reports, before the cancels. */
+    const evicted = run("b::c0 constraint hit", [
+      { meta: { $undefined: true }, requirementId: "B0:{}", resolver: "b::r0" },
+    ]);
+    const first = cancel();
+    const second = cancel();
+    const own = cancel2();
+    /** pr17d's shape with the trace on: `before` and the cancels in step 3. */
+    const traced = (
+      before: TraceEntry[],
+      cancels: TraceEntry[],
+      later: TraceEntry[] = [],
+    ) => [
+      ...goTo(),
+      ...step(2, created()),
+      ...step(3, [...before, ...finished(), ...cancels, end, reported]),
+      ...step(4, later),
+    ];
+    const f1 = traced([], [...first, ...second]);
+    const f2 = traced([evicted], own);
+    const missing = (reference: TraceEntry[], candidate: TraceEntry[]) =>
+      markAfterCancel(
+        compareContract(reference, candidate, "v2"),
+        reference,
+        candidate,
+      ).filter((d) => d.op === "missing");
+
+    it("control: pr17f's shape is explained, whichever cancel of 1.35's each stream pairs", () => {
+      const diffs = missing(f1, f2);
+      // The pairings cross: 2.0's cancel hooks pair with 1.35's second
+      // cancel (its first cancel's hooks are missing: row t's third path,
+      // after met), and 2.0's cancel event pairs with 1.35's first (its
+      // second cancel's event is missing).
+      expect(diffs.map((d) => [d.kind, d.at.reference, d.afterCancel])).toEqual(
+        [
+          ["onResolverCancel", f1.indexOf(first[0] as TraceEntry), undefined],
+          [
+            "onRequirementCanceled",
+            f1.indexOf(first[1] as TraceEntry),
+            undefined,
+          ],
+          ["requirement.canceled", f1.indexOf(second[2] as TraceEntry), true],
+        ],
+      );
+      // No point between the two engines' cancels is shared: the last one
+      // before 1.35's second cancel event is before 2.0's whole cancel.
+      expect((diffs[2] as Difference).shared.candidate).toBeLessThan(
+        f2.indexOf(own[0] as TraceEntry),
+      );
+      expect(left(f1, f2, TC_TRACE)).toEqual([]);
+      // The same after a run that failed.
+      const failed = (before: TraceEntry[], cancels: TraceEntry[]) => [
+        ...goTo(),
+        ...step(2, created()),
+        ...step(3, [...before, ...errored(), ...cancels, end, reported]),
+      ];
+      const g1 = failed([], [...cancel(), ...cancel()]);
+      const g2 = failed([evicted], cancel2());
+      expect(missing(g1, g2).map((d) => [d.kind, d.afterCancel])).toEqual([
+        ["onResolverCancel", undefined],
+        ["onRequirementCanceled", undefined],
+        ["requirement.canceled", true],
+      ]);
+      expect(left(g1, g2, [...TC_FAILS, "traceRing"])).toEqual([]);
+    });
+
+    it("the same with no cancel reported on 2.0 fails", () => {
+      const none = traced([evicted], []);
+      // 2.0 lacks both cancels. The first is row t's third path (after
+      // met); the second stays unexplained, in both streams.
+      expect(missing(f1, none).map((d) => d.afterCancel)).toEqual(
+        new Array(6).fill(undefined),
+      );
+      expect(left(f1, none, TC_TRACE)).toEqual(CANCELS);
+    });
+
+    it("a cancel 2.0 reports only in a later step fails", () => {
+      const late = traced([evicted], [], cancel2());
+      const marks = missing(f1, late).map((d) => d.afterCancel);
+      expect(marks).toEqual(new Array(6).fill(undefined));
+      expect(left(f1, late, TC_TRACE)).toEqual(expect.arrayContaining(CANCELS));
+    });
+
+    it("a second cancel on 2.0 fails, whichever of 1.35's three is left", () => {
+      const three = traced([], [...cancel(), ...cancel(), ...cancel()]);
+      const two = traced([evicted], [...cancel2(), ...cancel2()]);
+      expect(missing(three, two).map((d) => d.afterCancel)).toEqual(
+        new Array(3).fill(undefined),
+      );
+    });
+
+    it("without a goTo, or without the trace's run on 2.0 signed, it fails", () => {
+      const off = TC_TRACE.filter((t) => !t.startsWith("navigated"));
+      expect(left(f1, f2, off)).toContain(
+        "missing observe requirement.canceled 3",
+      );
+      expect(left(f1.slice(2), f2.slice(2), TC_TRACE)).toContain(
+        "missing observe requirement.canceled 3",
+      );
+      // Row (bi)'s run is covered only with a trace ring.
+      expect(left(f1, f2, TC_ON)).toEqual(["extra hook onTraceComplete 3"]);
+    });
   });
 
   it("markAfterCancel marks only a missing cancel record; the other markers leave it", () => {

@@ -127,11 +127,12 @@ export interface Difference {
   /**
    * Set by `markAfterCancel` (diff/scenario.ts) on a fuzz difference of a
    * requirement's cancel record the engine lacks (onResolverCancel,
-   * onRequirementCanceled, requirement.canceled) when, just before it, the
-   * requirement's lifecycle hooks on both engines end with its run's
-   * outcome (its completion and its met, or its error) and one cancel of
-   * it (one or more on the reference), from the same resolver. Only an
-   * entry with `afterCancel` reads it.
+   * onRequirementCanceled, requirement.canceled) when the requirement's
+   * lifecycle hooks end, on the reference just before it and on the engine
+   * at the same place in its own record order, with its run's outcome (its
+   * completion and its met, or its error) and one cancel of it (one or
+   * more on the reference), from the same resolver. Only an entry with
+   * `afterCancel` reads it.
    */
   afterCancel?: true;
   /** For `changed`: where inside the entry. */

@@ -2265,19 +2265,43 @@ const RUN_OUTCOMES = [
 /** One cancel's lifecycle hooks, in order (`markAfterCancel`). */
 const CANCEL_HOOKS = ["onResolverCancel", "onRequirementCanceled"];
 
-/** One lifecycle hook of a requirement: its index, name and resolver. */
-type LifecycleHook = [number, string, string | null];
+/**
+ * One lifecycle hook of a requirement: its index, name, the resolver it
+ * names and its segment (`segmentRank`).
+ */
+type LifecycleHook = [number, string, string | null, number];
+
+/**
+ * A step and phase as one number, a later segment's higher. Every step and
+ * async marker is in both traces, and the alignment pairs records only
+ * inside one step and phase (`keyOf`, diff/compare.ts), so a segment is the
+ * same stretch of the case on both engines, however the pairings inside it
+ * fall.
+ */
+const segmentRank = (step: number, phase: "setup" | "sync" | "async") =>
+  step * 3 + (phase === "setup" ? 0 : phase === "sync" ? 1 : 2);
 
 /**
  * Each requirement's lifecycle hooks in `trace`, in order, by id: every
  * onRequirement* hook (the requirement is its first argument) and every
- * onResolver* hook (its second), each with its name and the resolver it
+ * onResolver* hook (its second), each with its name, the resolver it
  * names (an onResolver* hook's first argument, an onRequirementMet's
- * second), or null.
+ * second), or null, and the segment it is in (as `keyTrace` files records).
  */
 function lifecycleOf(trace: TraceEntry[]): Map<string, LifecycleHook[]> {
   const out = new Map<string, LifecycleHook[]>();
+  let step = -1;
+  let phase: "setup" | "sync" | "async" = "setup";
   for (const [i, e] of trace.entries()) {
+    if (e.k === "step") {
+      step = e.i;
+      phase = "sync";
+      continue;
+    }
+    if (e.k === "async") {
+      phase = "async";
+      continue;
+    }
     if (e.k !== "hook") {
       continue;
     }
@@ -2295,7 +2319,12 @@ function lifecycleOf(trace: TraceEntry[]): Map<string, LifecycleHook[]> {
           ? e.args[1]
           : null;
       const list = out.get(id) ?? [];
-      list.push([i, e.hook, typeof resolver === "string" ? resolver : null]);
+      list.push([
+        i,
+        e.hook,
+        typeof resolver === "string" ? resolver : null,
+        segmentRank(step, phase),
+      ]);
       out.set(id, list);
     }
   }
@@ -2306,18 +2335,30 @@ function lifecycleOf(trace: TraceEntry[]): Map<string, LifecycleHook[]> {
 /**
  * Mark `Difference.afterCancel` (L12 gate run 5, the further cancels 1.35
  * reports for a batch run whose outcome and one cancel both engines
- * reported; PR seed 17's fourth and fifth shrinks): a cancel record the
- * engine lacks (op `missing`) whose requirement's lifecycle hooks, on both
- * engines, end just before the record with its run's outcome
- * (`RUN_OUTCOMES`: its completion and its met, or its error) and then its
- * cancel (`CANCEL_HOOKS`), with no create, start or other lifecycle hook of
- * it since. The engine must have reported exactly one cancel, through the
- * last paired record before the difference; the reference one or more,
- * before this cancel's first record (`cancelStart`), so each further
- * cancel of 1.35's is marked. The outcome must be the same on both
- * engines, and every outcome hook and onResolverCancel, the difference's
- * own too, must name the same resolver. Returns `differences`, marked in
- * place.
+ * reported; PR seed 17's fourth, fifth and sixth cases): a cancel record
+ * the engine lacks (op `missing`) whose requirement's run ended, on both
+ * engines, with the same outcome (`RUN_OUTCOMES`: its completion and its
+ * met, or its error) and was then canceled (`CANCEL_HOOKS`), with no
+ * create, start or other lifecycle hook of it in between.
+ *
+ * Each engine's side is read from its own record order, never from the
+ * pairing: the alignment pairs each stream on its own, so 2.0's one cancel
+ * can pair with 1.35's second cancel in the hook stream and with its first
+ * in the observe stream (PR seed 17's sixth case, `pr17f`: the trace option
+ * on, where a report only 2.0 makes, row (bi), shifts the hook pairing),
+ * and then no point between the two engines' cancels is shared.
+ * - On the reference, the requirement's hooks before this cancel's first
+ *   record (`cancelStart`) end with the outcome and one or more cancels, so
+ *   each further cancel of 1.35's is marked.
+ * - On the engine, the same outcome is found by its own count: the
+ *   outcome's last hook is the requirement's n-th hook of that name in its
+ *   step and phase on the reference, so it is the n-th on the engine. The
+ *   engine's hooks through that hook and the requirement's cancels right
+ *   after it, up to the end of the difference's step and phase, must end
+ *   with the outcome and exactly one cancel.
+ * The outcome must be the same on both engines, and every outcome hook and
+ * onResolverCancel, the difference's own too, must name the same resolver.
+ * Returns `differences`, marked in place.
  */
 export function markAfterCancel(
   differences: Difference[],
@@ -2328,20 +2369,17 @@ export function markAfterCancel(
     | [Map<string, LifecycleHook[]>, Map<string, LifecycleHook[]>]
     | undefined;
   /**
-   * The outcome and resolver ("<outcome's rank>:<resolver>") of a run that
-   * ended and was then canceled, `again` allowing more than one cancel, as
-   * the hooks before `before` end; null for any other ending.
+   * How a run that ended and was then canceled ends, as the first `count`
+   * hooks of `all` end, `again` allowing more than one cancel: its outcome
+   * and resolver (`key`, "<outcome's rank>:<resolver>") and how many hooks
+   * come before the first cancel (`end`); null for any other ending.
    */
   const canceledAfterOutcome = (
-    list: LifecycleHook[] | undefined,
-    before: number,
+    all: LifecycleHook[],
+    count: number,
     again: boolean,
   ) => {
-    const all = list ?? [];
-    let n = 0;
-    while (n < all.length && (all[n] as LifecycleHook)[0] < before) {
-      n++;
-    }
+    let n = count;
     const endsWith = (hooks: string[]) =>
       n >= hooks.length &&
       hooks.every((hook, rank) => all[n - hooks.length + rank]?.[1] === hook);
@@ -2365,7 +2403,7 @@ export function markAfterCancel(
     const resolver = resolvers[0] ?? null;
 
     return resolver !== null && resolvers.every((r) => r === resolver)
-      ? `${outcome}:${resolver}`
+      ? { key: `${outcome}:${resolver}`, end: n }
       : null;
   };
   for (const d of differences) {
@@ -2375,25 +2413,51 @@ export function markAfterCancel(
       continue;
     }
     timelines ??= [lifecycleOf(reference), lifecycleOf(candidate)];
-    const ended = canceledAfterOutcome(
-      timelines[0].get(id),
-      cancelStart(reference, at, d.kind, id),
-      true,
-    );
+    const mine = timelines[0].get(id) ?? [];
+    const theirs = timelines[1].get(id) ?? [];
+    const before = cancelStart(reference, at, d.kind, id);
+    let count = 0;
+    while (count < mine.length && (mine[count] as LifecycleHook)[0] < before) {
+      count++;
+    }
+    const ended = canceledAfterOutcome(mine, count, true);
     const named =
       d.kind === "onResolverCancel"
         ? (d.reference as { args?: Json[] } | undefined)?.args?.[0]
         : undefined;
     if (
-      ended !== null &&
-      (d.kind !== "onResolverCancel" ||
-        (typeof named === "string" && ended.endsWith(`:${named}`))) &&
-      canceledAfterOutcome(
-        timelines[1].get(id),
-        d.shared.candidate + 1,
-        false,
-      ) === ended
+      ended === null ||
+      (d.kind === "onResolverCancel" &&
+        !(typeof named === "string" && ended.key.endsWith(`:${named}`)))
     ) {
+      continue;
+    }
+    // The same outcome in the engine's own order: the requirement's n-th
+    // hook of that name in that step and phase, as on the reference.
+    const [, hook, , ran] = mine[ended.end - 1] as LifecycleHook;
+    const same = (h: LifecycleHook) => h[1] === hook && h[3] === ran;
+    let left = mine.slice(0, ended.end).filter(same).length;
+    let place = 0;
+    while (place < theirs.length && left > 0) {
+      if (same(theirs[place] as LifecycleHook)) {
+        left--;
+      }
+      place++;
+    }
+    if (left > 0) {
+      continue;
+    }
+    // Then the engine's cancels of it right after, in its own order, up to
+    // the end of the difference's step and phase.
+    const segment = segmentRank(d.step, d.phase);
+    while (
+      place < theirs.length &&
+      CANCEL_HOOKS.includes((theirs[place] as LifecycleHook)[1]) &&
+      (theirs[place] as LifecycleHook)[3] <= segment
+    ) {
+      place++;
+    }
+    if (canceledAfterOutcome(theirs, place, false)?.key === ended.key) {
       d.afterCancel = true;
     }
   }
