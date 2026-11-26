@@ -767,6 +767,31 @@ function navigateInserted(a: Json[], b: Json[]): boolean {
 }
 
 /**
+ * The requirement id a cancel record names (an onResolverCancel hook's
+ * second argument, an onRequirementCanceled hook's first, a
+ * requirement.canceled event's own id); undefined for any other record.
+ */
+export function canceledIdOf(record: Json | undefined): string | undefined {
+  if (record === null || typeof record !== "object" || Array.isArray(record)) {
+    return undefined;
+  }
+  const r = record as Record<string, Json>;
+  const args = r.args as Json[] | undefined;
+  const id =
+    r.k === "hook" && r.hook === "onResolverCancel"
+      ? (args?.[1] as Record<string, Json> | null | undefined)?.id
+      : r.k === "hook" && r.hook === "onRequirementCanceled"
+        ? (args?.[0] as Record<string, Json> | null | undefined)?.id
+        : r.k === "observe" &&
+            (r.event as Record<string, Json> | null)?.type ===
+              "requirement.canceled"
+          ? (r.event as Record<string, Json>).id
+          : undefined;
+
+  return typeof id === "string" ? id : undefined;
+}
+
+/**
  * Classes of a changed pattern's `pair` (`{ path, pair }`): each judges
  * 1.35's whole record and the engine under test's whole record together
  * (`Difference.record`, `candidateRecord`), so a field-by-field change is
@@ -777,6 +802,34 @@ export const PAIR: Record<
   string,
   (reference: Json | undefined, candidate: Json | undefined) => boolean
 > = {
+  /**
+   * Row t's shared mispairing rule (L12 gate run 5, PR seed 17's eighth
+   * case, `pr17h`): the two records are cancel records of the same kind
+   * (both onResolverCancel hooks, both onRequirementCanceled hooks, or
+   * both requirement.canceled events) that name different requirements
+   * (`canceledIdOf`). Any other record on either side, or the same
+   * requirement on both, is outside it. Which requirements they may be is
+   * not this class's to say: the entry's `mispaired` and `extraCancelOf`
+   * (diff/scenario.ts) decide that from the two traces. Added on the
+   * owner's instruction: "Apply it to all row t cancels (Recommended)"
+   * (2026-11-26), under row t's approval.
+   */
+  cancelOfAnother: (referenceRecord, candidateRecord) => {
+    const kind = (r: Json | undefined) => {
+      const o = r as { hook?: Json; k?: Json } | null | undefined;
+
+      return o?.k === "hook" ? o.hook : o?.k;
+    };
+    const id = canceledIdOf(referenceRecord);
+    const other = canceledIdOf(candidateRecord);
+
+    return (
+      id !== undefined &&
+      other !== undefined &&
+      id !== other &&
+      kind(referenceRecord) === kind(candidateRecord)
+    );
+  },
   /**
    * Row (bx)'s knock-on in a trace run (L12 gate run 5, deep seed 1): 2.0's
    * extra distributable-snapshot read computes a derivation inside a run,

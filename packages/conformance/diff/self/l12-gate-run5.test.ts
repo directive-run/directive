@@ -19,6 +19,13 @@
 //   (`afterCancel`, `markAfterCancel`), each engine read in its own record
 //   order, so the trace option's crossed pairings (PR seed 17's sixth case,
 //   `pr17f`) are explained as well;
+// - row t's shared mispairing rule (PR seed 17's eighth case, `pr17h`; the
+//   owner's "Apply it to all row t cancels (Recommended)", 2026-11-26):
+//   wherever an approved row t entry explains a cancel only 1.35 makes, the
+//   pairing of that cancel with 2.0's cancel of another requirement both
+//   engines cancel is explained too (`mispaired`, `extraCancelOf`,
+//   `markMispaired`); a wrong-request cancel on 2.0, or a mispairing with
+//   no approved extra cancel, still fails;
 // - row (bx)'s compute inside a trace run (deep seed 1,
 //   `PAIR.traceRunRecomputeInserted`);
 // - row (bx)'s unknown-key warning and the re-registered derivation (deep
@@ -41,10 +48,12 @@ import {
   markAfterCancel,
   markAfterError,
   markAfterMet,
+  markMispaired,
   markStale,
   pairedHalf,
   readDivergences,
   stepOps,
+  unpairedHalf,
 } from "../scenario.js";
 
 const ALL = readDivergences();
@@ -80,6 +89,20 @@ const TG_UNPAIRED = [
   "l12-cand-t-batch-second-cancel-hook-onRequirementCanceled-unpaired-missing",
   "l12-cand-t-batch-second-cancel-observe-requirement-canceled-unpaired-missing",
 ];
+/** Row t's shared mispairing rule (pr17h): the pairs, then the cancel left unpaired. */
+const TM_SLUGS = [
+  "hook-onResolverCancel",
+  "hook-onRequirementCanceled",
+  "observe-requirement-canceled",
+];
+const TM_CHANGED = TM_SLUGS.map(
+  (slug) => `l12-cand-t-mispaired-cancel-${slug}-changed`,
+);
+const TM_UNPAIRED = TM_SLUGS.map(
+  (slug) => `l12-cand-t-mispaired-cancel-${slug}-unpaired-missing`,
+);
+/** Row t's first fuzz entries: a single run's cancel 2.0 lacks. */
+const L3_MISSING = TM_SLUGS.map((slug) => `l3-cand-t-fuzz-${slug}-missing`);
 const BX_IDS = [
   "l12-fuzz-bx-hook-onError-repaired-changed",
   "l12-fuzz-bx-hook-onErrorRecovery-repaired-changed",
@@ -131,10 +154,14 @@ const left = (
   const steps = stepOps(reference);
   const diffs = fileMoves(
     FUZZ_SCENARIO,
-    markAfterCancel(
-      markAfterError(
-        markAfterMet(
-          markStale(compareContract(reference, candidate, "v2"), reference),
+    markMispaired(
+      markAfterCancel(
+        markAfterError(
+          markAfterMet(
+            markStale(compareContract(reference, candidate, "v2"), reference),
+            reference,
+            candidate,
+          ),
           reference,
           candidate,
         ),
@@ -1381,8 +1408,12 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
         FUZZ_SCENARIO,
         fileMoves(
           FUZZ_SCENARIO,
-          markAfterError(
-            markAfterMet(marked(reference, candidate), reference, candidate),
+          markMispaired(
+            markAfterError(
+              markAfterMet(marked(reference, candidate), reference, candidate),
+              reference,
+              candidate,
+            ),
             reference,
             candidate,
           ),
@@ -1499,7 +1530,15 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
       expect(marked(first1, first2).some((d) => d.afterCancel === true)).toBe(
         false,
       );
-      expect(run(first1, first2, TC_ON).left).toEqual(PAIRED);
+      // With row t's batch-completed triggers (writeRetracts, batched) this
+      // is that row's shape, mispaired: pr17h. It has no second cancel, but
+      // an approved extra cancel all the same, so the shared rule (the
+      // owner's 2026-11-26 answer) explains it, where it failed before that
+      // answer. Without that row's trigger it fails as it did.
+      const completed = run(first1, first2, TC_ON);
+      expect(completed.left).toEqual([]);
+      expect(completed.used).toEqual(expect.arrayContaining(TM_CHANGED));
+      expect(completed.used.some((id) => TG_CHANGED.includes(id))).toBe(false);
       expect(run(first1, first2, NO_WR).left).toEqual(PAIRED);
       // Two cancels on 1.35, one on 2.0, of a run with no outcome reported.
       const flight1 = caseOf([...cancel(), ...cancel(), ...cancelB()]);
@@ -1508,9 +1547,15 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
         false,
       );
       expect(run(flight1, flight2, TC_ON).left).toEqual(PAIRED);
-      // Two cancels on 1.35 of a finished run that 2.0 never canceled.
+      // Two cancels on 1.35 of a finished run that 2.0 never canceled. The
+      // first is row t's batch-completed cancel, mispaired, which the shared
+      // rule now explains (as above); the second, with no cancel of the run
+      // on 2.0, still fails.
       const none = run(g1, first2, TC_ON).left;
-      expect(none).toEqual(expect.arrayContaining(PAIRED));
+      expect(none).toEqual(CANCELS);
+      expect(run(g1, first2, NO_WR).left).toEqual(
+        expect.arrayContaining(PAIRED),
+      );
     });
 
     it("without a goTo it fails", () => {
@@ -1929,6 +1974,439 @@ describe("row (bx)'s unknown-key warning and re-registered derivation (deep seed
   });
 });
 
+describe("row t's shared mispairing rule: an approved extra cancel paired with 2.0's cancel of another requirement both engines cancel (PR seed 17's eighth case, pr17h)", () => {
+  // pr17h's own triggers.
+  const TH_ON = ["settleStop", "writeRetracts", "batched", "ignoresAbort"];
+  const AB = 'AB:{"item":"0.0"}';
+  const AB1 = 'AB:{"item":"0.1"}';
+  const A0 = "A0:{}";
+  const hook = (name: string, args: Json[]) =>
+    ({ k: "hook", hook: name, args }) as TraceEntry;
+  const observe = (event: Json) => ({ k: "observe", event }) as TraceEntry;
+  const batch = (id: string) => ({
+    fromConstraint: "a::b0",
+    id,
+    requirement: { item: id === AB ? "0.0" : "0.1", type: "AB" },
+  });
+  const single = (n: number) => ({
+    fromConstraint: `a::c${n}`,
+    id: `A${n}:{}`,
+    requirement: { type: `A${n}` },
+  });
+  const created = [
+    hook("onRequirementCreated", [batch(AB)]),
+    observe({ id: AB, requirementType: "AB", type: "requirement.created" }),
+  ];
+  /** The batch run finished: its completion, then its met, on both engines. */
+  const finished = () => [
+    hook("onResolverComplete", ["a::rb", batch(AB), 5]),
+    observe({
+      duration: 5,
+      requirementId: AB,
+      resolver: "a::rb",
+      type: "resolver.complete",
+    }),
+    hook("onRequirementMet", [batch(AB), "a::rb"]),
+    observe({ byResolver: "a::rb", id: AB, type: "requirement.met" }),
+  ];
+  const failure = { $error: { name: "Error", message: "a.rb 0.0 attempt 1" } };
+  /** The batch run failed: its error, on both engines. */
+  const errored = () => [
+    hook("onResolverError", ["a::rb", batch(AB), failure]),
+    observe({
+      error: failure,
+      requirementId: AB,
+      resolver: "a::rb",
+      type: "resolver.error",
+    }),
+  ];
+  /** 1.35's cancel of the batch requirement, carrying only the id (row (aq)). */
+  const cancelId = () => [
+    hook("onResolverCancel", ["a::rb", { id: AB }]),
+    hook("onRequirementCanceled", [{ id: AB }]),
+    observe({ id: AB, type: "requirement.canceled" }),
+  ];
+  /** A batch requirement's cancel carrying the whole requirement, the same on both engines. */
+  const cancelBatch = (id: string) => [
+    hook("onResolverCancel", ["a::rb", batch(id)]),
+    hook("onRequirementCanceled", [batch(id)]),
+    observe({ id, type: "requirement.canceled" }),
+  ];
+  /** A single resolver's cancel, the same on both engines. */
+  const cancelSingle = (n = 0) => [
+    hook("onResolverCancel", [`a::r${n}`, single(n)]),
+    hook("onRequirementCanceled", [single(n)]),
+    observe({ id: `A${n}:{}`, type: "requirement.canceled" }),
+  ];
+  /** A case of two steps: the batch requirement created, then `records`. */
+  const caseOf = (records: TraceEntry[]) => [
+    ...step(1, created),
+    ...step(2, records),
+  ];
+  /** Every marker, as runScenario applies them. */
+  const marked = (reference: TraceEntry[], candidate: TraceEntry[]) =>
+    markMispaired(
+      markAfterCancel(
+        markAfterError(
+          markAfterMet(
+            markStale(compareContract(reference, candidate, "v2"), reference),
+            reference,
+            candidate,
+          ),
+          reference,
+          candidate,
+        ),
+        reference,
+        candidate,
+      ),
+      reference,
+      candidate,
+    );
+  /** What is left unexplained, and the entries that covered any difference. */
+  const run = (
+    reference: TraceEntry[],
+    candidate: TraceEntry[],
+    triggers: string[],
+    entries = ALL,
+  ) => {
+    const steps = stepOps(reference);
+    const r = explain(
+      FUZZ_SCENARIO,
+      fileMoves(
+        FUZZ_SCENARIO,
+        marked(reference, candidate),
+        entries,
+        triggers,
+        steps,
+      ),
+      entries,
+      triggers,
+      steps,
+    );
+
+    return { left: r.unexplained.map(brief).sort(), used: [...r.used].sort() };
+  };
+  /** The pairing of 1.35's extra batch cancel with 2.0's cancel of A0. */
+  const PAIRED = [
+    "changed hook onRequirementCanceled 2 args[0].fromConstraint",
+    "changed hook onRequirementCanceled 2 args[0].id",
+    "changed hook onRequirementCanceled 2 args[0].requirement",
+    "changed hook onResolverCancel 2 args[0]",
+    "changed hook onResolverCancel 2 args[1].fromConstraint",
+    "changed hook onResolverCancel 2 args[1].id",
+    "changed hook onResolverCancel 2 args[1].requirement",
+    "changed observe requirement.canceled 2 event.id",
+  ];
+  const CANCELS = [
+    "missing hook onRequirementCanceled 2",
+    "missing hook onResolverCancel 2",
+    "missing observe requirement.canceled 2",
+  ];
+  /**
+   * pr17h's shape: the batch run finished on both engines; both cancel A0
+   * once, and 1.35 also cancels the met batch requirement.
+   */
+  const h1 = caseOf([...finished(), ...cancelId(), ...cancelSingle()]);
+  const h2 = caseOf([...finished(), ...cancelSingle()]);
+  /** The same with 1.35's two cancels in pr17h's own order. */
+  const hr1 = caseOf([...finished(), ...cancelSingle(), ...cancelId()]);
+
+  it("each entry is signed on the owner's 2026-11-26 answer, next to each listed row's own approval", () => {
+    for (const [i, id] of TM_CHANGED.entries()) {
+      const slug = TM_SLUGS[i] as string;
+      const d = byId(id);
+      const unpaired = byId(TM_UNPAIRED[i] as string);
+      expect(d.op).toBe("changed");
+      expect(d.extraCancelOf).toEqual([
+        `l3-cand-t-fuzz-${slug}-missing`,
+        `l9-fuzz-t-disable-${slug}-missing`,
+        `l12-cand-t-batch-completed-${slug}-missing`,
+        `l12-cand-t-batch-error-${slug}-missing`,
+        `l12-cand-t-batch-second-cancel-${slug}-missing`,
+      ]);
+      for (const listed of d.extraCancelOf ?? []) {
+        const row = byId(listed);
+        expect([row.op, row.stream, row.kind, row.engine]).toEqual([
+          "missing",
+          d.stream,
+          d.kind,
+          "v2",
+        ]);
+        expect(row.requires).toBeUndefined();
+        expect(row.mispaired).toBeUndefined();
+      }
+      expect(d.bound).toEqual({
+        match: [{ path: d.path, pair: "cancelOfAnother" }],
+      });
+      expect(d.mispairedBy).toBeUndefined();
+      expect(unpaired.op).toBe("missing");
+      expect(unpaired.extraCancelOf).toBeUndefined();
+      expect(unpaired.mispairedBy).toEqual([id]);
+      for (const e of [d, unpaired]) {
+        expect(e.mispaired).toBe(true);
+        expect(e.approvedBy).toBe("Jason Comes");
+        expect(e.date).toBe("2026-11-26");
+        expect(e.engine).toBe("v2");
+        expect(e.group).toBe("quirk-t-mispaired-cancel");
+        expect(e.ends).toBeUndefined();
+        expect(e.when).toBeUndefined();
+        expect(e.requires).toBeUndefined();
+        expect(e.afterOp).toBeUndefined();
+        expect(e.afterMet).toBeUndefined();
+        expect(e.afterError).toBeUndefined();
+        expect(e.afterCancel).toBeUndefined();
+        expect(e.reason).toContain("Signed on the owner's instruction");
+        for (const quoted of [
+          '"Apply it to all row t cancels (Recommended)" (2026-11-26)',
+          '"Extend the exception, not the pairing (Recommended)"',
+          "owner-approved 2026-11-01",
+          '"If all are better or non user facing they are all approved"',
+          '"Yes, run 5 (Recommended)" (2026-11-22)',
+          '"2.0\'s single cancel; sign it (Recommended)" (2026-11-23)',
+          '"Widen to any outcome (Recommended)" (2026-11-23)',
+        ]) {
+          expect(e.reason).toContain(quoted);
+        }
+      }
+    }
+  });
+
+  it("the rule lists every row t fuzz entry for a cancel only 1.35 makes", () => {
+    const rows = ALL.filter(
+      (e) =>
+        e.scenario === FUZZ_SCENARIO &&
+        /^l\d+-(cand|fuzz)-t-/.test(e.id) &&
+        e.op === "missing" &&
+        e.requires === undefined &&
+        e.mispaired === undefined,
+    ).map((e) => e.id);
+    expect(rows.length).toBe(15);
+    expect(
+      TM_CHANGED.flatMap((id) => byId(id).extraCancelOf ?? []).sort(),
+    ).toEqual([...rows].sort());
+  });
+
+  it("control: pr17h's shape is explained, the pair by the shared rule through row t's batch-completed entries", () => {
+    const diffs = marked(h1, h2);
+    const pair = diffs.filter((d) => d.op === "changed");
+    expect(pair.map(brief).sort()).toEqual(PAIRED);
+    expect(pair.every((d) => d.mispaired === true && d.afterMet === true)).toBe(
+      true,
+    );
+    expect(
+      pair.every(
+        (d) => d.afterError === undefined && d.afterCancel === undefined,
+      ),
+    ).toBe(true);
+    // 1.35's own cancel of A0 is left unpaired, and marked as that.
+    const unpaired = diffs.filter((d) => d.op === "missing");
+    expect(unpaired.map(brief).sort()).toEqual(CANCELS);
+    expect(unpaired.map((d) => canceledId(d.reference))).toEqual([A0, A0, A0]);
+    expect(
+      unpaired.every((d) => d.mispaired === true && d.afterMet === undefined),
+    ).toBe(true);
+    const all = run(h1, h2, TH_ON);
+    expect(all.left).toEqual([]);
+    expect(all.used).toEqual(expect.arrayContaining(TM_CHANGED));
+    // As in pr17h itself, row t's first entries take the unpaired cancel.
+    expect(all.used).toEqual(expect.arrayContaining(L3_MISSING));
+    expect(all.used.some((id) => TM_UNPAIRED.includes(id))).toBe(false);
+    // 1.35's two cancels in pr17h's own order: explained either way.
+    expect(run(hr1, h2, TH_ON).left).toEqual([]);
+  });
+
+  it("control: the cancel left unpaired is explained by its own twin where no earlier entry takes it", () => {
+    // The other requirement is a batch requirement, which l3-cand-t-fuzz-* never names.
+    const k1 = caseOf([...finished(), ...cancelId(), ...cancelBatch(AB1)]);
+    const k2 = caseOf([...finished(), ...cancelBatch(AB1)]);
+    const all = run(k1, k2, TH_ON);
+    expect(all.left).toEqual([]);
+    // Row (aq)'s entries take the hook pairs first (an id-only requirement
+    // against a whole one); the observe pair and the unpaired cancel are the rule's.
+    expect(all.used).toEqual(
+      expect.arrayContaining([TM_CHANGED[2], ...TM_UNPAIRED]),
+    );
+    // The unpaired cancel is excused only where its pair is.
+    const NO_WR = TH_ON.filter((t) => t !== "writeRetracts");
+    expect(run(k1, k2, NO_WR).left).toEqual(
+      expect.arrayContaining([...CANCELS, PAIRED[7]]),
+    );
+  });
+
+  it("a wrong-request cancel on 2.0 still fails", () => {
+    // 2.0 cancels A0, which 1.35 never cancels.
+    const never = caseOf([...finished(), ...cancelId()]);
+    expect(marked(never, h2).some((d) => d.mispaired === true)).toBe(false);
+    expect(run(never, h2, TH_ON).left).toEqual(PAIRED);
+    // 2.0 cancels A0 more often than 1.35 does.
+    const twice = caseOf([...finished(), ...cancelSingle(), ...cancelSingle()]);
+    expect(marked(h1, twice).some((d) => d.mispaired === true)).toBe(false);
+    expect(run(h1, twice, TH_ON).left).toEqual(expect.arrayContaining(PAIRED));
+  });
+
+  it("a mispairing without an approved extra cancel still fails", () => {
+    // The batch run still in flight: no row t entry approves 1.35's cancel.
+    const flight1 = caseOf([...cancelId(), ...cancelSingle()]);
+    const flight2 = caseOf([...cancelSingle()]);
+    const flight = marked(flight1, flight2).filter((d) => d.op === "changed");
+    expect(flight.map(brief).sort()).toEqual(PAIRED);
+    expect(flight.every((d) => d.mispaired === true)).toBe(true);
+    expect(
+      flight.every(
+        (d) =>
+          d.afterMet === undefined &&
+          d.afterError === undefined &&
+          d.afterCancel === undefined,
+      ),
+    ).toBe(true);
+    expect(run(flight1, flight2, TH_ON).left).toEqual(PAIRED);
+    // pr17h's shape in a case without the batch-completed row's trigger.
+    const NO_WR = TH_ON.filter((t) => t !== "writeRetracts");
+    const BOTH = [...PAIRED, ...CANCELS].sort();
+    expect(run(h1, h2, NO_WR).left).toEqual(BOTH);
+    expect(run(h1, h2, []).left).toEqual(BOTH);
+    // Only 1.35 reported the run complete and the requirement met.
+    const unmet2 = caseOf([...cancelSingle()]);
+    expect(marked(h1, unmet2).every((d) => d.afterMet === undefined)).toBe(
+      true,
+    );
+    expect(run(h1, unmet2, TH_ON).left).not.toEqual([]);
+    // The rule's own entries approve nothing without a listed row's entry.
+    const own = [...TM_CHANGED, ...TM_UNPAIRED].map(byId);
+    expect(run(h1, h2, TH_ON, own).left).toEqual(BOTH);
+  });
+
+  it("the unpaired twin alone never excuses a cancel 2.0 lacks", () => {
+    // 1.35 cancels another batch requirement; 2.0 does not, and nothing is mispaired.
+    const lacks1 = caseOf([...finished(), ...cancelBatch(AB1)]);
+    const lacks2 = caseOf([...finished()]);
+    expect(marked(lacks1, lacks2).some((d) => d.mispaired === true)).toBe(
+      false,
+    );
+    expect(run(lacks1, lacks2, TH_ON).left).toEqual(CANCELS);
+  });
+
+  it("control: row t's existing entries behave as before where nothing is mispaired", () => {
+    // Row t's batch-completed shape, unpaired: its own entries, no other.
+    const met1 = caseOf([...finished(), ...cancelId()]);
+    const met2 = caseOf([...finished()]);
+    expect(marked(met1, met2).some((d) => d.mispaired === true)).toBe(false);
+    expect(run(met1, met2, TH_ON)).toEqual({
+      left: [],
+      used: [...T_IDS].sort(),
+    });
+    expect(run(met1, met2, ["batched"]).left).toEqual(CANCELS);
+    // Row t's first shape, a single run's cancel 2.0 lacks: its own entries.
+    const one1 = caseOf([...cancelSingle()]);
+    const one2 = caseOf([]);
+    expect(run(one1, one2, ["writeRetracts"])).toEqual({
+      left: [],
+      used: [...L3_MISSING].sort(),
+    });
+    expect(run(one1, one2, []).left).toEqual(CANCELS);
+  });
+
+  it("each listed row's own conditions decide 1.35's side", () => {
+    // Row t's error shape (afterError; writeRetracts, batched, batchFails).
+    const e1 = caseOf([...errored(), ...cancelId(), ...cancelSingle()]);
+    const e2 = caseOf([...errored(), ...cancelSingle()]);
+    const pair = marked(e1, e2).filter((d) => d.op === "changed");
+    expect(pair.map(brief).sort()).toEqual(PAIRED);
+    expect(
+      pair.every(
+        (d) =>
+          d.mispaired === true &&
+          d.afterError === true &&
+          d.afterMet === undefined,
+      ),
+    ).toBe(true);
+    const failed = run(e1, e2, ["writeRetracts", "batched", "batchFails"]);
+    expect(failed.left).toEqual([]);
+    expect(failed.used).toEqual(expect.arrayContaining(TM_CHANGED));
+    expect(run(e1, e2, ["writeRetracts", "batched"]).left).toEqual(PAIRED);
+    // A disabled constraint's retraction (l9-fuzz-t-disable-*; disableRetracts).
+    const d1 = caseOf([...cancelSingle(1), ...cancelSingle(0)]);
+    const d2 = caseOf([...cancelSingle(0)]);
+    const disabled = run(d1, d2, ["disableRetracts"]);
+    expect(disabled.left).toEqual([]);
+    expect(disabled.used).toEqual(expect.arrayContaining(TM_CHANGED));
+    const none = run(d1, d2, []).left;
+    expect(none.some((x) => x.startsWith("changed "))).toBe(true);
+    expect(none).toEqual(expect.arrayContaining(CANCELS));
+    // Row t's first shape (l3-cand-t-fuzz-*; writeRetracts): a single run's
+    // extra cancel against a batch requirement's cancel both engines make.
+    const s1 = caseOf([...cancelSingle(), ...cancelBatch(AB1)]);
+    const s2 = caseOf([...cancelBatch(AB1)]);
+    const written = run(s1, s2, ["writeRetracts"]);
+    expect(written.left).toEqual([]);
+    expect(written.used).toEqual(
+      expect.arrayContaining([...TM_CHANGED, ...TM_UNPAIRED]),
+    );
+    expect(run(s1, s2, []).left.length).toBeGreaterThan(0);
+  });
+
+  it("the changed twins cover only a marked pair of two cancels of different requirements, by a listed entry", () => {
+    const asJson = (e: TraceEntry | undefined) => e as unknown as Json;
+    const pairOf = (over: Partial<Difference>) =>
+      diff(40, {
+        stream: "hook",
+        kind: "onResolverCancel",
+        op: "changed",
+        step: 2,
+        path: "args[1].id",
+        reference: AB,
+        candidate: A0,
+        record: asJson(cancelId()[0]),
+        candidateRecord: asJson(cancelSingle()[0]),
+        afterMet: true,
+        mispaired: true,
+        ...over,
+      });
+    const only = (over: Partial<Difference>, ids = [...TM_CHANGED, ...T_IDS]) =>
+      explain(FUZZ_SCENARIO, [pairOf(over)], ids.map(byId), TH_ON).unexplained
+        .length;
+    expect(only({})).toBe(0);
+    expect(only({ mispaired: undefined })).toBe(1);
+    // 1.35's record not after met: the batch-completed entries' own condition.
+    expect(only({ afterMet: undefined })).toBe(1);
+    // The same requirement on both sides, or a record that is no cancel.
+    expect(
+      only({ candidate: AB, candidateRecord: asJson(cancelBatch(AB)[0]) }),
+    ).toBe(1);
+    expect(only({ candidateRecord: asJson(finished()[0]) })).toBe(1);
+    // Without the listed entries in the list, the rule approves nothing.
+    expect(only({}, TM_CHANGED)).toBe(1);
+    // 1.35's record of the pair, as the missing difference a listed entry reads.
+    const half = unpairedHalf(pairOf({}));
+    expect(half).toMatchObject({
+      op: "missing",
+      reference: asJson(cancelId()[0]),
+      at: { reference: 40 },
+      afterMet: true,
+    });
+    for (const gone of ["path", "candidate", "record", "candidateRecord"]) {
+      expect(gone in half).toBe(false);
+    }
+    expect(half.mispaired).toBeUndefined();
+    const class_ = PAIR.cancelOfAnother as NonNullable<
+      typeof PAIR.cancelOfAnother
+    >;
+    for (const k of [0, 1, 2]) {
+      expect(class_(asJson(cancelId()[k]), asJson(cancelSingle()[k]))).toBe(
+        true,
+      );
+      expect(class_(asJson(cancelId()[k]), asJson(cancelBatch(AB)[k]))).toBe(
+        false,
+      );
+    }
+    expect(class_(asJson(cancelId()[0]), asJson(cancelSingle()[1]))).toBe(
+      false,
+    );
+    expect(class_(asJson(cancelId()[0]), asJson(finished()[0]))).toBe(false);
+    expect(class_(undefined, asJson(cancelSingle()[0]))).toBe(false);
+  });
+});
+
 describe("the census validates the run-5 fields", () => {
   const root = mkdtempSync(join(tmpdir(), "conformance-run5-"));
   mkdirSync(join(root, "diff"), { recursive: true });
@@ -1999,6 +2477,55 @@ describe("the census validates the run-5 fields", () => {
     expect(
       census([{ ...entry, scenario: "hand", when: undefined }], used),
     ).toMatch(/afterError must be true/);
+  });
+
+  it("mispaired and extraCancelOf: the shared mispairing rule's fields", () => {
+    const ids = [...TM_CHANGED, ...TM_UNPAIRED];
+    const listed = TM_CHANGED.flatMap((id) => byId(id).extraCancelOf ?? []);
+    expect(census([...listed, ...ids].map(byId), [...listed, ...ids])).toBe("");
+    const entry = byId(TM_CHANGED[0] as string);
+    const rows = (entry.extraCancelOf ?? []).map(byId);
+    const used = [...rows.map((r) => r.id), entry.id];
+    const withEntry = (over: object, more: unknown[] = []) =>
+      census([...rows, ...more, { ...entry, ...over }], used);
+    expect(withEntry({})).toBe("");
+    expect(withEntry({ op: "extra" })).toMatch(/mispaired must be true/);
+    expect(withEntry({ mispaired: false })).toMatch(/mispaired must be true/);
+    expect(withEntry({ extraCancelOf: undefined })).toMatch(
+      /needs extraCancelOf/,
+    );
+    expect(withEntry({ mispaired: undefined })).toMatch(
+      /extraCancelOf must be/,
+    );
+    expect(withEntry({ extraCancelOf: [] })).toMatch(/extraCancelOf must be/);
+    expect(withEntry({ extraCancelOf: ["l12-cand-t-nope"] })).toMatch(
+      /extraCancelOf names l12-cand-t-nope/,
+    );
+    // Another kind's entry, and the rule's own unpaired twin: neither is an
+    // approved exception for this kind's cancel.
+    const otherKind = byId(T_IDS[1] as string);
+    expect(withEntry({ extraCancelOf: [otherKind.id] }, [otherKind])).toMatch(
+      /extraCancelOf names/,
+    );
+    const unpaired = byId(TM_UNPAIRED[0] as string);
+    expect(withEntry({ extraCancelOf: [unpaired.id] }, [unpaired])).toMatch(
+      /extraCancelOf names/,
+    );
+    // The listed entries must be in the file.
+    expect(census([entry], [entry.id])).toMatch(/extraCancelOf names/);
+    expect(census([{ ...unpaired, op: "moved" }], [unpaired.id])).toMatch(
+      /mispaired must be true/,
+    );
+    const twin = (over: object) =>
+      census(
+        [...rows, entry, { ...unpaired, ...over }],
+        [...used, unpaired.id],
+      );
+    expect(twin({})).toBe("");
+    expect(twin({ mispairedBy: undefined })).toMatch(/needs mispairedBy/);
+    expect(twin({ mispairedBy: [] })).toMatch(/mispairedBy must be/);
+    expect(twin({ mispairedBy: [rows[0]?.id] })).toMatch(/mispairedBy names/);
+    expect(census([unpaired], [unpaired.id])).toMatch(/mispairedBy names/);
   });
 
   it("a pair class the harness lacks is rejected", () => {

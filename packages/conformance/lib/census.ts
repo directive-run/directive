@@ -891,12 +891,18 @@ export interface DivergenceEntry {
   afterMet?: unknown;
   afterError?: unknown;
   afterCancel?: unknown;
+  mispaired?: unknown;
+  extraCancelOf?: unknown;
+  mispairedBy?: unknown;
   afterOp?: unknown;
   repeats?: unknown;
   reason: string;
   approvedBy: string;
   date: string;
 }
+
+/** A row t entry's id (`extraCancelOf`): `l3-cand-t-…`, `l9-fuzz-t-…`. */
+const ROW_T_ID = /^l\d+-(cand|fuzz)-t-/;
 
 const DIVERGENCE_REQUIRED = [
   "approvedBy",
@@ -918,7 +924,10 @@ const DIVERGENCE_OPTIONAL = [
   "ends",
   "engine",
   "excuses",
+  "extraCancelOf",
   "group",
+  "mispaired",
+  "mispairedBy",
   "op",
   "path",
   "repeats",
@@ -1219,6 +1228,108 @@ export function checkDivergences(
       fail(
         `${label} afterCancel must be true, on a fuzz entry of op "missing" or "changed" only: it covers a requirement's cancel record (or, changed, its pairing with another requirement's cancel that both engines made) only after both engines reported the requirement's run's outcome (complete and met, or its error) and one cancel of it`,
       );
+    }
+    if (
+      e.mispaired !== undefined &&
+      (e.mispaired !== true ||
+        e.scenario !== FUZZ_SCENARIO ||
+        (e.op !== "missing" && e.op !== "changed"))
+    ) {
+      fail(
+        `${label} mispaired must be true, on a fuzz entry of op "changed" or "missing" only: it covers a cancel record's pairing with another requirement's cancel that both engines made (changed), or 1.35's own cancel of that other requirement left unpaired (missing)`,
+      );
+    }
+    if (
+      e.mispaired === true &&
+      e.op === "changed" &&
+      e.extraCancelOf === undefined
+    ) {
+      fail(
+        `${label} is a changed entry with mispaired, so it needs extraCancelOf: the approved row t entries that decide 1.35's side of the pair (without it it excuses any cancel 1.35 adds)`,
+      );
+    }
+    if (
+      e.mispaired === true &&
+      e.op === "missing" &&
+      e.mispairedBy === undefined
+    ) {
+      fail(
+        `${label} is a missing entry with mispaired, so it needs mispairedBy: the changed entries that must cover the pair (without it it excuses the unpaired cancel of a pair nothing approves)`,
+      );
+    }
+    if (e.mispairedBy !== undefined) {
+      const listed = e.mispairedBy;
+      if (
+        e.scenario !== FUZZ_SCENARIO ||
+        e.op !== "missing" ||
+        e.mispaired !== true ||
+        !Array.isArray(listed) ||
+        listed.length === 0 ||
+        listed.some((x) => typeof x !== "string") ||
+        new Set(listed).size !== listed.length
+      ) {
+        fail(
+          `${label} mispairedBy must be a non-empty list of distinct entry ids, on a fuzz entry of op "missing" with mispaired only: the changed entries, one of which must cover the pair that left this cancel unpaired`,
+        );
+      } else {
+        for (const id of listed as string[]) {
+          const other = (entries as (Partial<DivergenceEntry> | null)[]).find(
+            (x) => x?.id === id,
+          );
+          if (
+            !other ||
+            other.scenario !== FUZZ_SCENARIO ||
+            other.op !== "changed" ||
+            other.engine !== e.engine ||
+            other.stream !== e.stream ||
+            other.kind !== e.kind ||
+            other.mispaired !== true ||
+            other.extraCancelOf === undefined
+          ) {
+            fail(
+              `${label} mispairedBy names ${id}, which must be a fuzz entry of op "changed" on the same engine, stream and kind, with mispaired and extraCancelOf: the shared mispairing rule's entry for the pair`,
+            );
+          }
+        }
+      }
+    }
+    if (e.extraCancelOf !== undefined) {
+      const listed = e.extraCancelOf;
+      if (
+        e.scenario !== FUZZ_SCENARIO ||
+        e.op !== "changed" ||
+        e.mispaired !== true ||
+        !Array.isArray(listed) ||
+        listed.length === 0 ||
+        listed.some((x) => typeof x !== "string") ||
+        new Set(listed).size !== listed.length
+      ) {
+        fail(
+          `${label} extraCancelOf must be a non-empty list of distinct entry ids, on a fuzz entry of op "changed" with mispaired only: the approved row t entries, one of which must cover 1.35's record of the pair as a missing record`,
+        );
+      } else {
+        for (const id of listed as string[]) {
+          const other = (entries as (Partial<DivergenceEntry> | null)[]).find(
+            (x) => x?.id === id,
+          );
+          if (
+            !other ||
+            !ROW_T_ID.test(id) ||
+            other.scenario !== FUZZ_SCENARIO ||
+            other.op !== "missing" ||
+            other.engine !== e.engine ||
+            other.stream !== e.stream ||
+            other.kind !== e.kind ||
+            other.bound === undefined ||
+            other.requires !== undefined ||
+            other.mispaired !== undefined
+          ) {
+            fail(
+              `${label} extraCancelOf names ${id}, which must be a row t fuzz entry of op "missing" on the same engine, stream and kind, with a bound and no requires or mispaired: an approved exception for a cancel record 1.35 makes and the engine does not`,
+            );
+          }
+        }
+      }
     }
     if (
       e.kind === "*" &&

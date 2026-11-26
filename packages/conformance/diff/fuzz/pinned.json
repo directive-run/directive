@@ -5095,5 +5095,117 @@
         "inserted": []
       }
     }
+  },
+  {
+    "group": "quirk-t-mispaired-cancel",
+    "why": "PR seed 17 at L12, its eighth case in run 5 of the L12 gate (diff-notes l12gate/r5/specs/pr17h): no history. In one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape), which 2.0 never does. The comparison pairs that extra cancel with 2.0's cancel of the single requirement (the l12-cand-t-mispaired-cancel-*-changed entries, the shared mispairing rule, signed on the owner's instruction, 2026-11-26). Pinned so the shared rule stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 20,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            },
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 0,
+          "value": 1
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 0,
+          "value": 1
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": null,
+        "delay": 0,
+        "fails": 0,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": 2
+      },
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": false,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
   }
 ]

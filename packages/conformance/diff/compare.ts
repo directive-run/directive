@@ -133,8 +133,23 @@ export interface Difference {
    * completion and its met, or its error) and one cancel of it (one or
    * more on the reference), from the same resolver. Only an entry with
    * `afterCancel` reads it.
+   *
+   * `afterMet`, `afterError` and `afterCancel` are also set on a `changed`
+   * difference in the mispaired form (`mispaired`, below), where each reads
+   * 1.35's whole record of the pair (`record`) by the same rule.
    */
   afterCancel?: true;
+  /**
+   * Set by `markMispaired` (diff/scenario.ts; row t's shared mispairing
+   * rule, L12 gate run 5) on a fuzz difference of a cancel record in the
+   * mispaired form: a `changed` pair of two cancel records where the
+   * engine's record cancels a different requirement than 1.35's, one that
+   * 1.35 also cancels, with a record of the same kind, in the pair's step
+   * and phase, as many times as the engine does; and 1.35's own cancel
+   * record of that other requirement there, left unpaired (op `missing`).
+   * Only an entry with `mispaired` reads it.
+   */
+  mispaired?: true;
   /** For `changed`: where inside the entry. */
   path?: string;
   /**

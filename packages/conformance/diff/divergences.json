@@ -51417,5 +51417,283 @@
     "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the requirement.canceled observe event of the other requirement's cancel left unpaired on 1.35's side, a single resolver's whole requirement, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a goTo step (`afterOp`), and only where the case's 2.0 differences hold, at or before it, the batch-to-single change of `l12-cand-t-batch-second-cancel-observe-requirement-canceled-changed` (`requires`, with that entry's bound): the cancel of that requirement 2.0 does report was paired with 1.35's further batch cancel, so a single resolver's cancel 2.0 really lacks, with no such pairing, stays unexcused by this entry, and a case whose pairing that entry does not excuse still fails on the pairing. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
     "approvedBy": "Jason Comes",
     "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-hook-onResolverCancel-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args",
+    "mispaired": true,
+    "extraCancelOf": [
+      "l3-cand-t-fuzz-hook-onResolverCancel-missing",
+      "l9-fuzz-t-disable-hook-onResolverCancel-missing",
+      "l12-cand-t-batch-completed-hook-onResolverCancel-missing",
+      "l12-cand-t-batch-error-hook-onResolverCancel-missing",
+      "l12-cand-t-batch-second-cancel-hook-onResolverCancel-missing"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "args",
+          "pair": "cancelOfAnother"
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only a change inside the onResolverCancel hook between two cancel records that name different requirements (`PAIR.cancelOfAnother`, diff/fingerprint.ts), and only where both sides hold. 2.0's side (`mispaired`; diff/scenario.ts markMispaired and mispairedCancel): its record is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the pair's step and phase, as many times as 2.0 does. 1.35's side (`extraCancelOf`): one of the approved row t entries listed covers 1.35's record of the pair as the unpaired missing record it would otherwise be (unpairedHalf), by that entry's own conditions, each read on 1.35's record: its triggers (`when`), its step condition (`afterOp`), its bound and its marker (`afterMet`, `afterError`, `afterCancel`). A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels more or less often, and the same pairing where no listed entry approves 1.35's cancel (a run still in flight, a case without the row's triggers, an outcome only 1.35 reported), stay unexcused. It adds no trigger of its own: the listed entry's apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-hook-onRequirementCanceled-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0]",
+    "mispaired": true,
+    "extraCancelOf": [
+      "l3-cand-t-fuzz-hook-onRequirementCanceled-missing",
+      "l9-fuzz-t-disable-hook-onRequirementCanceled-missing",
+      "l12-cand-t-batch-completed-hook-onRequirementCanceled-missing",
+      "l12-cand-t-batch-error-hook-onRequirementCanceled-missing",
+      "l12-cand-t-batch-second-cancel-hook-onRequirementCanceled-missing"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0]",
+          "pair": "cancelOfAnother"
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only a change inside the onRequirementCanceled hook between two cancel records that name different requirements (`PAIR.cancelOfAnother`, diff/fingerprint.ts), and only where both sides hold. 2.0's side (`mispaired`; diff/scenario.ts markMispaired and mispairedCancel): its record is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the pair's step and phase, as many times as 2.0 does. 1.35's side (`extraCancelOf`): one of the approved row t entries listed covers 1.35's record of the pair as the unpaired missing record it would otherwise be (unpairedHalf), by that entry's own conditions, each read on 1.35's record: its triggers (`when`), its step condition (`afterOp`), its bound and its marker (`afterMet`, `afterError`, `afterCancel`). A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels more or less often, and the same pairing where no listed entry approves 1.35's cancel (a run still in flight, a case without the row's triggers, an outcome only 1.35 reported), stay unexcused. It adds no trigger of its own: the listed entry's apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-observe-requirement-canceled-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event.id",
+    "mispaired": true,
+    "extraCancelOf": [
+      "l3-cand-t-fuzz-observe-requirement-canceled-missing",
+      "l9-fuzz-t-disable-observe-requirement-canceled-missing",
+      "l12-cand-t-batch-completed-observe-requirement-canceled-missing",
+      "l12-cand-t-batch-error-observe-requirement-canceled-missing",
+      "l12-cand-t-batch-second-cancel-observe-requirement-canceled-missing"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "event.id",
+          "pair": "cancelOfAnother"
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only a change inside the requirement.canceled observe event between two cancel records that name different requirements (`PAIR.cancelOfAnother`, diff/fingerprint.ts), and only where both sides hold. 2.0's side (`mispaired`; diff/scenario.ts markMispaired and mispairedCancel): its record is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the pair's step and phase, as many times as 2.0 does. 1.35's side (`extraCancelOf`): one of the approved row t entries listed covers 1.35's record of the pair as the unpaired missing record it would otherwise be (unpairedHalf), by that entry's own conditions, each read on 1.35's record: its triggers (`when`), its step condition (`afterOp`), its bound and its marker (`afterMet`, `afterError`, `afterCancel`). A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels more or less often, and the same pairing where no listed entry approves 1.35's cancel (a run still in flight, a case without the row's triggers, an outcome only 1.35 reported), stay unexcused. It adds no trigger of its own: the listed entry's apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-hook-onResolverCancel-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "mispaired": true,
+    "mispairedBy": [
+      "l12-cand-t-mispaired-cancel-hook-onResolverCancel-changed"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "requirementId"
+              },
+              "requirement": {
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only the onResolverCancel hook of the other requirement's cancel that 1.35 made and the pairing left unpaired (a single or batch requirement's cancel, in the shapes the signed row t entries name; a keyed run's is left to `l3-cand-t-fuzz-*-missing`), and only where it is marked (`mispaired`, diff/scenario.ts markMispaired): in its step and phase a pair in the mispaired form took 2.0's cancel of this very requirement, a record of the same kind, which 2.0 reports as often as 1.35 does. It is excused only where that pair is: `l12-cand-t-mispaired-cancel-hook-onResolverCancel-changed` must cover the pair (`mispairedBy`), so where no row t entry approves 1.35's extra cancel, this cancel stays unexcused with it. A cancel 2.0 really lacks, with no such pair for its requirement, is never marked and stays unexcused by this entry. Earlier row t entries (`l3-cand-t-fuzz-*-missing`, `l9-fuzz-t-disable-*-missing`) take the record first where their triggers apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-hook-onRequirementCanceled-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "mispaired": true,
+    "mispairedBy": [
+      "l12-cand-t-mispaired-cancel-hook-onRequirementCanceled-changed"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "requirementId"
+              },
+              "requirement": {
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only the onRequirementCanceled hook of the other requirement's cancel that 1.35 made and the pairing left unpaired (a single or batch requirement's cancel, in the shapes the signed row t entries name; a keyed run's is left to `l3-cand-t-fuzz-*-missing`), and only where it is marked (`mispaired`, diff/scenario.ts markMispaired): in its step and phase a pair in the mispaired form took 2.0's cancel of this very requirement, a record of the same kind, which 2.0 reports as often as 1.35 does. It is excused only where that pair is: `l12-cand-t-mispaired-cancel-hook-onRequirementCanceled-changed` must cover the pair (`mispairedBy`), so where no row t entry approves 1.35's extra cancel, this cancel stays unexcused with it. A cancel 2.0 really lacks, with no such pair for its requirement, is never marked and stays unexcused by this entry. Earlier row t entries (`l3-cand-t-fuzz-*-missing`, `l9-fuzz-t-disable-*-missing`) take the record first where their triggers apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-observe-requirement-canceled-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "mispaired": true,
+    "mispairedBy": [
+      "l12-cand-t-mispaired-cancel-observe-requirement-canceled-changed"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "requirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        },
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only the requirement.canceled observe event of the other requirement's cancel that 1.35 made and the pairing left unpaired (a single or batch requirement's cancel, in the shapes the signed row t entries name; a keyed run's is left to `l3-cand-t-fuzz-*-missing`), and only where it is marked (`mispaired`, diff/scenario.ts markMispaired): in its step and phase a pair in the mispaired form took 2.0's cancel of this very requirement, a record of the same kind, which 2.0 reports as often as 1.35 does. It is excused only where that pair is: `l12-cand-t-mispaired-cancel-observe-requirement-canceled-changed` must cover the pair (`mispairedBy`), so where no row t entry approves 1.35's extra cancel, this cancel stays unexcused with it. A cancel 2.0 really lacks, with no such pair for its requirement, is never marked and stays unexcused by this entry. Earlier row t entries (`l3-cand-t-fuzz-*-missing`, `l9-fuzz-t-disable-*-missing`) take the record first where their triggers apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
   }
 ]

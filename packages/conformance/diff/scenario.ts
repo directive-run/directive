@@ -61,6 +61,7 @@ import {
   type Excuse,
   LIKE,
   admits,
+  canceledIdOf,
   excuseFor,
   names,
 } from "./fingerprint.js";
@@ -584,6 +585,39 @@ export interface Divergence {
    * times as the engine does.
    */
   afterCancel?: true;
+  /**
+   * Fuzz only, op `changed` or `missing` (L12 gate run 5, row t's shared
+   * mispairing rule; the owner's 2026-11-26 answer): the entry covers only
+   * a cancel record in the mispaired form (`Difference.mispaired`,
+   * `markMispaired`). On op `changed`: a pair of two cancel records where
+   * the engine's record cancels a different requirement, one that 1.35
+   * also cancels in the same step and phase, as many times as the engine
+   * does. On op `missing`: 1.35's own cancel of that other requirement,
+   * which such a pair left unpaired.
+   */
+  mispaired?: true;
+  /**
+   * Fuzz only, op `changed` with `mispaired`: the ids of approved row t
+   * entries of op `missing`, each an exception for a cancel record 1.35
+   * makes and the engine does not. The entry covers a mispaired pair only
+   * where one of them covers 1.35's record of the pair as the unpaired
+   * missing difference it would otherwise be (`unpairedHalf`), by that
+   * entry's own conditions: its triggers, step condition, bound and marker
+   * (`afterMet`, `afterError`, `afterCancel`). So the listed entry decides
+   * 1.35's side and `mispaired` decides the engine's.
+   */
+  extraCancelOf?: string[];
+  /**
+   * Fuzz only, op `missing` with `mispaired`: the ids of the `changed`
+   * entries of the shared mispairing rule. The entry covers 1.35's unpaired
+   * cancel of the other requirement only where the case holds the pair
+   * that took the engine's cancel of it (a `changed` difference marked
+   * `mispaired`, of the same kind, step and phase, whose engine record
+   * cancels this record's requirement) and one of the named entries covers
+   * that pair. So the cancel left unpaired is excused only where the pair
+   * is: where no row t entry approves 1.35's extra cancel, both fail.
+   */
+  mispairedBy?: string[];
   reason: string;
   approvedBy: string;
   date: string;
@@ -1416,9 +1450,36 @@ export const pairedHalf = (d: Difference): Json | undefined =>
   d.op === "changed" ? d.record : ownRecord(d);
 
 /**
+ * 1.35's record of a `changed` pair as the difference it would be had the
+ * comparison left it unpaired: op `missing`, at 1.35's place, with the
+ * pair's markers (`extraCancelOf`).
+ */
+export function unpairedHalf(d: Difference): Difference {
+  const {
+    path: _path,
+    candidate: _candidate,
+    record,
+    candidateRecord: _candidateRecord,
+    mispaired: _mispaired,
+    ...rest
+  } = d;
+
+  return {
+    ...rest,
+    op: "missing",
+    ...(record === undefined ? {} : { reference: record }),
+    at: d.at.reference === undefined ? {} : { reference: d.at.reference },
+    where:
+      d.where.reference === undefined ? {} : { reference: d.where.reference },
+  } as Difference;
+}
+
+/**
  * Whether `div` covers difference `d` of scenario `name`. An entry with
  * `when` covers only in a fuzz case whose `triggers` include every one it
  * lists: never in a hand scenario, nor in a case without a trigger set.
+ * `entries` is the whole list `div` is from: only an entry with
+ * `extraCancelOf` or `mispairedBy` reads it, for the entries it names.
  */
 export function covers(
   div: Divergence,
@@ -1427,6 +1488,7 @@ export function covers(
   triggers?: readonly string[],
   steps?: ReadonlyMap<number, string>,
   context?: readonly Difference[],
+  entries?: readonly Divergence[],
 ): boolean {
   return (
     div.scenario === name &&
@@ -1466,6 +1528,45 @@ export function covers(
       (name === FUZZ_SCENARIO &&
         (d.op === "missing" || d.op === "changed") &&
         d.afterCancel === true)) &&
+    (div.mispaired !== true ||
+      (name === FUZZ_SCENARIO &&
+        (d.op === "missing" || d.op === "changed") &&
+        d.mispaired === true)) &&
+    (div.extraCancelOf === undefined ||
+      (name === FUZZ_SCENARIO &&
+        d.op === "changed" &&
+        d.mispaired === true &&
+        (entries ?? []).some(
+          (e) =>
+            div.extraCancelOf?.includes(e.id) === true &&
+            e.op === "missing" &&
+            e.mispaired === undefined &&
+            e.extraCancelOf === undefined &&
+            e.requires === undefined &&
+            covers(e, name, unpairedHalf(d), triggers, steps, context),
+        ))) &&
+    (div.mispairedBy === undefined ||
+      (name === FUZZ_SCENARIO &&
+        d.op === "missing" &&
+        d.mispaired === true &&
+        (context ?? []).some(
+          (pair) =>
+            pair.op === "changed" &&
+            pair.mispaired === true &&
+            pair.engine === d.engine &&
+            pair.stream === d.stream &&
+            pair.kind === d.kind &&
+            pair.step === d.step &&
+            pair.phase === d.phase &&
+            canceledIdOf(pair.candidateRecord) === canceledIdOf(d.reference) &&
+            (entries ?? []).some(
+              (e) =>
+                div.mispairedBy?.includes(e.id) === true &&
+                e.op === "changed" &&
+                e.extraCancelOf !== undefined &&
+                covers(e, name, pair, triggers, steps, context, entries),
+            ),
+        ))) &&
     (div.bound === undefined || admits(div.bound, d)) &&
     (div.requires === undefined ||
       (name === FUZZ_SCENARIO && meets(div.requires, d, context ?? []))) &&
@@ -1678,7 +1779,9 @@ export function explain(
   covered: Covered[];
 } {
   const coverOf = (d: Difference) =>
-    divergences.find((x) => covers(x, name, d, triggers, steps, differences));
+    divergences.find((x) =>
+      covers(x, name, d, triggers, steps, differences, divergences),
+    );
   // How many of its records each excuse has excused so far in this run.
   const spent = new Map<Divergence, number[]>();
   // The first entry that covers `d` and, if it lists excuses, still has
@@ -1686,7 +1789,7 @@ export function explain(
   // next entry, and is unexplained if none takes it).
   const take = (d: Difference): Covered | undefined => {
     for (const div of divergences) {
-      if (!covers(div, name, d, triggers, steps, differences)) {
+      if (!covers(div, name, d, triggers, steps, differences, divergences)) {
         continue;
       }
       if (div.excuses === undefined) {
@@ -2009,27 +2112,6 @@ export function markStale(
   return differences;
 }
 
-/** The requirement id a cancel record names (`markAfterMet`). */
-function canceledIdOf(record: Json | undefined): string | undefined {
-  if (record === null || typeof record !== "object" || Array.isArray(record)) {
-    return undefined;
-  }
-  const r = record as Record<string, Json>;
-  const args = r.args as Json[] | undefined;
-  const id =
-    r.k === "hook" && r.hook === "onResolverCancel"
-      ? (args?.[1] as Record<string, Json> | null | undefined)?.id
-      : r.k === "hook" && r.hook === "onRequirementCanceled"
-        ? (args?.[0] as Record<string, Json> | null | undefined)?.id
-        : r.k === "observe" &&
-            (r.event as Record<string, Json> | null)?.type ===
-              "requirement.canceled"
-          ? (r.event as Record<string, Json>).id
-          : undefined;
-
-  return typeof id === "string" ? id : undefined;
-}
-
 /**
  * Each requirement's lifecycle hooks in `trace`, in order, by id: where it
  * was created or canceled (not met) and where it was reported met.
@@ -2063,8 +2145,10 @@ function metTimeline(trace: TraceEntry[]): Map<string, [number, boolean][]> {
  * of it, just before the record: on the reference before the record's own
  * index (an observe record's own onRequirementCanceled hook, the record
  * right before it, is the same cancel and does not count), on the engine
- * through the last paired record before it. Returns `differences`, marked
- * in place.
+ * through the last paired record before it. A `changed` pair in the
+ * mispaired form is marked by the same rule, read on 1.35's whole record
+ * (`extraCancelRecord`, the shared rule). Returns `differences`, marked in
+ * place.
  */
 export function markAfterMet(
   differences: Difference[],
@@ -2086,7 +2170,7 @@ export function markAfterMet(
     return met;
   };
   for (const d of differences) {
-    const id = d.op === "missing" ? canceledIdOf(d.reference) : undefined;
+    const id = canceledIdOf(extraCancelRecord(d, reference, candidate));
     const at = d.at.reference;
     if (id === undefined || at === undefined) {
       continue;
@@ -2203,7 +2287,9 @@ function cancelStart(
  * do not count; only the logging plugin's lines, a per-engine projection,
  * may sit between them: PR seed 17's third shrink), on the engine through
  * the last paired record before it.
- * An onResolverCancel must also name that resolver. Returns `differences`,
+ * An onResolverCancel must also name that resolver. A `changed` pair in
+ * the mispaired form is marked by the same rule, read on 1.35's whole
+ * record (`extraCancelRecord`, the shared rule). Returns `differences`,
  * marked in place.
  */
 export function markAfterError(
@@ -2232,7 +2318,8 @@ export function markAfterError(
     return resolver;
   };
   for (const d of differences) {
-    const id = d.op === "missing" ? canceledIdOf(d.reference) : undefined;
+    const own = extraCancelRecord(d, reference, candidate);
+    const id = canceledIdOf(own);
     const at = d.at.reference;
     if (id === undefined || at === undefined) {
       continue;
@@ -2242,7 +2329,7 @@ export function markAfterError(
     const resolver = erroredBefore(timelines[0].get(id), before);
     const named =
       d.kind === "onResolverCancel"
-        ? (d.reference as { args?: Json[] } | undefined)?.args?.[0]
+        ? (own as { args?: Json[] } | undefined)?.args?.[0]
         : resolver;
     if (
       resolver !== null &&
@@ -2366,6 +2453,103 @@ function cancelCounts(trace: TraceEntry[]): Map<string, number> {
   return out;
 }
 
+/** Each trace's `cancelCounts`, counted once (`mispairedCancel`). */
+const CANCEL_COUNTS = new WeakMap<TraceEntry[], Map<string, number>>();
+
+/**
+ * Row t's shared mispairing rule, the engine's side (L12 gate run 5; the
+ * owner's 2026-11-24 answer for the second-cancel group, applied to every
+ * row t extra cancel by his 2026-11-26 answer). The alignment pairs a step
+ * and phase's cancel records by kind, never by requirement id, so where a
+ * pass cancels another requirement on both engines, a cancel only 1.35
+ * makes can pair with the engine's cancel of that other requirement and
+ * show as op `changed`.
+ *
+ * Whether `d` is such a pair: both whole records are cancel records
+ * (`Difference.record`, `candidateRecord`), the engine's names a different
+ * requirement than 1.35's, and 1.35 also cancels that other requirement,
+ * with a record of the same kind, in the pair's step and phase, as many
+ * times as the engine does (`cancelCounts`). A cancel the engine makes of
+ * a requirement 1.35 never cancels, or cancels more or less often, is not
+ * one. Whether 1.35's record is an approved extra cancel is not decided
+ * here: each row t entry's own conditions decide that (`markAfterMet`,
+ * `markAfterError`, `markAfterCancel`, `Divergence.extraCancelOf`).
+ */
+export function mispairedCancel(
+  d: Difference,
+  reference: TraceEntry[],
+  candidate: TraceEntry[],
+): boolean {
+  if (d.op !== "changed") {
+    return false;
+  }
+  const id = canceledIdOf(d.record);
+  const other = canceledIdOf(d.candidateRecord);
+  if (id === undefined || other === undefined || other === id) {
+    return false;
+  }
+  const counted = (trace: TraceEntry[]) => {
+    const have = CANCEL_COUNTS.get(trace) ?? cancelCounts(trace);
+    CANCEL_COUNTS.set(trace, have);
+
+    return have;
+  };
+  const key = `${segmentRank(d.step, d.phase)}|${d.kind}|${other}`;
+  const also = counted(reference).get(key) ?? 0;
+
+  return also > 0 && also === (counted(candidate).get(key) ?? 0);
+}
+
+/**
+ * 1.35's cancel record a row t marker reads on `d`: the difference's own
+ * (op `missing`), or 1.35's half of a pair in the mispaired form
+ * (`mispairedCancel`); undefined for any other difference.
+ */
+function extraCancelRecord(
+  d: Difference,
+  reference: TraceEntry[],
+  candidate: TraceEntry[],
+): Json | undefined {
+  return d.op === "missing"
+    ? d.reference
+    : mispairedCancel(d, reference, candidate)
+      ? d.record
+      : undefined;
+}
+
+/**
+ * Mark `Difference.mispaired` (row t's shared mispairing rule): every
+ * `changed` pair in the mispaired form (`mispairedCancel`), and each cancel
+ * record of the other requirement that 1.35 made in the same step and
+ * phase and the comparison left unpaired (op `missing`, the same kind): the
+ * pair took the engine's cancel that record would have paired with. A
+ * missing cancel with no such pair for its requirement is never marked.
+ * Returns `differences` (one engine's), marked in place.
+ */
+export function markMispaired(
+  differences: Difference[],
+  reference: TraceEntry[],
+  candidate: TraceEntry[],
+): Difference[] {
+  const took = new Set<string>();
+  const key = (d: Difference, id: string | undefined) =>
+    `${segmentRank(d.step, d.phase)}|${d.kind}|${id}`;
+  for (const d of differences) {
+    if (mispairedCancel(d, reference, candidate)) {
+      d.mispaired = true;
+      took.add(key(d, canceledIdOf(d.candidateRecord)));
+    }
+  }
+  for (const d of differences) {
+    const id = d.op === "missing" ? canceledIdOf(d.reference) : undefined;
+    if (id !== undefined && took.has(key(d, id))) {
+      d.mispaired = true;
+    }
+  }
+
+  return differences;
+}
+
 /**
  * Mark `Difference.afterCancel` (L12 gate run 5, the further cancels 1.35
  * reports for a batch run whose outcome and one cancel both engines
@@ -2404,7 +2588,9 @@ function cancelCounts(trace: TraceEntry[]): Map<string, number> {
  * step and phase, as many times as the engine does (`cancelCounts`): a
  * cancel the engine makes of a requirement 1.35 never cancels, or more
  * often than 1.35, stays unmarked. 1.35's own cancel of the other
- * requirement, left unpaired, is never marked.
+ * requirement, left unpaired, is never marked. That test of the engine's
+ * record is the shared rule's (`mispairedCancel`), which `markAfterMet` and
+ * `markAfterError` apply as well (the owner's 2026-11-26 answer).
  * Returns `differences`, marked in place.
  */
 export function markAfterCancel(
@@ -2415,7 +2601,6 @@ export function markAfterCancel(
   let timelines:
     | [Map<string, LifecycleHook[]>, Map<string, LifecycleHook[]>]
     | undefined;
-  let counts: [Map<string, number>, Map<string, number>] | undefined;
   /**
    * How a run that ended and was then canceled ends, as the first `count`
    * hooks of `all` end, `again` allowing more than one cancel: its outcome
@@ -2455,33 +2640,14 @@ export function markAfterCancel(
       : null;
   };
   for (const d of differences) {
-    // 1.35's cancel record: the difference's own, or 1.35's half of a pair.
-    const own =
-      d.op === "missing"
-        ? d.reference
-        : d.op === "changed"
-          ? d.record
-          : undefined;
+    // 1.35's cancel record: the difference's own, or 1.35's half of a pair
+    // in the mispaired form (the engine's half is a cancel of another
+    // requirement, which 1.35 cancels as often in this step and phase).
+    const own = extraCancelRecord(d, reference, candidate);
     const id = canceledIdOf(own);
     const at = d.at.reference;
     if (id === undefined || at === undefined) {
       continue;
-    }
-    if (d.op === "changed") {
-      // The mispaired form: the engine's half is a cancel of another
-      // requirement, which 1.35 cancels as often in this step and phase.
-      const other = canceledIdOf(d.candidateRecord);
-      counts ??= [cancelCounts(reference), cancelCounts(candidate)];
-      const key = `${segmentRank(d.step, d.phase)}|${d.kind}|${other}`;
-      const also = counts[0].get(key) ?? 0;
-      if (
-        other === undefined ||
-        other === id ||
-        also === 0 ||
-        also !== (counts[1].get(key) ?? 0)
-      ) {
-        continue;
-      }
     }
     timelines ??= [lifecycleOf(reference), lifecycleOf(candidate)];
     const mine = timelines[0].get(id) ?? [];
@@ -2830,10 +2996,14 @@ export async function runScenario(
   const advisories: string[] = [];
   const steps = stepOps(first);
   for (const [engine, trace] of Object.entries(theirs)) {
-    const compared = markAfterCancel(
-      markAfterError(
-        markAfterMet(
-          markStale(compareContract(first, trace, engine), first),
+    const compared = markMispaired(
+      markAfterCancel(
+        markAfterError(
+          markAfterMet(
+            markStale(compareContract(first, trace, engine), first),
+            first,
+            trace,
+          ),
           first,
           trace,
         ),
