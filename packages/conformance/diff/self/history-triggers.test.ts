@@ -723,7 +723,8 @@ describe("the ignoresAbort gate on the late-write entries", () => {
           } as unknown as Difference,
         ]
       : [];
-    const steps = new Map<number, string>(e.afterOp ? [[1, e.afterOp]] : []);
+    const afterOp = typeof e.afterOp === "string" ? e.afterOp : e.afterOp?.[0];
+    const steps = new Map<number, string>(afterOp ? [[1, afterOp]] : []);
 
     return { d, context: [d, ...context], steps };
   }

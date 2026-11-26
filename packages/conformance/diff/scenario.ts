@@ -523,9 +523,12 @@ export interface Divergence {
   requires?: Requirement;
   /**
    * Fuzz only: the op of a step the difference must come after (`stepOps`):
-   * the 2/352 entries cover a late write's hooks only after `destroy`.
+   * the 2/352 entries cover a late write's hooks only after `destroy`. A
+   * list names any one of several ops: the second-cancel entries take any
+   * history move (`goTo`, `back` or `forward`; the owner's "Any history move
+   * (Recommended)", 2026-11-26).
    */
-  afterOp?: string;
+  afterOp?: string | readonly string[];
   /**
    * Fuzz only, op `missing`: the entry covers only a dropped repeat
    * (`Difference.repeat`), a record the reference made more times in its
@@ -1573,7 +1576,10 @@ export function covers(
     (div.afterOp === undefined ||
       (name === FUZZ_SCENARIO &&
         [...(steps ?? new Map<number, string>())].some(
-          ([i, op]) => op === div.afterOp && i < d.step,
+          ([i, op]) =>
+            (typeof div.afterOp === "string"
+              ? op === div.afterOp
+              : div.afterOp?.includes(op) === true) && i < d.step,
         )))
   );
 }

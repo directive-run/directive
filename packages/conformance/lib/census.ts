@@ -1161,10 +1161,17 @@ export function checkDivergences(
     if (
       e.afterOp !== undefined &&
       (e.scenario !== FUZZ_SCENARIO ||
-        !FUZZ_STEP_OPS.includes(e.afterOp as string))
+        !(typeof e.afterOp === "string"
+          ? FUZZ_STEP_OPS.includes(e.afterOp)
+          : Array.isArray(e.afterOp) &&
+            e.afterOp.length > 1 &&
+            new Set(e.afterOp).size === e.afterOp.length &&
+            e.afterOp.every(
+              (op) => typeof op === "string" && FUZZ_STEP_OPS.includes(op),
+            )))
     ) {
       fail(
-        `${label} afterOp must be a fuzz step op (one of ${FUZZ_STEP_OPS.join(", ")}), on a fuzz entry only`,
+        `${label} afterOp must be a fuzz step op (one of ${FUZZ_STEP_OPS.join(", ")}), or a list of two or more distinct ones, on a fuzz entry only`,
       );
     }
     if (

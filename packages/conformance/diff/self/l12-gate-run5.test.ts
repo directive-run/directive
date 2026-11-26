@@ -14,7 +14,9 @@
 //   reported that error (`afterError`, `markAfterError`);
 // - 1.35's second cancel of a finished batch run after a goTo (PR seed 17's
 //   fourth shrink; the owner's "2.0's single cancel; sign it (Recommended)",
-//   2026-11-23): only after a goTo step, and only after both engines
+//   2026-11-23): only after a history move (a goTo, back or forward step;
+//   the owner's "Any history move (Recommended)", 2026-11-26, for PR seed
+//   17's ninth case, `pr17i`), and only after both engines
 //   reported the run complete, the requirement met and one cancel of it
 //   (`afterCancel`, `markAfterCancel`), each engine read in its own record
 //   order, so the trace option's crossed pairings (PR seed 17's sixth case,
@@ -833,6 +835,13 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
       { k: "async", i },
     ] as TraceEntry[];
   const goTo = (i = 1) => history(i, { op: "goTo", position: 0 });
+  /** The history moves the second-cancel entries take (`afterOp`). */
+  const HISTORY_MOVES = ["goTo", "back", "forward"];
+  /** `trace` with its first step, a goTo, replaced by another history step. */
+  const moved = (trace: TraceEntry[], op: Json) => [
+    ...history(1, op),
+    ...trace.slice(goTo().length),
+  ];
   const created = (id = ID) => [
     hook("onRequirementCreated", [full(id)]),
     observe({ id, requirementType: "AB", type: "requirement.created" }),
@@ -942,7 +951,7 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
       expect(d.afterCancel).toBe(true);
       expect(d.afterMet).toBeUndefined();
       expect(d.afterError).toBeUndefined();
-      expect(d.afterOp).toBe("goTo");
+      expect(d.afterOp).toEqual(HISTORY_MOVES);
       expect(d.when).toEqual(["batched", "navigated", "navigatedBusy"]);
       expect(d.group).toBe("quirk-t-batch-second-cancel");
       expect(d.reason).toContain("Signed on the owner's instruction");
@@ -1022,17 +1031,47 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
     ).toHaveLength(6);
   });
 
-  it("after a failed run, without a goTo it fails", () => {
+  it("after a failed run, without a history move it fails", () => {
     // No navigation in the case.
     const off = TC_FAILS.filter((t) => !t.startsWith("navigated"));
     expect(left(e1, e2, off)).toEqual(CANCELS);
-    // No goTo step before the cancels' step.
+    // No history step before the cancels' step.
     expect(left(e1.slice(2), e2.slice(2), TC_FAILS)).toEqual(CANCELS);
-    // Another navigation than a goTo.
-    const back = history(1, { op: "back", steps: 1 });
-    expect(
-      left([...back, ...e1.slice(2)], [...back, ...e2.slice(2)], TC_FAILS),
-    ).toEqual(CANCELS);
+    // A history step that is not a move.
+    for (const op of [
+      { op: "replay" },
+      { op: "roundtrip" },
+      { op: "begin" },
+    ] as Json[]) {
+      expect(left(moved(e1, op), moved(e2, op), TC_FAILS)).toEqual(CANCELS);
+    }
+  });
+
+  it("after a failed run, a back (pr17i) or a forward step is a history move, as a goTo is (the owner's 2026-11-26 answer)", () => {
+    // Held as failing before the owner's "Any history move (Recommended)"
+    // (2026-11-26); his answer makes back and forward qualify.
+    for (const op of [
+      { op: "back", steps: 1 },
+      { op: "back" },
+      { op: "forward", steps: 1 },
+      { op: "forward" },
+    ] as Json[]) {
+      const [r, c] = [moved(e1, op), moved(e2, op)];
+      expect(marks(r, c)).toEqual(YES);
+      expect(left(r, c, TC_FAILS)).toEqual([]);
+      // An extra cancel on 2.0 after the same move still fails.
+      expect(
+        left(c, r, TC_FAILS).filter((line) => line.startsWith("extra ")),
+      ).toHaveLength(3);
+      // So does the move with no navigation that ran while work was in flight.
+      expect(
+        left(
+          r,
+          c,
+          TC_FAILS.filter((t) => t !== "navigatedBusy"),
+        ),
+      ).toEqual(CANCELS);
+    }
   });
 
   it("an extra cancel on 2.0 instead of 1.35 fails", () => {
@@ -1134,11 +1173,13 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
     ).toHaveLength(6);
   });
 
-  it("without a goTo it fails", () => {
+  it("without a history move it fails", () => {
     // No navigation in the case.
     const off = TC_ON.filter((t) => !t.startsWith("navigated"));
     expect(left(v1, v2, off)).toEqual(CANCELS);
     expect(left(v1.slice(2), v2.slice(2), off)).toEqual(CANCELS);
+    // No history step before the cancels' step, the triggers as they are.
+    expect(left(v1.slice(2), v2.slice(2), TC_ON)).toEqual(CANCELS);
     // A navigation that never ran while work was in flight.
     expect(
       left(
@@ -1147,15 +1188,44 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
         TC_ON.filter((t) => t !== "navigatedBusy"),
       ),
     ).toEqual(CANCELS);
-    // Another navigation than a goTo.
-    const back = history(1, { op: "back", steps: 1 });
-    expect(
-      left([...back, ...v1.slice(2)], [...back, ...v2.slice(2)], TC_ON),
-    ).toEqual(CANCELS);
-    // A goTo only after the second cancel's step.
-    expect(
-      left([...v1.slice(2), ...goTo(4)], [...v2.slice(2), ...goTo(4)], TC_ON),
-    ).toEqual(CANCELS);
+    // A history step that is not a move.
+    for (const op of [
+      { op: "replay" },
+      { op: "roundtrip" },
+      { op: "end" },
+    ] as Json[]) {
+      expect(left(moved(v1, op), moved(v2, op), TC_ON)).toEqual(CANCELS);
+    }
+    // A history move only after the second cancel's step.
+    for (const op of [
+      { op: "goTo", position: 0 },
+      { op: "back", steps: 1 },
+      { op: "forward", steps: 1 },
+    ] as Json[]) {
+      expect(
+        left(
+          [...v1.slice(2), ...history(4, op)],
+          [...v2.slice(2), ...history(4, op)],
+          TC_ON,
+        ),
+      ).toEqual(CANCELS);
+    }
+  });
+
+  it("after a finished run, a back or a forward step is a history move, as a goTo is (the owner's 2026-11-26 answer)", () => {
+    // Held as failing ("another navigation than a goTo") before the owner's
+    // "Any history move (Recommended)" (2026-11-26).
+    for (const op of [
+      { op: "back", steps: 1 },
+      { op: "forward", steps: 1 },
+    ] as Json[]) {
+      const [r, c] = [moved(v1, op), moved(v2, op)];
+      expect(marks(r, c)).toEqual(YES);
+      expect(left(r, c, TC_ON)).toEqual([]);
+      expect(
+        left(c, r, TC_ON).filter((line) => line.startsWith("extra ")),
+      ).toHaveLength(3);
+    }
   });
 
   it("on a run with no outcome reported, or one from another resolver, it fails", () => {
@@ -1451,7 +1521,7 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
           expect(e.ends).toBeUndefined();
           expect(e.afterMet).toBeUndefined();
           expect(e.afterError).toBeUndefined();
-          expect(e.afterOp).toBe("goTo");
+          expect(e.afterOp).toEqual(HISTORY_MOVES);
           expect(e.when).toEqual(["batched", "navigated", "navigatedBusy"]);
           expect(e.group).toBe("quirk-t-batch-second-cancel");
           expect(e.reason).toContain("Signed on the owner's instruction");
@@ -1558,15 +1628,30 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
       );
     });
 
-    it("without a goTo it fails", () => {
-      const back = (trace: TraceEntry[]) => [
-        ...history(1, { op: "back" }),
-        ...trace.slice(goTo().length),
-      ];
-      expect(run(back(g1), back(g2), TC_ON).left).toEqual(PAIRED);
-      expect(run(back(g1), back(g2), NO_WR).left).toEqual(
+    it("without a history move it fails", () => {
+      // Held a back step as failing before the owner's "Any history move
+      // (Recommended)" (2026-11-26); a step that is no move still fails.
+      const replay = (trace: TraceEntry[]) => moved(trace, { op: "replay" });
+      expect(run(replay(g1), replay(g2), TC_ON).left).toEqual(PAIRED);
+      expect(run(replay(g1), replay(g2), NO_WR).left).toEqual(
         [...PAIRED, ...CANCELS].sort(),
       );
+      const none = (trace: TraceEntry[]) => trace.slice(goTo().length);
+      expect(run(none(g1), none(g2), TC_ON).left).toEqual(PAIRED);
+    });
+
+    it("after a back or a forward step it is explained, as after a goTo (the owner's 2026-11-26 answer)", () => {
+      for (const op of [
+        { op: "back" },
+        { op: "forward", steps: 1 },
+      ] as Json[]) {
+        expect(run(moved(g1, op), moved(g2, op), TC_ON).left).toEqual([]);
+        const all = run(moved(g1, op), moved(g2, op), NO_WR);
+        expect(all.left).toEqual([]);
+        expect(all.used).toEqual(
+          expect.arrayContaining([...TG_CHANGED, ...TG_UNPAIRED]),
+        );
+      }
     });
 
     it("the changed twins admit only a batch id-only record paired with a single resolver's, and only when marked", () => {
@@ -2463,6 +2548,26 @@ describe("the census validates the run-5 fields", () => {
         used,
       ),
     ).toMatch(/afterCancel must be true/);
+  });
+
+  it("afterOp takes one fuzz step op, or a list of two or more distinct ones", () => {
+    const entry = byId(TC_IDS[0] as string);
+    const used = [entry.id];
+    expect(entry.afterOp).toEqual(["goTo", "back", "forward"]);
+    expect(census([entry], used)).toBe("");
+    expect(census([{ ...entry, afterOp: "goTo" }], used)).toBe("");
+    for (const afterOp of [
+      [],
+      ["goTo"],
+      ["goTo", "goTo"],
+      ["goTo", "sideways"],
+      ["goTo", 1],
+      "sideways",
+    ]) {
+      expect(census([{ ...entry, afterOp }], used)).toMatch(
+        /afterOp must be a fuzz step op/,
+      );
+    }
   });
 
   it("afterError must be true, on a fuzz entry of op missing", () => {
