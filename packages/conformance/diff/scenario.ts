@@ -60,6 +60,7 @@ import {
   type Bound,
   type Excuse,
   LIKE,
+  PLUGIN_COUNTERS,
   admits,
   canceledIdOf,
   excuseFor,
@@ -621,6 +622,18 @@ export interface Divergence {
    * is: where no row t entry approves 1.35's extra cancel, both fail.
    */
   mispairedBy?: string[];
+  /**
+   * Fuzz only, op `changed`, stream `external` (L12 gate run 5, the shared
+   * plugin-counter rule; the owner's "Counters follow approved records
+   * (Recommended)", 2026-11-26): the entry covers a plugin counter's
+   * difference only where the records that other approved entries already
+   * explain in the same case account for it exactly (`counterExplained`,
+   * `PLUGIN_COUNTERS`): the counter's 1.35 value less its 2.0 value equals
+   * the number of explained records of the hook kind it counts, for the key
+   * it is keyed by, that 1.35 has and 2.0 lacks, less those 2.0 has and 1.35
+   * lacks. `explain` reads it in a second pass, after every other entry.
+   */
+  counterFollows?: true;
   reason: string;
   approvedBy: string;
   date: string;
@@ -1492,9 +1505,14 @@ export function covers(
   steps?: ReadonlyMap<number, string>,
   context?: readonly Difference[],
   entries?: readonly Divergence[],
+  explained?: readonly Difference[],
 ): boolean {
   return (
     div.scenario === name &&
+    (div.counterFollows !== true ||
+      (name === FUZZ_SCENARIO &&
+        explained !== undefined &&
+        counterExplained(d, explained, steps))) &&
     (div.when === undefined ||
       (name === FUZZ_SCENARIO &&
         triggers !== undefined &&
@@ -1844,7 +1862,7 @@ export function explain(
     );
   };
   const twins = shiftedTwins(differences, pastCut);
-  const unexplained = differences.filter((d) => {
+  const firstPass = differences.filter((d) => {
     if (pastCut(d) || twins.has(d)) {
       dropped.set(d.engine, (dropped.get(d.engine) ?? 0) + 1);
 
@@ -1860,6 +1878,39 @@ export function explain(
 
     return true;
   });
+  // The plugin-counter rule (`Divergence.counterFollows`): a counter is
+  // read against the records the first pass explained, never the other
+  // way round, so no counter entry excuses a record.
+  const explainedRecords = covered.map((c) => c.difference);
+  const unexplained =
+    name === FUZZ_SCENARIO &&
+    firstPass.length > 0 &&
+    divergences.some((x) => x.counterFollows === true)
+      ? firstPass.filter((d) => {
+          const div = divergences.find(
+            (x) =>
+              x.counterFollows === true &&
+              covers(
+                x,
+                name,
+                d,
+                triggers,
+                steps,
+                differences,
+                divergences,
+                explainedRecords,
+              ),
+          );
+          if (div) {
+            used.add(div.id);
+            covered.push({ id: div.id, difference: d });
+
+            return false;
+          }
+
+          return true;
+        })
+      : firstPass;
 
   return {
     unexplained,
@@ -1872,6 +1923,150 @@ export function explain(
       dropped: dropped.get(engine) ?? 0,
     })),
   };
+}
+
+/** The hook a counter difference counts and its key (`PLUGIN_COUNTERS`). */
+export function counterOf(
+  d: Difference,
+): { hook: string; key?: string } | undefined {
+  const sections = PLUGIN_COUNTERS[d.kind];
+  if (
+    sections === undefined ||
+    d.stream !== "external" ||
+    d.op !== "changed" ||
+    typeof d.path !== "string"
+  ) {
+    return undefined;
+  }
+  const snapshot = (d.record as { data?: Json[] } | undefined)?.data?.[1];
+  for (const [section, fields] of Object.entries(sections)) {
+    for (const [field, hook] of Object.entries(fields)) {
+      if (section === "reconcile") {
+        if (d.path === `data[1].${section}.${field}`) {
+          return { hook };
+        }
+        continue;
+      }
+      const keyed = (snapshot as Record<string, Json> | null | undefined)?.[
+        section
+      ];
+      if (keyed === null || typeof keyed !== "object") {
+        continue;
+      }
+      for (const key of Object.keys(keyed)) {
+        if (d.path === `data[1].${section}.${key}.${field}`) {
+          return { hook, key };
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Whether the records already explained in a case (`explained`: the
+ * differences other entries covered) account exactly for a plugin
+ * counter's difference `d` (`Divergence.counterFollows`; the owner's
+ * "Counters follow approved records (Recommended)", 2026-11-26). Counted:
+ * each explained record of the counter's hook kind and key, on `d`'s
+ * engine, each record once (a changed pair is two records, one per side),
+ * before the counter's own record in that side's trace, and after the
+ * last `destroy` or `twin` step before it (the plugin resets on
+ * `onDestroy`; a twin's records are not the system's). 1.35's records
+ * (missing, and 1.35's half of a changed pair) count for 1.35, the
+ * engine's (extra, the engine's half) for the engine. The counter may
+ * differ only by that net count, in its direction: a counter off by more
+ * or less, the other way, or with no explained record behind it, is not
+ * excused, and neither is a counter `PLUGIN_COUNTERS` does not list.
+ */
+export function counterExplained(
+  d: Difference,
+  explained: readonly Difference[],
+  steps?: ReadonlyMap<number, string>,
+): boolean {
+  const counter = counterOf(d);
+  const atRef = d.at.reference;
+  const atCand = d.at.candidate;
+  if (
+    counter === undefined ||
+    typeof d.reference !== "number" ||
+    typeof d.candidate !== "number" ||
+    atRef === undefined ||
+    atCand === undefined
+  ) {
+    return false;
+  }
+  let after = -1;
+  for (const [i, op] of steps ?? new Map<number, string>()) {
+    if ((op === "destroy" || op === "twin") && i <= d.step && i > after) {
+      after = i;
+    }
+  }
+  const counts = (record: Json | undefined) => {
+    const r = record as Record<string, Json> | null | undefined;
+    if (r === null || typeof r !== "object" || r.k !== "hook") {
+      return false;
+    }
+    if (r.hook !== counter.hook) {
+      return false;
+    }
+
+    return (
+      counter.key === undefined ||
+      (r.args as Json[] | undefined)?.[0] === counter.key
+    );
+  };
+  const seen = new Set<string>();
+  let reference = 0;
+  let candidate = 0;
+  for (const x of explained) {
+    if (
+      x.engine !== d.engine ||
+      x.stream !== "hook" ||
+      x.kind !== counter.hook ||
+      x.step <= after ||
+      (x.op !== "missing" && x.op !== "extra" && x.op !== "changed")
+    ) {
+      continue;
+    }
+    const pair = `${x.at.reference}|${x.at.candidate}`;
+    if (seen.has(pair)) {
+      continue;
+    }
+    seen.add(pair);
+    const own =
+      x.op === "missing"
+        ? x.reference
+        : x.op === "changed"
+          ? x.record
+          : undefined;
+    const theirs =
+      x.op === "extra"
+        ? x.candidate
+        : x.op === "changed"
+          ? x.candidateRecord
+          : undefined;
+    if (
+      own !== undefined &&
+      x.at.reference !== undefined &&
+      x.at.reference < atRef &&
+      counts(own)
+    ) {
+      reference++;
+    }
+    if (
+      theirs !== undefined &&
+      x.at.candidate !== undefined &&
+      x.at.candidate < atCand &&
+      counts(theirs)
+    ) {
+      candidate++;
+    }
+  }
+  const net = reference - candidate;
+
+  return net !== 0 && d.reference - d.candidate === net;
 }
 
 /**

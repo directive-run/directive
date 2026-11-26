@@ -31,6 +31,7 @@ import { describeDrift, gateBuiltNext } from "../contracts/lib/next-surface.js";
 import {
   LIKE,
   PAIR,
+  PLUGIN_COUNTERS,
   TEXT,
   canonicalJson,
   isLower,
@@ -894,6 +895,7 @@ export interface DivergenceEntry {
   mispaired?: unknown;
   extraCancelOf?: unknown;
   mispairedBy?: unknown;
+  counterFollows?: unknown;
   afterOp?: unknown;
   repeats?: unknown;
   reason: string;
@@ -920,6 +922,7 @@ const DIVERGENCE_OPTIONAL = [
   "afterOp",
   "bound",
   "by",
+  "counterFollows",
   "during",
   "ends",
   "engine",
@@ -1339,6 +1342,23 @@ export function checkDivergences(
       }
     }
     if (
+      e.counterFollows !== undefined &&
+      (e.counterFollows !== true ||
+        e.scenario !== FUZZ_SCENARIO ||
+        e.op !== "changed" ||
+        e.stream !== "external" ||
+        typeof e.kind !== "string" ||
+        PLUGIN_COUNTERS[e.kind] === undefined ||
+        e.excuses !== undefined ||
+        e.requires !== undefined ||
+        e.bound !== undefined ||
+        e.ends !== undefined)
+    ) {
+      fail(
+        `${label} counterFollows must be true, on a fuzz entry of op "changed" on stream "external" of a plugin kind PLUGIN_COUNTERS maps (${Object.keys(PLUGIN_COUNTERS).join(", ")}), with no excuses, requires, bound or ends: it covers a plugin counter only by the records other approved entries explain`,
+      );
+    }
+    if (
       e.kind === "*" &&
       (e.stream !== "notify" ||
         e.scenario !== FUZZ_SCENARIO ||
@@ -1400,7 +1420,8 @@ export function checkDivergences(
  *   entry's each name the full `path` (inside the entry's `path`, if it has
  *   one) and `from` and/or `to`. No two excuses of an entry name the same
  *   record (one excuse, a higher count).
- * - A fuzz entry has a `bound` and no `excuses` (`checkBound`).
+ * - A fuzz entry has a `bound` and no `excuses` (`checkBound`), except a
+ *   plugin-counter entry (`counterFollows`), which has neither.
  *
  * `uses` counts, per `<id>\t<index>`, the records each excuse excused in
  * the run (null when not known). Each excuse of an entry the run used must
@@ -1436,8 +1457,13 @@ export function checkExcuses(
           "has excuses, which only a hand scenario's entry may have: a fuzz case's records differ from seed to seed (give a bound)",
         );
       }
-      for (const m of checkBound(e)) {
-        fail(m);
+      // A plugin-counter entry (`counterFollows`) is bounded by the
+      // records other entries explain (`counterExplained`), and has no
+      // bound of its own (checkDivergences rejects one).
+      if (e.counterFollows !== true) {
+        for (const m of checkBound(e)) {
+          fail(m);
+        }
       }
       continue;
     }

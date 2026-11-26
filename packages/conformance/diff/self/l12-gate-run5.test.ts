@@ -40,11 +40,12 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { checkDivergences, checkExcuses } from "../../lib/census.js";
 import { type Difference, compareContract } from "../compare.js";
-import { PAIR, TEXT } from "../fingerprint.js";
+import { PAIR, PLUGIN_COUNTERS, TEXT } from "../fingerprint.js";
 import type { Json } from "../normalize.js";
 import type { TraceEntry } from "../record.js";
 import {
   FUZZ_SCENARIO,
+  counterOf,
   explain,
   fileMoves,
   markAfterCancel,
@@ -2649,5 +2650,239 @@ describe("the census validates the run-5 fields", () => {
     expect(checkExcuses(root, null).join("\n")).toMatch(
       /names an unknown pair "traceRunAnything"/,
     );
+  });
+});
+
+describe("the shared plugin-counter rule: a counter differs only by the approved records it counts (PR seed 17's tenth case, pr17j)", () => {
+  const COUNTER = "l12-plugin-counter-follows-performance-changed";
+  const ON = ["writeRetracts", "batched", "batchFails", "performancePlugin"];
+  const ID = 'AB:{"item":"0.0"}';
+  const req = {
+    fromConstraint: "a::b0",
+    id: ID,
+    requirement: { item: "0.0", type: "AB" },
+  };
+  const hook = (name: string, args: Json[]) =>
+    ({ k: "hook", hook: name, args }) as TraceEntry;
+  const observe = (event: Json) => ({ k: "observe", event }) as TraceEntry;
+  const failure = { $error: { name: "Error", message: "a.rb 0.0 attempt 1" } };
+  const created = [
+    hook("onRequirementCreated", [req]),
+    observe({ id: ID, requirementType: "AB", type: "requirement.created" }),
+  ];
+  const errored = [
+    hook("onResolverError", ["a::rb", req, failure]),
+    observe({
+      error: failure,
+      requirementId: ID,
+      resolver: "a::rb",
+      type: "resolver.error",
+    }),
+  ];
+  /** 1.35's row t error-shape cancel (l12-cand-t-batch-error-*). */
+  const cancel = [
+    hook("onResolverCancel", ["a::rb", { id: ID }]),
+    hook("onRequirementCanceled", [{ id: ID }]),
+    observe({ id: ID, type: "requirement.canceled" }),
+  ];
+  const end = hook("onReconcileEnd", [{ canceled: [{ id: ID }] }]);
+  /** The performance plugin's numbers at the end, as the fuzz records them. */
+  const perf = (counts: Record<string, Record<string, number>>) =>
+    ({
+      k: "external",
+      data: [
+        "performance",
+        {
+          constraints: {},
+          effects: {},
+          reconcile: { runs: 2 },
+          resolvers: counts,
+        },
+      ],
+    }) as TraceEntry;
+  const rb = (cancellations: number, extra: Record<string, number> = {}) => ({
+    "a::rb": { cancellations, completions: 0, errors: 1, ...extra },
+  });
+  /** pr17j's shape: 1.35's approved extra cancel in step 2, the counter read in step 4. */
+  const pair = (
+    v1Counts: Record<string, Record<string, number>>,
+    v2Counts: Record<string, Record<string, number>>,
+    { v1Cancel = true, middle = [] as TraceEntry[] } = {},
+  ) => ({
+    v1: [
+      ...step(1, created),
+      ...step(2, [...errored, ...(v1Cancel ? cancel : []), end]),
+      ...middle,
+      ...step(4, [perf(v1Counts)]),
+    ],
+    v2: [
+      ...step(1, created),
+      ...step(2, [...errored, end]),
+      ...middle,
+      ...step(4, [perf(v2Counts)]),
+    ],
+  });
+  const COUNTED =
+    "changed external performance 4 data[1].resolvers.a::rb.cancellations";
+  const used = (v1: TraceEntry[], v2: TraceEntry[]) => {
+    const steps = stepOps(v1);
+    const diffs = markAfterError(compareContract(v1, v2, "v2"), v1, v2);
+
+    return explain(FUZZ_SCENARIO, diffs, ALL, ON, steps).used;
+  };
+
+  it("the entry is signed on the owner's 2026-11-26 answer, in its narrowest form", () => {
+    const e = byId(COUNTER);
+    expect(e.counterFollows).toBe(true);
+    expect([e.scenario, e.stream, e.kind, e.engine, e.op, e.path]).toEqual([
+      FUZZ_SCENARIO,
+      "external",
+      "performance",
+      "v2",
+      "changed",
+      "data[1]",
+    ]);
+    expect(e.when).toEqual(["performancePlugin"]);
+    expect(e.excuses).toBeUndefined();
+    expect(e.requires).toBeUndefined();
+    expect(e.bound).toBeUndefined();
+    expect(e.reason).toContain("Signed on the owner's instruction");
+    expect(e.reason).toContain(
+      '"Counters follow approved records (Recommended)" (2026-11-26)',
+    );
+    expect(e.date).toBe("2026-11-26");
+    expect(
+      ALL.filter((x) => x.counterFollows === true).map((x) => x.id),
+    ).toEqual([COUNTER]);
+  });
+
+  it("the map holds only the performance plugin's direct hook counts", () => {
+    expect(PLUGIN_COUNTERS).toEqual({
+      performance: {
+        resolvers: {
+          starts: "onResolverStart",
+          completions: "onResolverComplete",
+          errors: "onResolverError",
+          retries: "onResolverRetry",
+          cancellations: "onResolverCancel",
+        },
+        effects: { runs: "onEffectRun", errors: "onEffectError" },
+        constraints: { evaluations: "onConstraintEvaluate" },
+        reconcile: { runs: "onReconcileEnd" },
+      },
+    });
+  });
+
+  it("control: pr17j's shape is explained, the counter by 1.35's approved extra cancel", () => {
+    const { v1, v2 } = pair(rb(5), rb(4));
+    expect(left(v1, v2, ON)).toEqual([]);
+    expect(used(v1, v2)).toEqual(expect.arrayContaining([COUNTER, ...TE_IDS]));
+  });
+
+  it("a counter off by more than the explained records still fails", () => {
+    const { v1, v2 } = pair(rb(6), rb(4));
+    expect(left(v1, v2, ON)).toEqual([COUNTED]);
+  });
+
+  it("a counter difference with no explained record behind it still fails", () => {
+    const { v1, v2 } = pair(rb(5), rb(4), { v1Cancel: false });
+    expect(left(v1, v2, ON)).toEqual([COUNTED]);
+    // The record is there but unexplained (the case lacks the row's triggers): both fail.
+    const bare = pair(rb(5), rb(4));
+    const steps = stepOps(bare.v1);
+    const diffs = markAfterError(
+      compareContract(bare.v1, bare.v2, "v2"),
+      bare.v1,
+      bare.v2,
+    );
+    expect(
+      explain(FUZZ_SCENARIO, diffs, ALL, ["performancePlugin"], steps)
+        .unexplained.map(brief)
+        .sort(),
+    ).toEqual(
+      expect.arrayContaining([COUNTED, "missing hook onResolverCancel 2"]),
+    );
+  });
+
+  it("the wrong direction still fails", () => {
+    const { v1, v2 } = pair(rb(4), rb(5));
+    expect(left(v1, v2, ON)).toEqual([COUNTED]);
+  });
+
+  it("a counter of an unmapped kind, field or key still fails", () => {
+    // A field the map does not list.
+    const field = pair(rb(4, { pending: 5 }), rb(4, { pending: 4 }));
+    expect(left(field.v1, field.v2, ON)).toEqual([
+      "changed external performance 4 data[1].resolvers.a::rb.pending",
+    ]);
+    // Another resolver's cancellations: the cancel counted is a::rb's.
+    const key = pair(
+      { ...rb(4), "a::r0": { cancellations: 5 } },
+      { ...rb(4), "a::r0": { cancellations: 4 } },
+    );
+    expect(left(key.v1, key.v2, ON)).toEqual([
+      "changed external performance 4 data[1].resolvers.a::r0.cancellations",
+    ]);
+    // Another counted kind: errors count onResolverError, which both engines report.
+    const kind = pair(rb(5, { errors: 2 }), rb(4, { errors: 1 }));
+    expect(left(kind.v1, kind.v2, ON)).toEqual([
+      "changed external performance 4 data[1].resolvers.a::rb.errors",
+    ]);
+    // A plugin the map does not list (the status plugin's numbers): never a counter.
+    const status = compareContract(
+      [
+        ...step(1, [
+          { k: "external", data: ["status", { AB: { pending: 1 } }] },
+        ] as TraceEntry[]),
+      ],
+      [
+        ...step(1, [
+          { k: "external", data: ["status", { AB: { pending: 0 } }] },
+        ] as TraceEntry[]),
+      ],
+      "v2",
+    );
+    expect(status.length).toBe(1);
+    expect(counterOf(status[0] as Difference)).toBeUndefined();
+  });
+
+  it("records before a destroy or twin step are not counted", () => {
+    for (const op of ["destroy", "twin"]) {
+      const middle = [
+        { k: "step", i: 3, step: { op } },
+        { k: "async", i: 3 },
+      ] as TraceEntry[];
+      const { v1, v2 } = pair(rb(5), rb(4), { middle });
+      expect(left(v1, v2, ON)).toEqual([COUNTED]);
+    }
+  });
+});
+
+describe("the census validates counterFollows", () => {
+  const root = mkdtempSync(join(tmpdir(), "conformance-run5-counter-"));
+  mkdirSync(join(root, "diff"), { recursive: true });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  const census = (entries: unknown[], used: string[]) => {
+    writeFileSync(join(root, "diff/divergences.json"), JSON.stringify(entries));
+
+    return checkDivergences(root, new Set(used)).join("\n");
+  };
+  const entry = () => byId("l12-plugin-counter-follows-performance-changed");
+  const withEntry = (over: object) =>
+    census([{ ...entry(), ...over }], [entry().id]);
+
+  it("accepts the entry as signed, and rejects any other shape", () => {
+    expect(withEntry({})).toBe("");
+    for (const over of [
+      { counterFollows: false },
+      { op: "missing" },
+      { stream: "hook" },
+      { kind: "status" },
+      { bound: { match: [] } },
+      { ends: true },
+      { scenario: "a hand scenario" },
+    ]) {
+      expect(withEntry(over)).toMatch(/counterFollows must be true/);
+    }
   });
 });

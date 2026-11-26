@@ -1174,3 +1174,33 @@ export function excuseFor(d: Difference): Excuse {
     ...(d.candidate === undefined ? {} : { to: d.candidate }),
   };
 }
+
+/**
+ * The plugin counters whose source counts one hook record each (L12 gate
+ * run 5, `Divergence.counterFollows`), by section and field of the
+ * performance plugin's `getSnapshot()` as the fuzz records it (an `external`
+ * record `["performance", snapshot]`, diff/fuzz/model.ts). Both engines'
+ * plugins (packages/core/src/plugins/performance.ts and
+ * packages/core-next/src/plugins/performance.ts) add 1 to the field in the
+ * named hook, keyed by the hook's first argument (the resolver, effect or
+ * constraint id); `reconcile` is not keyed. The status plugin
+ * (utils/requirement-status.ts) is not listed: its numbers are the sizes
+ * of sets of requirement ids, not counts of records, and no fuzz case
+ * records them. A counter not listed here is never excused by the rule.
+ */
+export const PLUGIN_COUNTERS: Readonly<
+  Record<string, Readonly<Record<string, Readonly<Record<string, string>>>>>
+> = {
+  performance: {
+    resolvers: {
+      starts: "onResolverStart",
+      completions: "onResolverComplete",
+      errors: "onResolverError",
+      retries: "onResolverRetry",
+      cancellations: "onResolverCancel",
+    },
+    effects: { runs: "onEffectRun", errors: "onEffectError" },
+    constraints: { evaluations: "onConstraintEvaluate" },
+    reconcile: { runs: "onReconcileEnd" },
+  },
+};
