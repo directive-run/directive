@@ -27,6 +27,37 @@
         }
       }
     },
+    "tests/adapters/l13-worker-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L13",
+      "pin": true,
+      "tests": {
+        "L13 probe pins: /worker > U13: an unregistered module at INIT posts ERROR from INIT, and the worker stays uninitialised": {
+          "layer": "L13",
+          "by": ["import handleWorkerMessages", "import registerWorkerModule"]
+        },
+        "L13 probe pins: /worker > U13: a fact key with no module posts ERROR naming the format, and one for an unknown module names the module": {
+          "layer": "L13",
+          "by": ["import handleWorkerMessages", "import registerWorkerModule"]
+        },
+        "L13 probe pins: /worker > U14: a message before INIT is dropped with no reply (shows cc)": {
+          "layer": "L13",
+          "by": ["import handleWorkerMessages", "import registerWorkerModule"]
+        },
+        "L13 probe pins: /worker > U14: a message after DESTROY is dropped with no reply, and a second INIT starts afresh (shows cc)": {
+          "layer": "L13",
+          "by": ["import handleWorkerMessages", "import registerWorkerModule"]
+        },
+        "L13 probe pins: /worker > U15: START posts the init write's changes before STARTED; an equal write posts nothing": {
+          "layer": "L13",
+          "by": ["import handleWorkerMessages", "import registerWorkerModule"]
+        },
+        "L13 probe pins: /worker > U15: GET_SNAPSHOT after a write posts DERIVATION_CHANGED, then SNAPSHOT_RESULT, and SET_FACTS folds a key's run into one message": {
+          "layer": "L13",
+          "by": ["import handleWorkerMessages", "import registerWorkerModule"]
+        }
+      }
+    },
     "tests/adapters/worker-mirrors-batched-writes.test.ts": {
       "category": "black-box",
       "rule": "L13",
@@ -8344,6 +8375,36 @@
         "L12 review pins: the audit ledger's payload, field by field (development) > source.attach, source.detach and source.error: the source, its module, and an error's phase and message": {
           "layer": "L12",
           "by": ["import createAuditLedger"]
+        }
+      }
+    },
+    "tests/core/l13-adapter-utils-pins-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L13",
+      "pin": true,
+      "tests": {
+        "L13 probe pins: /adapter-utils assertSystem (production) > U12: assertSystem returns for null and undefined": {
+          "layer": "L13",
+          "by": ["import assertSystem"]
+        }
+      }
+    },
+    "tests/core/l13-adapter-utils-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L13",
+      "pin": true,
+      "tests": {
+        "L13 probe pins: /adapter-utils assertSystem (development) > U12: assertSystem throws for null and undefined, naming the hook and what it got": {
+          "layer": "L13",
+          "by": ["import assertSystem"]
+        },
+        "L13 probe pins: /adapter-utils assertSystem (development) > U12: assertSystem accepts anything else, including a falsy non-nullish value": {
+          "layer": "L13",
+          "by": ["import assertSystem"]
+        },
+        "L13 review pins: /adapter-utils createThrottle on a real clock > the first call runs at once, later calls inside the window trail with the latest arguments, and a call after the window runs at once": {
+          "layer": "L13",
+          "by": ["import createThrottle"]
         }
       }
     },
@@ -19364,6 +19425,100 @@
         "history redactSnapshot > export() emits the redacted form, not the raw facts": {
           "layer": "L8",
           "by": ["import createHistoryManager"]
+        }
+      }
+    },
+    "tests/utils/l13-internals-pins-oracle.test.ts": {
+      "category": "internals",
+      "rule": "L13",
+      "pin": true,
+      "tests": {
+        "L13 probe pins: /internals safeStringify > serialises with a two-space indent": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        },
+        "L13 probe pins: /internals safeStringify > writes a BigInt as its digits and an n, at any depth": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        },
+        "L13 probe pins: /internals safeStringify > returns [undefined] for undefined, a function and a symbol": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        },
+        "L13 probe pins: /internals safeStringify > returns [unserializable] for a cycle and for a throwing toJSON": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        },
+        "L13 probe pins: /internals safeStringify > cuts at maxLen and reports the full length, and leaves a value of exactly maxLen alone": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        },
+        "L13 probe pins: /internals safeStringify > has no depth limit, and writes an Error, a Map and a Set as {}": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        }
+      }
+    },
+    "tests/utils/l13-testing-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L13",
+      "pin": true,
+      "tests": {
+        "L13 probe pins: /testing (development) > U1: start() works on a test system: the constraint fires and the mock resolver runs": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
+        },
+        "L13 probe pins: /testing (development) > U1: a test system's isRunning, isInitialized and isSettled keep their creation values after start() (shows bz)": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
+        },
+        "L13 probe pins: /testing (development) > U1: a namespaced test system's flags are frozen the same way (shows bz)": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
+        },
+        "L13 probe pins: /testing (development) > U2: eventHistory records dispatch only; events.* changes the fact and is not recorded (shows ca)": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
+        },
+        "L13 probe pins: /testing (development) > U3: createFakeTimers has no way to add a timer: advance, next and runAll only move the clock (shows cb)": {
+          "layer": "L13",
+          "by": ["import createFakeTimers"]
+        },
+        "L13 probe pins: /testing (development) > U4: settleWithFakeTimers throws its message, naming the in-flight resolvers, when time runs out": {
+          "layer": "L13",
+          "by": ["import settleWithFakeTimers"]
+        },
+        "L13 probe pins: /testing (development) > U4: settleWithFakeTimers returns at once when nothing is in flight, advancing nothing": {
+          "layer": "L13",
+          "by": ["import settleWithFakeTimers"]
+        },
+        "L13 probe pins: /testing (development) > U5: mockResolver's calls and pending are plain properties holding the live arrays": {
+          "layer": "L13",
+          "by": ["import createTestSystem", "import mockResolver"]
+        },
+        "L13 probe pins: /testing (development) > U6: the init write is the first getFactsHistory() row": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
+        },
+        "L13 probe pins: /testing (development) > U7: assertFactSet(key, undefined) passes for any write of the key": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
+        },
+        "L13 probe pins: /testing (development) > U8: a namespaced test system records the module as the namespace and matches a short or a full key": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
+        },
+        "L13 probe pins: /testing (development) > U8: a module registered after creation is not a known namespace, so its key keeps the whole name and no namespace": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
+        },
+        "L13 probe pins: /testing (development) > U9: assertDynamic and assertNotDynamic switch over the four registries, with their messages": {
+          "layer": "L13",
+          "by": ["import assertDynamic", "import assertNotDynamic"]
+        },
+        "L13 probe pins: the spread keeps what the system defines > a test system has the system's own enumerable keys, plus its own members": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
         }
       }
     },

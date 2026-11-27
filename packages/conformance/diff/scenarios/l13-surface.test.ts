@@ -1,6 +1,7 @@
 /**
- * L13: the public surface itself — every export of the root and /plugins
- * entries by name and kind — and the small helpers no system exercises:
+ * L13: the public surface itself — every export of all seven entries (the
+ * root, /plugins, /testing, /adapter-utils, /worker, /migration and
+ * /internals; the L13 RFC's U16) by name and kind — and the small helpers no system exercises:
  * requirement helpers, createSystemWithStatus, the requirement-status
  * plugin, typed definition helpers, shallowEqual.
  */
@@ -29,7 +30,7 @@ function surface(entry: Record<string, unknown>) {
 
 suite("L13 the public surface", () => {
   scenario(
-    "every root and /plugins export, by name and kind",
+    "every export of the seven entries, by name and kind (U16)",
     ({ core: { createModule, t } }) => ({
       module: createModule("m", {
         schema: { facts: { n: t.number() }, derivations: {}, events: {} },
@@ -42,9 +43,18 @@ suite("L13 the public surface", () => {
       {
         op: "run",
         label: "list exports",
-        fn: (_s, { core, plugins, external }) => {
+        fn: (_s, { core, plugins, entries, external }) => {
           external(["root", surface(core as Record<string, unknown>)]);
           external(["plugins", surface(plugins)]);
+          for (const subpath of [
+            "./testing",
+            "./adapter-utils",
+            "./worker",
+            "./migration",
+            "./internals",
+          ]) {
+            external([subpath, surface(entries[subpath] ?? {})]);
+          }
           external(["Backoff", (core as any).Backoff]);
         },
       },

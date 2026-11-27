@@ -490,6 +490,15 @@ export interface FuzzSpec {
    * is the only plugin and no distributable snapshot is taken.
    */
   plugins?: FuzzPlugins;
+  /**
+   * L13, single-module cases only (the L13 RFC's fuzz section): the case is
+   * built through `createTestSystem`, and each checkpoint also records the
+   * test system's facts history, requirements and event history. The
+   * hooks under them (`onFactSet`, `onFactsBatch`, `onRequirementCreated`)
+   * are already compared; this checks the view `/testing` makes of them.
+   * Absent (a spec written before L13-pre), the system is `createSystem`'s.
+   */
+  via?: "testSystem";
 }
 
 /**
@@ -557,6 +566,13 @@ export const FEATURE_LAYERS = {
    * L11-pre drew.
    */
   plugins: 12,
+  /**
+   * The test-system view (L13): a single-module case built through
+   * `createTestSystem` (`/testing`), recording `getFactsHistory()`,
+   * `allRequirements` and `eventHistory` at every checkpoint. Its own phase
+   * (`testSystemArbitrary`), so a case below L13 is the one L12-pre drew.
+   */
+  testSystem: 13,
 } as const;
 
 type Feature = keyof typeof FEATURE_LAYERS;
@@ -892,6 +908,49 @@ export function dataFormArbitrary(): fc.Arbitrary<FuzzSpec> {
  */
 export function pluginArbitrary(): fc.Arbitrary<FuzzSpec> {
   return baseArbitrary().chain((spec) => pluginDraws(spec, true));
+}
+
+/**
+ * A single-module base case (`baseArbitrary`) built through
+ * `createTestSystem` (`via: "testSystem"`), so every case it draws sits at
+ * L13. Its own phase and seed in the fuzz (diff/fuzz/fuzz.test.ts), so the
+ * draws of the other phases do not move. Only a single-module case: 1.35's
+ * namespaced form keys history rows by `module::key`, which the L13 pins
+ * (U8) cover by hand.
+ */
+export function testSystemArbitrary(): fc.Arbitrary<FuzzSpec> {
+  return baseArbitrary()
+    .filter((spec) => spec.modules.length === 1)
+    .map((spec): FuzzSpec => ({ ...spec, via: "testSystem" }));
+}
+
+/** The same case built through `createSystem`: the control for the view. */
+export function withoutTestSystem(spec: FuzzSpec): FuzzSpec {
+  const { via: _via, ...rest } = spec;
+
+  return rest;
+}
+
+/**
+ * What a test system adds to a checkpoint: the facts history without its
+ * timestamps (the fake clocks of the two engines can end a wait apart, as
+ * for a history snapshot's), the requirements it created and the events
+ * `dispatch` recorded.
+ */
+export function testSystemView(system: any): unknown {
+  return {
+    facts: system
+      .getFactsHistory()
+      .map((r: any) => [
+        r.key,
+        r.fullKey,
+        r.namespace ?? null,
+        r.previousValue,
+        r.newValue,
+      ]),
+    requirements: system.allRequirements.map((r: any) => [r.id, r.requirement]),
+    events: system.eventHistory,
+  };
 }
 
 /** Indexes into a list of `n`, each at most once, in draw order. */
@@ -1503,6 +1562,9 @@ export function specLayer(spec: FuzzSpec): string {
   }
   if (spec.plugins !== undefined) {
     use("plugins");
+  }
+  if (spec.via !== undefined) {
+    use("testSystem");
   }
 
   return `L${n}`;
@@ -2713,6 +2775,8 @@ const TRIGGERS = {
   clobberAlert: (spec) => (spec.plugins?.clobber ?? null) !== null,
   /** L12: the clobber-loop plugin beside clobber alert. */
   clobberLoop: (spec) => spec.plugins?.clobber?.loop === true,
+  /** L13: built through `createTestSystem`. */
+  testSystem: (spec) => spec.via === "testSystem",
 } satisfies Record<
   FuzzTrigger,
   (spec: FuzzSpec, boundary: Record<string, unknown> | undefined) => boolean
@@ -3820,5 +3884,14 @@ export function toScenario(spec: FuzzSpec, name = FUZZ_SCENARIO): ScenarioDef {
     layer: specLayer(spec),
     triggers: specTriggers(spec),
     ...(spec.batch ? { settleDrain: batchDrain(spec.batch) } : {}),
+    ...(spec.via === "testSystem"
+      ? {
+          create: (config, ctx) =>
+            (ctx.entries["./testing"]?.createTestSystem as (o: unknown) => any)(
+              config,
+            ),
+          view: (system) => testSystemView(system),
+        }
+      : {}),
   };
 }

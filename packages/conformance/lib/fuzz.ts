@@ -120,6 +120,9 @@ export const FUZZ_TRIGGERS = [
   "performancePlugin",
   "clobberAlert",
   "clobberLoop",
+  // L13 (the L13 RFC's fuzz section): a single-module case built through
+  // `createTestSystem` (diff/fuzz/model.ts `via`).
+  "testSystem",
 ] as const;
 
 export type FuzzTrigger = (typeof FUZZ_TRIGGERS)[number];

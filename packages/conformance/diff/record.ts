@@ -63,6 +63,12 @@ export interface Recorder {
   external(data: unknown): void;
   /** Snapshot facts, derivations and inspect() under `label`. */
   checkpoint(label: string): void;
+  /**
+   * A scenario's own view of its system (L13-pre: the test system's facts
+   * history and requirements). When set, every checkpoint also records what
+   * it returns, as an `external` entry `["view", label, value]`.
+   */
+  view?: () => unknown;
   /** Stop observing (hooks stop when the system is destroyed). */
   detach(): void;
 }
@@ -162,6 +168,12 @@ export function createRecorder(): Recorder {
         derived,
         inspect,
       });
+      if (rec.view) {
+        trace.push({
+          k: "external",
+          data: ["view", label, guard(() => rec.view?.())],
+        });
+      }
     },
     detach() {
       for (const off of rec.unsubscribe.splice(0)) {

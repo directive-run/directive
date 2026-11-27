@@ -27,6 +27,7 @@ import {
   coreEntries,
   defaultRepoRoot,
   v1Entries,
+  v2Entries,
 } from "../lib/core-entries.js";
 
 export type CoreApi = typeof Core;
@@ -44,7 +45,24 @@ export interface EngineHandle {
    * created (same module graph), or undefined if it has none.
    */
   loadPlugins(): Promise<Record<string, any> | undefined>;
+  /**
+   * Every other subpath the engine ships (`./testing`, `./adapter-utils`,
+   * `./worker`, `./migration`, `./internals`), from the instance the last
+   * `load()` created, keyed by the package.json subpath. A subpath the
+   * engine has no file for is absent. Not-yet-built v2 entries are core-next's
+   * stubs, which load and throw `featureMissing` when called.
+   */
+  loadEntries(): Promise<Record<string, Record<string, any>>>;
 }
+
+/** The subpaths `loadEntries` offers (the root and `./plugins` have their own). */
+export const OTHER_SUBPATHS = [
+  "./testing",
+  "./adapter-utils",
+  "./worker",
+  "./migration",
+  "./internals",
+] as const;
 
 /** core-next's root entry (it does not exist before Phase 1). */
 export const V2_ENTRY = join(
@@ -62,6 +80,7 @@ export function engineAt(
   pluginsFile: string | undefined = file.endsWith("/src/index.ts")
     ? join(file, "../plugins/index.ts")
     : undefined,
+  entryFiles: Record<string, string> = {},
 ): EngineHandle {
   return {
     name,
@@ -70,6 +89,19 @@ export function engineAt(
       vi.resetModules();
 
       return (await import(/* @vite-ignore */ file)) as CoreApi;
+    },
+    async loadEntries() {
+      const out: Record<string, Record<string, any>> = {};
+      for (const [subpath, entryFile] of Object.entries(entryFiles)) {
+        if (existsSync(entryFile)) {
+          out[subpath] = (await import(/* @vite-ignore */ entryFile)) as Record<
+            string,
+            any
+          >;
+        }
+      }
+
+      return out;
     },
     async loadPlugins() {
       return pluginsFile && existsSync(pluginsFile)
@@ -93,7 +125,51 @@ function entry(name: "v1" | "local", subpath: string): string {
 }
 
 const handle = (name: "v1" | "local") =>
-  engineAt(name, entry(name, "."), entry(name, "./plugins"));
+  engineAt(
+    name,
+    entry(name, "."),
+    entry(name, "./plugins"),
+    Object.fromEntries(OTHER_SUBPATHS.map((s) => [s, entry(name, s)])),
+  );
+
+/**
+ * core-next's file for each other subpath: where core's source has it, or
+ * core-next's own `src/<name>.ts` (its worker and migration stubs sit
+ * there until L13 builds them at core's path).
+ */
+function v2EntryFiles(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const subpath of OTHER_SUBPATHS) {
+    const derived = v2Entries().find((e) => e.subpath === subpath)?.file;
+    const own = join(
+      defaultRepoRoot,
+      "packages/core-next/src",
+      `${subpath.slice(2)}.ts`,
+    );
+    const file = derived && !derived.endsWith("/unbuilt.ts") ? derived : own;
+    if (existsSync(file)) {
+      out[subpath] = file;
+    }
+  }
+
+  return out;
+}
+
+/**
+ * The other subpaths' source files under a copy of `packages/core/src`
+ * (`srcDir`), for an engine built from a copy (diff/self/faults.ts).
+ */
+export function entryFilesUnder(srcDir: string): Record<string, string> {
+  const coreSrc = join(defaultRepoRoot, "packages/core/src");
+
+  return Object.fromEntries(
+    OTHER_SUBPATHS.map((subpath) => {
+      const file = coreEntries().find((e) => e.subpath === subpath)?.file ?? "";
+
+      return [subpath, join(srcDir, file.slice(coreSrc.length + 1))];
+    }),
+  );
+}
 
 /** Whether v2 takes part, and why not if it does not. */
 export function v2Status(): { present: boolean; reason: string } {
@@ -110,7 +186,7 @@ export function v2Status(): { present: boolean; reason: string } {
 export function engines(): EngineHandle[] {
   const out = [handle("v1"), handle("local")];
   if (v2Status().present) {
-    out.push(engineAt("v2", V2_ENTRY));
+    out.push(engineAt("v2", V2_ENTRY, undefined, v2EntryFiles()));
   }
 
   return out;

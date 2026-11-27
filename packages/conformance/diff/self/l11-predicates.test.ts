@@ -277,6 +277,7 @@ describe("the drawn data forms run on 1.35 (L11-pre)", () => {
     const config = toScenario(spec).build({
       core,
       plugins: {},
+      entries: {},
       handles: {},
       external: (data) => records.push(data),
     });

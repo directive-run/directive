@@ -83,6 +83,11 @@ export interface BuildContext {
   core: CoreApi;
   /** The same engine instance's `/plugins` entry (persistence, logging, …). */
   plugins: Record<string, any>;
+  /**
+   * The same instance's other entries by subpath (`./testing`,
+   * `./adapter-utils`, `./worker`, `./migration`, `./internals`).
+   */
+  entries: Record<string, Record<string, any>>;
   /** Per-run storage shared by build() and run steps (e.g. a source's publish). */
   handles: Record<string, any>;
   /** Report an outside-world effect into the trace (`external`). */
@@ -146,6 +151,17 @@ export interface ScenarioDef {
    * with `when` covers a difference only in a case that has all of them.
    */
   triggers?: readonly string[];
+  /**
+   * Make the system from the built config instead of `core.createSystem`
+   * (the fuzz's `testSystem` view builds it through `createTestSystem`).
+   * The recorder's plugin is already in `config.plugins`.
+   */
+  create?: (config: Record<string, unknown>, ctx: BuildContext) => AnySystem;
+  /**
+   * What to record about the system at every checkpoint, beside its facts,
+   * derivations and inspect() (`Recorder.view`).
+   */
+  view?: (system: AnySystem, ctx: BuildContext) => unknown;
   /**
    * Fuzz cases only (diff/fuzz/model.ts): the shared wait at a `settle`
    * step. Hand scenarios never set it, so their signed (as) entries keep
@@ -1268,16 +1284,25 @@ export async function runBudgeted(
     const ctx: BuildContext = {
       core,
       plugins: (await engine.loadPlugins()) ?? {},
+      entries: await engine.loadEntries(),
       handles: {},
       external: (data) => rec.external(data),
     };
     try {
       const config = def.build(ctx);
       const plugins = (config.plugins as unknown[] | undefined) ?? [];
-      system = core.createSystem({
+      const made = {
         ...config,
         plugins: [...plugins, rec.plugin],
-      } as never);
+      };
+      system = def.create
+        ? def.create(made, ctx)
+        : core.createSystem(made as never);
+      if (def.view) {
+        const view = def.view;
+        const made_ = system;
+        rec.view = () => view(made_, ctx);
+      }
       record(system, {
         recorder: rec,
         derivations: def.observeDerivations !== false,
