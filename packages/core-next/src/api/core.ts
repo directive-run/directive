@@ -1039,7 +1039,7 @@ export function createSystemCore<const M extends ModuleSchema>(
 
     return d;
   }
-  for (const id in deriveDefs) {
+  for (const id of Object.keys(deriveDefs)) {
     define(id);
   }
   const miss = (id: string): undefined => {
@@ -1999,7 +1999,7 @@ export function createSystemCore<const M extends ModuleSchema>(
       for (const id of ids) {
         if (derivations.has(id)) {
           derived.push(id);
-        } else if (id in schema) {
+        } else if (Object.hasOwn(schema, id)) {
           keys.push(id);
         } else if (isDevelopment) {
           warnUnknown("subscribe", id);
@@ -2020,7 +2020,7 @@ export function createSystemCore<const M extends ModuleSchema>(
     ) {
       const equal = opts?.equalityFn ?? Object.is;
       const isDerived = derivations.has(id);
-      if (isDevelopment && !isDerived && !(id in schema)) {
+      if (isDevelopment && !isDerived && !Object.hasOwn(schema, id)) {
         warnUnknown("watch", id);
       }
       const get = () => (isDerived ? read(id) : store.get(id));
