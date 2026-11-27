@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configDefaults, defineConfig } from "vitest/config";
+import { engineAlias } from "./vitest.engine.js";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const packagesDir = resolve(root, "packages");
@@ -171,7 +172,8 @@ function runtimeTarget(target: unknown): string | undefined {
 }
 
 export default defineConfig({
-  resolve: { alias: buildAlias() },
+  // engineAlias() is empty unless DIRECTIVE_ENGINE=v2; it goes first so it wins.
+  resolve: { alias: [...engineAlias(), ...buildAlias()] },
   test: {
     globals: true,
     environment: "node",
