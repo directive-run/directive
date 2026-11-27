@@ -37,7 +37,12 @@ import {
   isLower,
 } from "../diff/fingerprint.js";
 import type { Json } from "../diff/normalize.js";
-import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
+import {
+  type CoreEntry,
+  coreEntries,
+  v2DistEntries,
+  v2Entries,
+} from "./core-entries.js";
 import {
   FUZZ_FLOOR as FLOOR,
   FUZZ_STEP_OPS,
@@ -502,6 +507,13 @@ export function checkConfig(
 export function census(
   repoRoot: string,
   reports: Partial<Record<string, JsonReport>>,
+  // The v2 entry lists, as v2Entries and v2DistEntries return them. A
+  // self-test passes its own so the unbuilt-entry rule is exercised whether or
+  // not core-next has an unbuilt entry.
+  entryLists: { v2: CoreEntry[]; v2Dist: CoreEntry[] } = {
+    v2: v2Entries(repoRoot),
+    v2Dist: v2DistEntries(repoRoot),
+  },
 ): string[] {
   const failures: string[] = [];
   const fail = (m: string) => failures.push(m);
@@ -520,8 +532,8 @@ export function census(
   // Files that import an entry core-next has not built: the stub exports
   // nothing useful, so a test that reaches one of its bindings and runs on v2
   // is reading undefined. Only a gated test may reach one.
-  const v2Unbuilt = v2Entries(repoRoot);
-  const v2DistUnbuilt = v2DistEntries(repoRoot);
+  const v2Unbuilt = entryLists.v2;
+  const v2DistUnbuilt = entryLists.v2Dist;
   const reachedCache = new Map<string, Map<string, string[]>>();
   const unbuiltProject = new Project({ useInMemoryFileSystem: true });
   const importsUnbuilt = (file: string, test: string, dist: boolean) => {
