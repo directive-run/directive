@@ -97,3 +97,54 @@ jobs:
           path: packages/conformance/reports/diff-fuzz/
           if-no-files-found: ignore
           retention-days: 30
+
+  # Seed 17 at the PR count, in report mode. Jason, 2026-11-27: "Approve (ay)
+  # knock-on, keep going (Recommended)": the L12 gate blocks on 20 short seeds
+  # and seed 17 reports nightly, because its twelfth case (a row (ay) variant,
+  # GATE-12.md follow-ups) has no signed entry. Report mode covers batched
+  # cases only, so the fuzz step may fail: continue-on-error keeps this job a
+  # report, and the step's own log carries the counterexample.
+  fuzz-seed-17:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The conformance vitest config resolves core's and core-next's builds
+      # when it loads.
+      - run: pnpm --filter @directive-run/core build
+      - run: pnpm --filter @directive-run/core-next build
+
+      - name: Fuzz
+        continue-on-error: true
+        env:
+          DIFF_FUZZ_SEED: "17"
+          DIFF_FUZZ_BATCH_REPORT: "1"
+          DIFF_FUZZ_REPORT_DIR: reports/diff-fuzz
+        working-directory: packages/conformance
+        run: ./node_modules/.bin/vitest run --config vitest.config.ts --project conformance:diff diff/fuzz
+
+      - name: List reported batched cases in the job summary
+        if: ${{ !cancelled() }}
+        working-directory: packages/conformance
+        run: |
+          if [ -f reports/diff-fuzz/summary.md ]; then
+            cat reports/diff-fuzz/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: diff-fuzz-batched-17
+          path: packages/conformance/reports/diff-fuzz/
+          if-no-files-found: ignore
+          retention-days: 30
