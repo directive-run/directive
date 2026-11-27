@@ -487,3 +487,60 @@ describe("pause() inside a changeset (U18)", () => {
     system.destroy();
   });
 });
+
+// The L12 principal review (2026-11-27): a 2.0 whose resume() did not clear a
+// pause that a navigation had put back took no snapshot again, and no pin
+// said so. Row (ay) differs only between the navigation and the resume
+// (1.35's navigation clears the pause, 2.0's keeps it); from resume() on
+// both engines agree, and this pins that.
+describe("resume() after a navigation under a pause", () => {
+  it("clears the pause, and each later write takes a snapshot", async () => {
+    const system = await begin();
+    await count(system, 2);
+    system.history.pause();
+    system.history.goTo(system.history.snapshots[1].id);
+    await system.settle();
+    system.history.resume();
+
+    expect(system.history.isPaused).toBe(false);
+    expect(at(system)).toEqual({ index: 1, n: 1 });
+    expect(system.history.snapshots.length).toBe(3);
+
+    await write(system, "n", 7);
+    expect(system.history.isPaused).toBe(false);
+    expect(system.history.snapshots.length).toBe(3);
+    expect(at(system)).toEqual({ index: 2, n: 7 });
+
+    await write(system, "n", 8);
+    await write(system, "n", 9);
+    expect(system.history.snapshots.map((s: any) => s.facts.n)).toEqual([
+      0, 1, 7, 8, 9,
+    ]);
+    expect(at(system)).toEqual({ index: 4, n: 9 });
+    system.destroy();
+  });
+
+  it("the same after goBack and goForward under the pause", async () => {
+    for (const dir of ["goBack", "goForward"] as const) {
+      const system = await begin();
+      await count(system, 2);
+      await go(system, "goBack");
+      system.history.pause();
+      await go(system, dir);
+      system.history.resume();
+      expect(system.history.isPaused).toBe(false);
+      const before = system.history.snapshots.length;
+      const index = system.history.currentIndex;
+
+      await write(system, "n", 7);
+      await write(system, "n", 8);
+
+      expect(system.history.currentIndex).toBe(index + 2);
+      expect(system.history.snapshots.length).toBe(
+        dir === "goBack" ? 3 : before + 2,
+      );
+      expect(system.history.snapshots.at(-1).facts.n).toBe(8);
+      system.destroy();
+    }
+  });
+});

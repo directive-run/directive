@@ -769,3 +769,465 @@ describe("L12 gate mutation pins (development)", () => {
     system.destroy();
   });
 });
+
+// The L12 principal review (2026-11-27): three weakenings of
+// verifySnapshotSignature and 14 dropped ledger payload fields passed every
+// test on both engines. Each pin below states what 1.35 does.
+describe("L12 review pins: a signature is checked whole (development)", () => {
+  const SNAPSHOT = { data: { a: 1 }, createdAt: 0 };
+
+  it("a wrong, missing or differently cased algorithm does not verify", async () => {
+    const signed = await signSnapshot(SNAPSHOT, SECRET);
+    expect(await verifySnapshotSignature(signed, SECRET)).toBe(true);
+
+    for (const algorithm of ["hmac-sha512", "none", "", "HMAC-SHA256"]) {
+      expect(
+        await verifySnapshotSignature(
+          { ...signed, algorithm } as never,
+          SECRET,
+        ),
+      ).toBe(false);
+    }
+    const { algorithm: _dropped, ...bare } = signed;
+    expect(await verifySnapshotSignature(bare as never, SECRET)).toBe(false);
+  });
+
+  it("a signature right only in its first 8 hex characters does not verify", async () => {
+    const signed = await signSnapshot(SNAPSHOT, SECRET);
+    const flip = (c: string) => (c === "0" ? "1" : "0");
+    const head = signed.signature.slice(0, 8);
+    const tail = [...signed.signature.slice(8)].map(flip).join("");
+    expect(`${head}${tail}`).toHaveLength(64);
+
+    expect(
+      await verifySnapshotSignature(
+        { ...signed, signature: `${head}${tail}` },
+        SECRET,
+      ),
+    ).toBe(false);
+    // One wrong character, at each position past the eighth and at the last.
+    for (const i of [8, 9, 31, 32, 63]) {
+      const s = signed.signature;
+      const signature = `${s.slice(0, i)}${flip(s[i] as string)}${s.slice(i + 1)}`;
+      expect(
+        await verifySnapshotSignature({ ...signed, signature }, SECRET),
+      ).toBe(false);
+    }
+  });
+
+  it("a signature of the wrong length does not verify, though every character it has is right", async () => {
+    const signed = await signSnapshot(SNAPSHOT, SECRET);
+    const s = signed.signature;
+
+    for (const signature of [
+      s.slice(0, 8),
+      s.slice(0, 32),
+      s.slice(0, 63),
+      `${s}0`,
+      `${s}${s}`,
+    ]) {
+      expect(
+        await verifySnapshotSignature({ ...signed, signature }, SECRET),
+      ).toBe(false);
+    }
+  });
+});
+
+describe("L12 review pins: the audit ledger's payload, field by field (development)", () => {
+  /** An entry less what the chain adds (its place, time and hash link). */
+  function payload(entry: any): Record<string, unknown> {
+    const { seq, ts, prevHash, hashAlgo, schemaVersion, ...rest } = entry;
+    expect(typeof seq).toBe("number");
+    expect(typeof ts).toBe("number");
+    expect(hashAlgo).toBe("djb2-1");
+    expect(schemaVersion).toBe(2);
+    expect(prevHash === null || typeof prevHash === "string").toBe(true);
+
+    return rest;
+  }
+
+  /** Every entry of `kind`, oldest first, as payloads. */
+  function payloads(ledger: any, kind: string): Record<string, unknown>[] {
+    return (ledger.query({}) as any[])
+      .filter((e) => e.kind === kind)
+      .sort((a, b) => a.seq - b.seq)
+      .map(payload);
+  }
+
+  const FUNCTION_WHEN = {
+    kind: "function",
+    sourceHash: expect.stringMatching(/^[0-9a-f]{1,8}$/),
+  };
+
+  /** A load that succeeds, a FAIL that throws, history on: run, then go back. */
+  async function worked() {
+    const module = createModule("m", {
+      schema: {
+        facts: { count: t.number(), label: t.string(), boom: t.boolean() },
+        derivations: {},
+        events: {},
+        requirements: { LOAD: { id: t.number() }, FAIL: {} },
+      },
+      init: (facts: any) => {
+        facts.count = 0;
+        facts.label = "start";
+        facts.boom = false;
+      },
+      constraints: {
+        needLoad: {
+          when: (facts: any) => facts.count >= 2 && facts.label !== "loaded",
+          require: (facts: any) => ({ type: "LOAD", id: facts.count }),
+        },
+        needFail: {
+          when: (facts: any) => facts.boom === true,
+          require: { type: "FAIL" },
+        },
+      },
+      resolvers: {
+        load: {
+          requirement: "LOAD",
+          resolve: async (_req: unknown, ctx: any) => {
+            ctx.facts.label = "loaded";
+          },
+        },
+        fail: {
+          requirement: "FAIL",
+          resolve: async () => {
+            throw new Error("nope");
+          },
+        },
+      },
+    } as never);
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module,
+      history: true,
+      plugins: [ledger.plugin],
+    } as never) as any;
+    system.start();
+    await system.settle();
+    system.facts.count = 2;
+    await system.settle();
+    system.facts.boom = true;
+    try {
+      await system.settle();
+    } catch {
+      // The FAIL resolver's error; the ledger has it.
+    }
+    await wait(10);
+    system.history.goBack();
+    await wait(5);
+    system.stop();
+
+    return { ledger, system };
+  }
+
+  it("system.init, system.start and system.stop carry the kind alone", async () => {
+    const { ledger, system } = await worked();
+
+    for (const kind of ["system.init", "system.start", "system.stop"]) {
+      expect(payloads(ledger, kind)).toEqual([{ kind }]);
+    }
+    system.destroy();
+  });
+
+  it("fact.change: key, prior, next and origin; no prior on a first write", async () => {
+    const { ledger, system } = await worked();
+
+    expect(payloads(ledger, "fact.change")).toEqual([
+      { kind: "fact.change", key: "count", next: 0, origin: "authored" },
+      { kind: "fact.change", key: "label", next: "start", origin: "authored" },
+      { kind: "fact.change", key: "boom", next: false, origin: "authored" },
+      {
+        kind: "fact.change",
+        key: "count",
+        prior: 0,
+        next: 2,
+        origin: "authored",
+      },
+      {
+        kind: "fact.change",
+        key: "label",
+        prior: "start",
+        next: "loaded",
+        origin: "authored",
+      },
+      {
+        kind: "fact.change",
+        key: "boom",
+        prior: false,
+        next: true,
+        origin: "authored",
+      },
+      {
+        kind: "fact.change",
+        key: "boom",
+        prior: true,
+        next: false,
+        origin: "restore",
+      },
+    ]);
+    system.destroy();
+  });
+
+  it("constraint.evaluate: constraintId, active and a function when's source hash", async () => {
+    const { ledger, system } = await worked();
+    const evaluate = (constraintId: string, active: boolean) => ({
+      kind: "constraint.evaluate",
+      constraintId,
+      active,
+      whenSource: FUNCTION_WHEN,
+    });
+
+    expect(payloads(ledger, "constraint.evaluate")).toEqual([
+      evaluate("needLoad", false),
+      evaluate("needFail", false),
+      evaluate("needLoad", true),
+      evaluate("needLoad", false),
+      evaluate("needFail", true),
+      evaluate("needLoad", false),
+      evaluate("needFail", false),
+    ]);
+    system.destroy();
+  });
+
+  it("resolver.complete: resolverId, requirementId and a duration", async () => {
+    const { ledger, system } = await worked();
+
+    expect(payloads(ledger, "resolver.complete")).toEqual([
+      {
+        kind: "resolver.complete",
+        resolverId: "load",
+        requirementId: 'LOAD:{"id":2}',
+        duration: expect.any(Number),
+      },
+    ]);
+    system.destroy();
+  });
+
+  it("resolver.error: resolverId, requirementId and the error as a string", async () => {
+    const { ledger, system } = await worked();
+
+    expect(payloads(ledger, "resolver.error")).toEqual([
+      {
+        kind: "resolver.error",
+        resolverId: "fail",
+        requirementId: "FAIL:{}",
+        error: "Error: nope",
+      },
+    ]);
+    system.destroy();
+  });
+
+  it("system.snapshot: snapshotId and trigger, and no facts", async () => {
+    const { ledger, system } = await worked();
+
+    expect(payloads(ledger, "system.snapshot")).toEqual([
+      {
+        kind: "system.snapshot",
+        snapshotId: 1,
+        trigger: "facts-changed:count,label,boom",
+      },
+      {
+        kind: "system.snapshot",
+        snapshotId: 2,
+        trigger: "facts-changed:count",
+      },
+      {
+        kind: "system.snapshot",
+        snapshotId: 3,
+        trigger: "facts-changed:label",
+      },
+      { kind: "system.snapshot", snapshotId: 4, trigger: "facts-changed:boom" },
+    ]);
+    system.destroy();
+  });
+
+  it("system.history.navigate: from and to", async () => {
+    const { ledger, system } = await worked();
+
+    expect(payloads(ledger, "system.history.navigate")).toEqual([
+      { kind: "system.history.navigate", from: 3, to: 2 },
+    ]);
+    system.destroy();
+  });
+
+  it("resolver.write.rejected: a rejection names the fact and both values, the summary the count dropped", async () => {
+    const keys = Array.from({ length: 12 }, (_, i) => `f${i}`);
+    const facts: Record<string, unknown> = { status: t.string() };
+    for (const key of keys) {
+      facts[key] = t.string();
+    }
+    let release!: () => void;
+    const blocker = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const module = createModule("clob", {
+      schema: {
+        facts,
+        derivations: {},
+        events: {},
+        requirements: { ACT: {} },
+      },
+      init: (f: any) => {
+        f.status = "idle";
+        for (const key of keys) {
+          f[key] = "a";
+        }
+      },
+      constraints: {
+        mutate: {
+          when: (f: any) => f.status === "go",
+          require: { type: "ACT" },
+          abortOn: keys,
+        },
+      },
+      resolvers: {
+        run: {
+          requirement: "ACT",
+          resolve: async (_req: unknown, ctx: any) => {
+            await blocker;
+            for (const key of keys) {
+              ctx.facts[key] = "mine";
+            }
+          },
+        },
+      },
+    } as never);
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module,
+      plugins: [ledger.plugin],
+    } as never) as any;
+    system.start();
+    await wait();
+    system.facts.status = "go";
+    await wait();
+    system.batch(() => {
+      for (const key of keys) {
+        system.facts[key] = "theirs";
+      }
+    });
+    await wait();
+    release();
+    await wait(5);
+
+    const rejected = {
+      kind: "resolver.write.rejected",
+      resolverId: "run",
+      requirementId: "ACT:{}",
+      reason: "clobbered",
+    };
+    expect(payloads(ledger, "resolver.write.rejected")).toEqual([
+      ...keys.slice(0, 10).map((fact) => ({
+        ...rejected,
+        rejection: "rejection",
+        fact,
+        expected: "a",
+        actual: "theirs",
+      })),
+      { ...rejected, rejection: "summary", dropped: 1 },
+    ]);
+    system.destroy();
+  });
+
+  it("the clobber-loop entries: every field of the event, and the overlap's verdict alone", () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: acct(),
+      plugins: [ledger.plugin],
+    } as never) as any;
+    system.start();
+    const detected = {
+      type: "resolver.clobber.loop.detected",
+      systemId: "sys-1",
+      fact: "count",
+      participants: ["a", "b"],
+      windowMs: 5000,
+      count: 3,
+      severity: "warn",
+      rejectionSeqs: [4, 6, 9],
+    };
+    system.notify.clobberLoopDetected({
+      ...detected,
+      predicateOverlap: { verdict: "overlap", detail: "kept out" },
+    });
+    system.notify.clobberLoopDetected(detected);
+    system.notify.clobberLoopResolved({
+      type: "resolver.clobber.loop.resolved",
+      systemId: "sys-1",
+      fact: "count",
+      participants: ["a", "b"],
+      durationMs: 1200,
+      resolution: "quiet",
+    });
+
+    const { type: _type, ...fields } = detected;
+    expect(payloads(ledger, "resolver.clobber.loop.detected")).toEqual([
+      {
+        kind: "resolver.clobber.loop.detected",
+        ...fields,
+        overlapVerdict: "overlap",
+      },
+      { kind: "resolver.clobber.loop.detected", ...fields },
+    ]);
+    expect(payloads(ledger, "resolver.clobber.loop.resolved")).toEqual([
+      {
+        kind: "resolver.clobber.loop.resolved",
+        systemId: "sys-1",
+        fact: "count",
+        participants: ["a", "b"],
+        durationMs: 1200,
+        resolution: "quiet",
+      },
+    ]);
+    system.destroy();
+  });
+
+  it("source.attach, source.detach and source.error: the source, its module, and an error's phase and message", async () => {
+    const module = createModule("src", {
+      schema: {
+        facts: { n: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (f: any) => {
+        f.n = 0;
+      },
+      sources: {
+        ticker: { attach: () => () => undefined },
+        bad: {
+          attach: () => {
+            throw new Error("attach failed");
+          },
+        },
+      },
+    } as never);
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module,
+      plugins: [ledger.plugin],
+    } as never) as any;
+    system.start();
+    await wait();
+    system.stop();
+
+    expect(payloads(ledger, "source.attach")).toEqual([
+      { kind: "source.attach", sourceId: "ticker", moduleId: "src" },
+    ]);
+    expect(payloads(ledger, "source.error")).toEqual([
+      {
+        kind: "source.error",
+        sourceId: "bad",
+        moduleId: "src",
+        phase: "attach",
+        error: "attach failed",
+      },
+    ]);
+    expect(payloads(ledger, "source.detach")).toEqual([
+      { kind: "source.detach", sourceId: "ticker", moduleId: "src" },
+    ]);
+    system.destroy();
+  });
+});
