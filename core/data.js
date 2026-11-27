@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795814569915,
+  "lastUpdate": 1795816854919,
   "repoUrl": "https://github.com/directive-run/directive",
   "entries": {
     "@directive-run/core": [
@@ -38190,6 +38190,576 @@ window.BENCHMARK_DATA = {
             "value": 684424.5,
             "unit": "ns/op",
             "extra": "samples: 731, rme: ±8.69%"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jasonwcomes@gmail.com",
+            "name": "Jason Comes",
+            "username": "jasoncomes"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ff733e9b412ff24ed22e6d46faaf982ea17fdcaa",
+          "message": "conformance: row (ay) excuses nothing after resume; signature and ledger payload pins (#443)\n\nThe L12 principal review planted \"resume() does not clear a\nnavigation-restored pause\" in core-next and the oracle passed: row (ay)'s\nentries read the case-wide trigger navigatedPaused, and its ends stop\ndropped everything after it.\n\n- diff/scenario.ts: pauseKept reads an entry that lists navigatedPaused by\n  step (from a navigation under a pause up to the next resume step);\n  historyFollows counts only snapshots of those steps; a row (ay) stop\n  still compares a snapshot only 1.35 takes after a later resume, until\n  the next navigation (resumedAfterStop). No divergence entry changed.\n- diff/self/l12-review-resume.test.ts: the planted shapes and controls.\n- L8 pin: after pause, a navigation and resume, writes snapshot again.\n- L12 pins: a signature is checked whole (algorithm, every character,\n  length); the audit ledger's payload per entry kind, as 1.35 writes it.",
+          "timestamp": "2026-11-27T15:58:34-06:00",
+          "tree_id": "76567a722bbef7a70f142c7a9253f6d10468cc72",
+          "url": "https://github.com/directive-run/directive/commit/ff733e9b412ff24ed22e6d46faaf982ea17fdcaa"
+        },
+        "date": 1795816854013,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > Directive",
+            "value": 150.03,
+            "unit": "ns/op",
+            "extra": "samples: 3332706, rme: ±0.09%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > Zustand",
+            "value": 75.99,
+            "unit": "ns/op",
+            "extra": "samples: 6579761, rme: ±0.09%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > Redux Toolkit",
+            "value": 77.69,
+            "unit": "ns/op",
+            "extra": "samples: 6435810, rme: ±0.11%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > MobX",
+            "value": 132.69,
+            "unit": "ns/op",
+            "extra": "samples: 3768279, rme: ±0.13%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > Jotai",
+            "value": 211.47,
+            "unit": "ns/op",
+            "extra": "samples: 2364418, rme: ±0.47%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > Preact Signals",
+            "value": 78.15,
+            "unit": "ns/op",
+            "extra": "samples: 6398114, rme: ±0.13%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Read > XState",
+            "value": 77.56,
+            "unit": "ns/op",
+            "extra": "samples: 6446895, rme: ±0.10%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > Directive",
+            "value": 550.36,
+            "unit": "ns/op",
+            "extra": "samples: 908499, rme: ±0.76%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > Zustand",
+            "value": 159.41,
+            "unit": "ns/op",
+            "extra": "samples: 3136651, rme: ±0.71%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > Redux Toolkit",
+            "value": 1219.73,
+            "unit": "ns/op",
+            "extra": "samples: 409926, rme: ±0.22%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > MobX",
+            "value": 349.97,
+            "unit": "ns/op",
+            "extra": "samples: 1428674, rme: ±0.56%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > Jotai",
+            "value": 1038.98,
+            "unit": "ns/op",
+            "extra": "samples: 481242, rme: ±0.56%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > Preact Signals",
+            "value": 88.5,
+            "unit": "ns/op",
+            "extra": "samples: 5649581, rme: ±0.10%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Single Write > XState",
+            "value": 2395.95,
+            "unit": "ns/op",
+            "extra": "samples: 208686, rme: ±0.66%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > Directive",
+            "value": 336966.51,
+            "unit": "ns/op",
+            "extra": "samples: 1484, rme: ±0.92%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > Zustand",
+            "value": 77669.35,
+            "unit": "ns/op",
+            "extra": "samples: 6438, rme: ±0.73%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > Redux Toolkit",
+            "value": 1147417.8,
+            "unit": "ns/op",
+            "extra": "samples: 436, rme: ±0.66%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > MobX",
+            "value": 251906.68,
+            "unit": "ns/op",
+            "extra": "samples: 1985, rme: ±0.42%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > Jotai",
+            "value": 1147447.42,
+            "unit": "ns/op",
+            "extra": "samples: 439, rme: ±5.60%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > Preact Signals",
+            "value": 21238.4,
+            "unit": "ns/op",
+            "extra": "samples: 23543, rme: ±0.65%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 1K Write+Read Cycles > XState",
+            "value": 2232843.29,
+            "unit": "ns/op",
+            "extra": "samples: 224, rme: ±0.47%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > Directive",
+            "value": 1681.86,
+            "unit": "ns/op",
+            "extra": "samples: 297290, rme: ±0.17%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > Zustand",
+            "value": 172.24,
+            "unit": "ns/op",
+            "extra": "samples: 2902877, rme: ±0.68%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > Redux Toolkit",
+            "value": 1327.4,
+            "unit": "ns/op",
+            "extra": "samples: 376676, rme: ±3.36%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > MobX",
+            "value": 594.81,
+            "unit": "ns/op",
+            "extra": "samples: 840608, rme: ±0.40%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > Jotai",
+            "value": 2745.81,
+            "unit": "ns/op",
+            "extra": "samples: 182096, rme: ±4.21%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > Preact Signals",
+            "value": 117.5,
+            "unit": "ns/op",
+            "extra": "samples: 4255212, rme: ±0.09%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Derived Value (write + read computed) > XState",
+            "value": 2402.62,
+            "unit": "ns/op",
+            "extra": "samples: 208107, rme: ±0.63%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > Directive",
+            "value": 12362.35,
+            "unit": "ns/op",
+            "extra": "samples: 40446, rme: ±0.44%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > Zustand",
+            "value": 3664.62,
+            "unit": "ns/op",
+            "extra": "samples: 136440, rme: ±0.69%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > Redux Toolkit",
+            "value": 57099.75,
+            "unit": "ns/op",
+            "extra": "samples: 8757, rme: ±0.69%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > MobX",
+            "value": 11036.04,
+            "unit": "ns/op",
+            "extra": "samples: 45307, rme: ±0.40%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > Jotai",
+            "value": 45512.24,
+            "unit": "ns/op",
+            "extra": "samples: 10987, rme: ±0.78%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > Preact Signals",
+            "value": 899.71,
+            "unit": "ns/op",
+            "extra": "samples: 555737, rme: ±1.44%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 50 Writes + 1 Read (batch efficiency) > XState",
+            "value": 115274.55,
+            "unit": "ns/op",
+            "extra": "samples: 4338, rme: ±1.15%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Subscribe + Notify (create store, 10 subs, 1 write) > Directive",
+            "value": 146929.22,
+            "unit": "ns/op",
+            "extra": "samples: 3403, rme: ±14.85%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Subscribe + Notify (create store, 10 subs, 1 write) > Zustand",
+            "value": 865.24,
+            "unit": "ns/op",
+            "extra": "samples: 577874, rme: ±1.04%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Subscribe + Notify (create store, 10 subs, 1 write) > MobX",
+            "value": 234147.57,
+            "unit": "ns/op",
+            "extra": "samples: 2136, rme: ±3.85%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Subscribe + Notify (create store, 10 subs, 1 write) > Preact Signals",
+            "value": 1226.59,
+            "unit": "ns/op",
+            "extra": "samples: 407634, rme: ±0.25%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > Directive",
+            "value": 129645.49,
+            "unit": "ns/op",
+            "extra": "samples: 3857, rme: ±10.61%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > Zustand",
+            "value": 83.89,
+            "unit": "ns/op",
+            "extra": "samples: 5960250, rme: ±0.18%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > Redux Toolkit",
+            "value": 17744.99,
+            "unit": "ns/op",
+            "extra": "samples: 28177, rme: ±5.68%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > MobX",
+            "value": 3887.77,
+            "unit": "ns/op",
+            "extra": "samples: 128609, rme: ±1.22%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > Jotai",
+            "value": 1442.61,
+            "unit": "ns/op",
+            "extra": "samples: 346918, rme: ±10.11%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > Preact Signals",
+            "value": 70.34,
+            "unit": "ns/op",
+            "extra": "samples: 7108573, rme: ±0.10%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Store Creation (cold start) > XState",
+            "value": 15524.67,
+            "unit": "ns/op",
+            "extra": "samples: 32207, rme: ±19.16%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Read 10 Keys > Directive",
+            "value": 1375.92,
+            "unit": "ns/op",
+            "extra": "samples: 363393, rme: ±0.19%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Read 10 Keys > Zustand",
+            "value": 625.32,
+            "unit": "ns/op",
+            "extra": "samples: 799597, rme: ±0.10%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Read 10 Keys > MobX",
+            "value": 1019.22,
+            "unit": "ns/op",
+            "extra": "samples: 490570, rme: ±0.17%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Read 10 Keys > Preact Signals",
+            "value": 105.72,
+            "unit": "ns/op",
+            "extra": "samples: 4729593, rme: ±0.10%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Read 10 Keys > Jotai",
+            "value": 1299.99,
+            "unit": "ns/op",
+            "extra": "samples: 384617, rme: ±0.54%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > Directive",
+            "value": 2433038.98,
+            "unit": "ns/op",
+            "extra": "samples: 206, rme: ±0.94%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > Zustand",
+            "value": 710771.31,
+            "unit": "ns/op",
+            "extra": "samples: 704, rme: ±0.61%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > Redux Toolkit",
+            "value": 11707270.77,
+            "unit": "ns/op",
+            "extra": "samples: 43, rme: ±0.47%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > MobX",
+            "value": 2217307.58,
+            "unit": "ns/op",
+            "extra": "samples: 226, rme: ±0.53%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > Jotai",
+            "value": 9449796.72,
+            "unit": "ns/op",
+            "extra": "samples: 53, rme: ±6.38%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > Preact Signals",
+            "value": 199715.33,
+            "unit": "ns/op",
+            "extra": "samples: 2504, rme: ±0.85%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 10K Writes (raw throughput) > XState",
+            "value": 22710627.09,
+            "unit": "ns/op",
+            "extra": "samples: 23, rme: ±0.31%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > Directive",
+            "value": 32509.87,
+            "unit": "ns/op",
+            "extra": "samples: 15380, rme: ±0.36%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > Zustand",
+            "value": 7959.74,
+            "unit": "ns/op",
+            "extra": "samples: 62817, rme: ±1.19%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > Redux Toolkit",
+            "value": 119848.68,
+            "unit": "ns/op",
+            "extra": "samples: 4172, rme: ±0.62%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > MobX",
+            "value": 27664.78,
+            "unit": "ns/op",
+            "extra": "samples: 18074, rme: ±0.32%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > Jotai",
+            "value": 113043.74,
+            "unit": "ns/op",
+            "extra": "samples: 4424, rme: ±1.27%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > Preact Signals",
+            "value": 2656.76,
+            "unit": "ns/op",
+            "extra": "samples: 188200, rme: ±0.60%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: Alternating Read/Write (100 each) > XState",
+            "value": 227493.56,
+            "unit": "ns/op",
+            "extra": "samples: 2198, rme: ±0.61%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 3 Derived Values from 1 Source > Directive",
+            "value": 3580.95,
+            "unit": "ns/op",
+            "extra": "samples: 139628, rme: ±1.43%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 3 Derived Values from 1 Source > MobX",
+            "value": 1058.6,
+            "unit": "ns/op",
+            "extra": "samples: 472334, rme: ±0.42%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 3 Derived Values from 1 Source > Preact Signals",
+            "value": 185.23,
+            "unit": "ns/op",
+            "extra": "samples: 2699340, rme: ±0.10%"
+          },
+          {
+            "name": "comparison.bench.ts > Comparison: 3 Derived Values from 1 Source > Jotai",
+            "value": 6603.99,
+            "unit": "ns/op",
+            "extra": "samples: 75810, rme: ±6.93%"
+          },
+          {
+            "name": "core.bench.ts > Fact Mutations > single fact set",
+            "value": 641.93,
+            "unit": "ns/op",
+            "extra": "samples: 778902, rme: ±0.61%"
+          },
+          {
+            "name": "core.bench.ts > Fact Mutations > single fact read",
+            "value": 163.65,
+            "unit": "ns/op",
+            "extra": "samples: 3055343, rme: ±0.11%"
+          },
+          {
+            "name": "core.bench.ts > Fact Mutations – Batch > 100 facts batched",
+            "value": 20517.91,
+            "unit": "ns/op",
+            "extra": "samples: 24369, rme: ±0.26%"
+          },
+          {
+            "name": "core.bench.ts > Fact Mutations – Batch > 100 fact reads via proxy",
+            "value": 16100.09,
+            "unit": "ns/op",
+            "extra": "samples: 31056, rme: ±0.28%"
+          },
+          {
+            "name": "core.bench.ts > Derivations > simple derivation (read after invalidate)",
+            "value": 1828.35,
+            "unit": "ns/op",
+            "extra": "samples: 273471, rme: ±0.73%"
+          },
+          {
+            "name": "core.bench.ts > Derivations > 10 chained derivations (read after invalidate)",
+            "value": 9682.29,
+            "unit": "ns/op",
+            "extra": "samples: 51641, rme: ±1.15%"
+          },
+          {
+            "name": "core.bench.ts > Derivations > 50 chained derivations (read after invalidate)",
+            "value": 45754.05,
+            "unit": "ns/op",
+            "extra": "samples: 10928, rme: ±0.99%"
+          },
+          {
+            "name": "core.bench.ts > Derivation Invalidation > invalidate 20 derivations (1 fact change)",
+            "value": 2896.06,
+            "unit": "ns/op",
+            "extra": "samples: 172650, rme: ±0.96%"
+          },
+          {
+            "name": "core.bench.ts > Derivation Invalidation – graph nothing reads back > chain of 20, unread",
+            "value": 867.32,
+            "unit": "ns/op",
+            "extra": "samples: 576490, rme: ±0.15%"
+          },
+          {
+            "name": "core.bench.ts > Derivation Invalidation – graph nothing reads back > chain of 500, unread",
+            "value": 795.81,
+            "unit": "ns/op",
+            "extra": "samples: 628293, rme: ±0.11%"
+          },
+          {
+            "name": "core.bench.ts > Derivation Invalidation – graph nothing reads back > 500 nodes / ~15k edges, unread",
+            "value": 796.88,
+            "unit": "ns/op",
+            "extra": "samples: 627449, rme: ±0.10%"
+          },
+          {
+            "name": "core.bench.ts > Constraints > single constraint eval + reconcile",
+            "value": 191606.56,
+            "unit": "ns/op",
+            "extra": "samples: 2610, rme: ±9.88%"
+          },
+          {
+            "name": "core.bench.ts > Constraints > 10 constraints, 1 triggers",
+            "value": 226253.61,
+            "unit": "ns/op",
+            "extra": "samples: 2210, rme: ±6.54%"
+          },
+          {
+            "name": "core.bench.ts > Sync vs Async Resolvers > sync resolver (no Promise)",
+            "value": 226870.08,
+            "unit": "ns/op",
+            "extra": "samples: 2204, rme: ±8.38%"
+          },
+          {
+            "name": "core.bench.ts > Sync vs Async Resolvers > async resolver (returns Promise)",
+            "value": 180720.58,
+            "unit": "ns/op",
+            "extra": "samples: 2767, rme: ±7.21%"
+          },
+          {
+            "name": "core.bench.ts > Reconciliation > no-op reconcile (nothing changed)",
+            "value": 132269.47,
+            "unit": "ns/op",
+            "extra": "samples: 3811, rme: ±8.76%"
+          },
+          {
+            "name": "core.bench.ts > Reconciliation > minimal cycle (1 fact → 1 constraint → 1 resolver)",
+            "value": 188423.92,
+            "unit": "ns/op",
+            "extra": "samples: 2661, rme: ±6.89%"
+          },
+          {
+            "name": "core.bench.ts > Reconciliation > medium system (5 facts → 3 constraints → 3 resolvers → 5 derivations)",
+            "value": 250590.71,
+            "unit": "ns/op",
+            "extra": "samples: 1996, rme: ±6.32%"
+          },
+          {
+            "name": "core.bench.ts > Real-World: Traffic Light > full cycle: red → green → yellow → red",
+            "value": 274900.67,
+            "unit": "ns/op",
+            "extra": "samples: 1819, rme: ±5.15%"
+          },
+          {
+            "name": "core.bench.ts > Real-World: Auth Flow > login → token → profile chain",
+            "value": 218006.5,
+            "unit": "ns/op",
+            "extra": "samples: 2294, rme: ±6.25%"
+          },
+          {
+            "name": "frame-loop.bench.ts > Frame loop – crossModuleDeps reader > 60 frames, independent reader",
+            "value": 1525308.29,
+            "unit": "ns/op",
+            "extra": "samples: 328, rme: ±7.49%"
+          },
+          {
+            "name": "frame-loop.bench.ts > Frame loop – crossModuleDeps reader > 60 frames, reader declares crossModuleDeps",
+            "value": 1076346.76,
+            "unit": "ns/op",
+            "extra": "samples: 465, rme: ±5.98%"
           }
         ]
       }
