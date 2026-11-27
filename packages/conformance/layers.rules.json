@@ -58,7 +58,7 @@
     "/adapter-utils over a live system (U10, U11)": "L13",
     "/adapter-utils history state on and off (U10)": "L13",
     "/adapter-utils history state is null with history off (U10)": "L13",
-    "/adapter-utils throttle: a trailing call with the latest arguments, and cleanup (U10)": "L13",
+    "/adapter-utils throttle on the scenario fake clock: a trailing call with the latest arguments, and cleanup (U10)": "L13",
     "/migration over a Redux, a Zustand and an XState fixture (U17)": "L13",
     "requirement helpers, typed helpers and the status plugin": "L12",
     "createSystemWithStatus wires the status plugin in": "L12",
@@ -889,6 +889,10 @@
     },
     "tests/plugins/performance.test.ts": {
       "rule": "L12"
+    },
+    "tests/utils/l13-internals-pins-oracle.test.ts": {
+      "rule": "L13",
+      "pin": true
     },
     "tests/utils/l13-testing-pins-oracle.test.ts": {
       "rule": "L13",

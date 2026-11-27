@@ -175,16 +175,19 @@ describe("L13 probe pins: /worker", () => {
     ]);
   });
 
-  it("U15: GET_SNAPSHOT can post DERIVATION_CHANGED before its result, and SET_FACTS folds a key's run into one message", async () => {
+  it("U15: GET_SNAPSHOT after a write posts DERIVATION_CHANGED, then SNAPSHOT_RESULT, and SET_FACTS folds a key's run into one message", async () => {
     await init();
     await send({ type: "START" });
+    await send({ type: "SET_FACT", key: "pinned::n", value: 4 });
     posted.length = 0;
     await send({ type: "GET_SNAPSHOT", requestId: "s-1", options: {} });
-    const resultAt = types().indexOf("SNAPSHOT_RESULT");
-    expect(resultAt).toBeGreaterThanOrEqual(0);
-    expect(posted[resultAt]?.requestId).toBe("s-1");
-    const before = types().slice(0, resultAt);
-    expect(before.every((x) => x === "DERIVATION_CHANGED")).toBe(true);
+    expect(types()).toEqual(["DERIVATION_CHANGED", "SNAPSHOT_RESULT"]);
+    expect(posted[0]).toEqual({
+      type: "DERIVATION_CHANGED",
+      key: "pinned::double",
+      value: 8,
+    });
+    expect(posted[1]?.requestId).toBe("s-1");
 
     posted.length = 0;
     await send({
@@ -192,7 +195,7 @@ describe("L13 probe pins: /worker", () => {
       facts: { "pinned::n": 7, "pinned::label": "x" },
     });
     expect(posted.filter((m) => m.type === "FACT_CHANGED")).toEqual([
-      { type: "FACT_CHANGED", key: "pinned::n", value: 7, prev: 1 },
+      { type: "FACT_CHANGED", key: "pinned::n", value: 7, prev: 4 },
       { type: "FACT_CHANGED", key: "pinned::label", value: "x", prev: "start" },
     ]);
   });

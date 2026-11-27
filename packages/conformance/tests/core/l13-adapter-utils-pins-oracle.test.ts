@@ -1,8 +1,11 @@
 // Ported from packages/core/src/core/__tests__/l13-adapter-utils-pins-oracle.test.ts by packages/conformance/scripts/port.ts.
 // Do not edit by hand: change the original and re-run the port.
 
-import { assertSystem } from "@directive-run/core/adapter-utils";
-import { describe, expect, it } from "vitest";
+import {
+  assertSystem,
+  createThrottle,
+} from "@directive-run/core/adapter-utils";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The L13 RFC's U12 (development): assertSystem throws for a missing system.
 // The production half is l13-adapter-utils-pins-oracle-production.
@@ -32,5 +35,40 @@ describe("L13 probe pins: /adapter-utils assertSystem (development)", () => {
     expect(() => assertSystem("h", 0)).not.toThrow();
     expect(() => assertSystem("h", "")).not.toThrow();
     expect(() => assertSystem("h", false)).not.toThrow();
+  });
+});
+
+describe("L13 review pins: /adapter-utils createThrottle on a real clock", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("the first call runs at once, later calls inside the window trail with the latest arguments, and a call after the window runs at once", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const calls: unknown[][] = [];
+    const { throttled } = createThrottle(
+      (...args: unknown[]) => calls.push(args),
+      500,
+    );
+
+    throttled("a");
+    expect(calls).toEqual([["a"]]);
+    throttled("b");
+    throttled("c");
+    expect(calls).toEqual([["a"]]);
+    vi.advanceTimersByTime(499);
+    expect(calls).toEqual([["a"]]);
+    vi.advanceTimersByTime(1);
+    expect(calls).toEqual([["a"], ["c"]]);
+    // the trailing call restarted the window
+    throttled("d");
+    expect(calls).toEqual([["a"], ["c"]]);
+    vi.advanceTimersByTime(500);
+    expect(calls).toEqual([["a"], ["c"], ["d"]]);
+    // idle for longer than the window: the next call is immediate again
+    vi.advanceTimersByTime(1_000);
+    throttled("e");
+    expect(calls).toEqual([["a"], ["c"], ["d"], ["e"]]);
   });
 });

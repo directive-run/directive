@@ -222,7 +222,7 @@ suite("L13 pins", () => {
   );
 
   scenario(
-    "/adapter-utils throttle: a trailing call with the latest arguments, and cleanup (U10)",
+    "/adapter-utils throttle on the scenario fake clock: a trailing call with the latest arguments, and cleanup (U10)",
     (ctx) => ({ module: counter(ctx) }),
     [
       { op: "start" },

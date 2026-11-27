@@ -206,6 +206,7 @@
   "tests/plugins/performance.test.ts": "packages/core/src/plugins/__tests__/performance.test.ts",
   "tests/plugins/persistence.test.ts": "packages/core/src/plugins/__tests__/persistence.test.ts",
   "tests/utils/history.test.ts": "packages/core/src/utils/__tests__/history.test.ts",
+  "tests/utils/l13-internals-pins-oracle.test.ts": "packages/core/src/utils/__tests__/l13-internals-pins-oracle.test.ts",
   "tests/utils/l13-testing-pins-oracle.test.ts": "packages/core/src/utils/__tests__/l13-testing-pins-oracle.test.ts",
   "tests/utils/snapshot-signing.test.ts": "packages/core/src/utils/__tests__/snapshot-signing.test.ts",
   "tests/utils/testing-sees-batched-writes.test.ts": "packages/core/src/utils/__tests__/testing-sees-batched-writes.test.ts",

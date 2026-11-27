@@ -76,6 +76,17 @@ function message(fn: () => unknown): string {
 }
 
 describe("L13 probe pins: /testing (development)", () => {
+  it("U1: start() works on a test system: the constraint fires and the mock resolver runs", async () => {
+    const ts = single();
+
+    ts.start();
+    ts.facts.go = true;
+    await ts.settle();
+    ts.assertResolverCalled("LOAD", 1);
+    expect(ts.facts.n).toBe(0);
+    ts.destroy();
+  });
+
   it("U1: a test system's isRunning, isInitialized and isSettled keep their creation values after start() (shows bz)", async () => {
     const ts = single();
 
@@ -86,16 +97,36 @@ describe("L13 probe pins: /testing (development)", () => {
     ]);
     ts.start();
     ts.facts.go = true;
+    // read after start() and before settle(): still the creation values
+    expect([ts.isRunning, ts.isInitialized, ts.isSettled]).toEqual([
+      false,
+      false,
+      true,
+    ]);
     await ts.settle();
-    // start() itself worked: the constraint fired and the mock resolver ran.
-    ts.assertResolverCalled("LOAD", 1);
-    expect(ts.facts.n).toBe(0);
     // The flags were read once, when the object was spread.
     expect([ts.isRunning, ts.isInitialized, ts.isSettled]).toEqual([
       false,
       false,
       true,
     ]);
+    ts.destroy();
+  });
+
+  it("U1: a namespaced test system's flags are frozen the same way (shows bz)", async () => {
+    const ts = createTestSystem({
+      modules: { counter: counter() },
+      mocks: { resolvers: { LOAD: {} } },
+    } as never) as any;
+
+    const read = () => [ts.isRunning, ts.isInitialized, ts.isSettled];
+    const before = read();
+    ts.start();
+    ts.facts.counter.go = true;
+    expect(read()).toEqual(before);
+    await ts.settle();
+    expect(read()).toEqual(before);
+    expect(before).toEqual([false, false, true]);
     ts.destroy();
   });
 
@@ -297,6 +328,49 @@ describe("L13 probe pins: /testing (development)", () => {
     // the short key counts both modules' writes (two inits and two writes)
     expect(() => ts.assertFactChanges("c", 4)).not.toThrow();
     expect(() => ts.assertFactChanges("m::c", 2)).not.toThrow();
+    ts.destroy();
+  });
+
+  it("U8: a module registered after creation is not a known namespace, so its key keeps the whole name and no namespace", () => {
+    const ts = createTestSystem({
+      modules: {
+        m: createModule("m", {
+          schema: {
+            facts: { c: t.number() },
+            derivations: {},
+            events: {},
+            requirements: {},
+          },
+          init: (facts: any) => {
+            facts.c = 0;
+          },
+        } as never),
+      },
+    } as never) as any;
+    ts.start();
+    ts.registerModule(
+      "late",
+      createModule("late", {
+        schema: {
+          facts: { c: t.number() },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        init: (facts: any) => {
+          facts.c = 0;
+        },
+      } as never),
+    );
+    ts.facts.late.c = 9;
+    const row = ts.getFactsHistory().find((r: any) => r.newValue === 9);
+
+    expect(row).toMatchObject({ key: "late::c", fullKey: "late::c" });
+    expect(row.namespace).toBeUndefined();
+    expect(message(() => ts.assertFactSet("c", 9))).toMatch(
+      /^\[Directive\] Expected fact "c" to be set to 9 but got: /,
+    );
+    expect(() => ts.assertFactSet("late::c", 9)).not.toThrow();
     ts.destroy();
   });
 

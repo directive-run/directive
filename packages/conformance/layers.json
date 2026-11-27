@@ -52,7 +52,7 @@
           "layer": "L13",
           "by": ["import handleWorkerMessages", "import registerWorkerModule"]
         },
-        "L13 probe pins: /worker > U15: GET_SNAPSHOT can post DERIVATION_CHANGED before its result, and SET_FACTS folds a key's run into one message": {
+        "L13 probe pins: /worker > U15: GET_SNAPSHOT after a write posts DERIVATION_CHANGED, then SNAPSHOT_RESULT, and SET_FACTS folds a key's run into one message": {
           "layer": "L13",
           "by": ["import handleWorkerMessages", "import registerWorkerModule"]
         }
@@ -8401,6 +8401,10 @@
         "L13 probe pins: /adapter-utils assertSystem (development) > U12: assertSystem accepts anything else, including a falsy non-nullish value": {
           "layer": "L13",
           "by": ["import assertSystem"]
+        },
+        "L13 review pins: /adapter-utils createThrottle on a real clock > the first call runs at once, later calls inside the window trail with the latest arguments, and a call after the window runs at once": {
+          "layer": "L13",
+          "by": ["import createThrottle"]
         }
       }
     },
@@ -19424,12 +19428,51 @@
         }
       }
     },
+    "tests/utils/l13-internals-pins-oracle.test.ts": {
+      "category": "internals",
+      "rule": "L13",
+      "pin": true,
+      "tests": {
+        "L13 probe pins: /internals safeStringify > serialises with a two-space indent": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        },
+        "L13 probe pins: /internals safeStringify > writes a BigInt as its digits and an n, at any depth": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        },
+        "L13 probe pins: /internals safeStringify > returns [undefined] for undefined, a function and a symbol": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        },
+        "L13 probe pins: /internals safeStringify > returns [unserializable] for a cycle and for a throwing toJSON": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        },
+        "L13 probe pins: /internals safeStringify > cuts at maxLen and reports the full length, and leaves a value of exactly maxLen alone": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        },
+        "L13 probe pins: /internals safeStringify > has no depth limit, and writes an Error, a Map and a Set as {}": {
+          "layer": "L13",
+          "by": ["import safeStringify"]
+        }
+      }
+    },
     "tests/utils/l13-testing-pins-oracle.test.ts": {
       "category": "black-box",
       "rule": "L13",
       "pin": true,
       "tests": {
+        "L13 probe pins: /testing (development) > U1: start() works on a test system: the constraint fires and the mock resolver runs": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
+        },
         "L13 probe pins: /testing (development) > U1: a test system's isRunning, isInitialized and isSettled keep their creation values after start() (shows bz)": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
+        },
+        "L13 probe pins: /testing (development) > U1: a namespaced test system's flags are frozen the same way (shows bz)": {
           "layer": "L13",
           "by": ["import createTestSystem"]
         },
@@ -19462,6 +19505,10 @@
           "by": ["import createTestSystem"]
         },
         "L13 probe pins: /testing (development) > U8: a namespaced test system records the module as the namespace and matches a short or a full key": {
+          "layer": "L13",
+          "by": ["import createTestSystem"]
+        },
+        "L13 probe pins: /testing (development) > U8: a module registered after creation is not a known namespace, so its key keeps the whole name and no namespace": {
           "layer": "L13",
           "by": ["import createTestSystem"]
         },

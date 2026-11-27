@@ -781,7 +781,7 @@
   {
     "file": "src/core/__tests__/l13-adapter-utils-pins-oracle.test.ts",
     "category": "black-box",
-    "cases": 2,
+    "cases": 3,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -2056,9 +2056,18 @@
     "notes": []
   },
   {
+    "file": "src/utils/__tests__/l13-internals-pins-oracle.test.ts",
+    "category": "internals",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": ["safeStringify"],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/utils/__tests__/l13-testing-pins-oracle.test.ts",
     "category": "black-box",
-    "cases": 11,
+    "cases": 14,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
