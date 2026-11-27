@@ -1,12 +1,19 @@
 /**
- * `@directive-run/core/adapter-utils` on core-next: not built yet (the
- * helpers the framework adapters share).
- * 1.35's exports with 1.35's names and signatures, taken from
- * packages/conformance/contracts/api-surface.json. Each function throws
- * `featureMissing` (code E_FEATURE_MISSING) when called; the entry arrives
- * in layer 13. Generated for the alpha.0 tarball (slice P3-F5).
+ * `@directive-run/core/adapter-utils` (the L13 RFC's AU1 to AU8): the helpers
+ * the framework adapters share, ported line for line from
+ * packages/core/src/adapter-utils.ts and core/types/adapter-utils.ts.
+ *
+ * One difference in mechanism, none in behaviour: 1.35 tracks a selector's
+ * reads with a module-level tracker; core-next keeps one tracker per system,
+ * so {@link runTrackedSelector} borrows the system's own through `scopes`
+ * (api/plugins.ts), the first-party pairing persistence already reads. No
+ * core seam, and nothing here reaches a `createSystem` build.
+ * @internal
  */
-import { featureMissing } from "./api/missing.js";
+
+import isDevelopment from "#is-development";
+import { type Tracker, withTracking } from "./api/facts.js";
+import { scopes } from "./api/plugins.js";
 import type { Facts } from "./types/facts.js";
 import type { Plugin } from "./types/plugins.js";
 import type { Requirement } from "./types/requirements.js";
@@ -14,50 +21,20 @@ import type { Schema } from "./types/schema.js";
 import type {
   HistoryAPI,
   HistoryState,
+  SnapshotMeta,
   SystemInspection,
 } from "./types/system.js";
 
-// 1.35 declares this here without exporting it.
-interface AdapterCallbacks {
-  onRequirementCreated?: (req: Requirement) => void;
-  onRequirementResolved?: (req: Requirement) => void;
-  onError?: (error: Error) => void;
-}
+// ============================================================================
+// SystemLike — structural type satisfied by both System and SingleModuleSystem
+// ============================================================================
 
-export interface ConstraintInfo {
-  id: string;
-  active: boolean;
-  priority: number;
-}
-
-export interface InspectState {
-  isSettled: boolean;
-  unmet: RequirementsState["unmet"];
-  inflight: RequirementsState["inflight"];
-  isWorking: boolean;
-  hasUnmet: boolean;
-  hasInflight: boolean;
-}
-
-export interface RequirementsState {
-  unmet: Array<{
-    id: string;
-    requirement: {
-      type: string;
-      [key: string]: unknown;
-    };
-    fromConstraint: string;
-  }>;
-  inflight: Array<{
-    id: string;
-    resolverId: string;
-    startedAt: number;
-  }>;
-  hasUnmet: boolean;
-  hasInflight: boolean;
-  isWorking: boolean;
-}
-
+/**
+ * Minimal structural type for shared adapter helpers.
+ * Both `System<any>` and `SingleModuleSystem<any>` satisfy this interface,
+ * eliminating the need for `as unknown as System<any>` casts in adapters.
+ * @internal
+ */
 export interface SystemLike {
   readonly isSettled: boolean;
   readonly history: HistoryAPI | null;
@@ -73,128 +50,434 @@ export interface SystemLike {
   inspect(): SystemInspection;
 }
 
+// ============================================================================
+// Requirements State
+// ============================================================================
+
+/**
+ * Requirements state returned by useRequirements hooks.
+ * Provides a focused view of just requirements without full inspection overhead.
+ */
+export interface RequirementsState {
+  /** Array of unmet requirements waiting to be resolved */
+  unmet: Array<{
+    id: string;
+    requirement: { type: string; [key: string]: unknown };
+    fromConstraint: string;
+  }>;
+  /** Array of requirements currently being resolved */
+  inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
+  /** Whether there are any unmet requirements */
+  hasUnmet: boolean;
+  /** Whether there are any inflight requirements */
+  hasInflight: boolean;
+  /** Whether the system is actively working (has unmet or inflight requirements) */
+  isWorking: boolean;
+}
+
+// ============================================================================
+// Inspect State (shared across all adapters)
+// ============================================================================
+
+/**
+ * Consolidated inspection state returned by useInspect hooks.
+ * Identical shape across React, Vue, Svelte, Solid, and Lit adapters.
+ */
+export interface InspectState {
+  /** Whether the system has settled (no pending operations) */
+  isSettled: boolean;
+  /** Array of unmet requirements */
+  unmet: RequirementsState["unmet"];
+  /** Array of inflight requirements */
+  inflight: RequirementsState["inflight"];
+  /** Whether the system is actively working */
+  isWorking: boolean;
+  /** Whether there are any unmet requirements */
+  hasUnmet: boolean;
+  /** Whether there are any inflight requirements */
+  hasInflight: boolean;
+}
+
+/**
+ * Information about a single constraint.
+ */
+export interface ConstraintInfo {
+  id: string;
+  active: boolean;
+  priority: number;
+}
+
+/**
+ * Compute InspectState from a system instance.
+ * Centralizes the logic currently duplicated across adapters.
+ * @internal
+ */
+export function computeInspectState(system: SystemLike): InspectState {
+  const inspection = system.inspect();
+  return {
+    isSettled: system.isSettled,
+    unmet: inspection.unmet,
+    inflight: inspection.inflight,
+    isWorking: inspection.unmet.length > 0 || inspection.inflight.length > 0,
+    hasUnmet: inspection.unmet.length > 0,
+    hasInflight: inspection.inflight.length > 0,
+  };
+}
+
+// ============================================================================
+// Throttled Hook Options
+// ============================================================================
+
+/**
+ * Options for throttled hooks.
+ * Used by useInspectThrottled, useRequirementsThrottled, etc.
+ */
 export interface ThrottledHookOptions {
+  /**
+   * Minimum time between updates in milliseconds.
+   * @default 100
+   */
   throttleMs?: number;
 }
 
+// ============================================================================
+// Throttle Utility
+// ============================================================================
+
+/**
+ * Create a throttled version of a callback function.
+ * Uses trailing-edge throttling: the callback will be called at most once per interval,
+ * with the latest arguments from the most recent call.
+ *
+ * @param callback - The function to throttle
+ * @param ms - The minimum time between calls in milliseconds
+ * @returns A throttled version of the callback and a cleanup function
+ * @internal
+ */
+export function createThrottle<T extends (...args: unknown[]) => void>(
+  callback: T,
+  ms: number,
+): { throttled: T; cleanup: () => void } {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let lastArgs: Parameters<T> | null = null;
+  let lastCallTime = 0;
+
+  const throttled = ((...args: Parameters<T>) => {
+    const now = Date.now();
+    const timeSinceLastCall = now - lastCallTime;
+
+    if (timeSinceLastCall >= ms) {
+      // Enough time has passed, call immediately
+      lastCallTime = now;
+      callback(...args);
+    } else {
+      // Schedule for later, keeping latest args
+      lastArgs = args;
+      if (!timeoutId) {
+        timeoutId = setTimeout(() => {
+          timeoutId = null;
+          lastCallTime = Date.now();
+          if (lastArgs) {
+            callback(...lastArgs);
+            lastArgs = null;
+          }
+        }, ms - timeSinceLastCall);
+      }
+    }
+  }) as T;
+
+  const cleanup = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    lastArgs = null;
+  };
+
+  return { throttled, cleanup };
+}
+
+// ============================================================================
+// Shared Adapter Helpers
+// ============================================================================
+
+/**
+ * Dev-mode assertion that the system parameter is non-null.
+ * Tree-shaken in production builds.
+ * @internal
+ */
+export function assertSystem(hookName: string, system: unknown): void {
+  if (isDevelopment && system == null) {
+    throw new Error(
+      `[Directive] ${hookName}() requires a system instance as the first argument. Received ${system}.`,
+    );
+  }
+}
+
+/** Default equality function using Object.is */
+export function defaultEquality<T>(a: T, b: T): boolean {
+  return Object.is(a, b);
+}
+
+/**
+ * Build a HistoryState object from a system's history instance.
+ * Returns null when history is disabled.
+ * @internal
+ */
+export function buildHistoryState(system: SystemLike): HistoryState | null {
+  const debug = system.history;
+  if (!debug) return null;
+
+  // Build lightweight metadata array (no facts data)
+  const snapshots: SnapshotMeta[] = debug.snapshots.map((s) => ({
+    id: s.id,
+    timestamp: s.timestamp,
+    trigger: s.trigger,
+  }));
+
+  return {
+    // Navigation state
+    canGoBack: debug.currentIndex > 0,
+    canGoForward: debug.currentIndex < debug.snapshots.length - 1,
+    currentIndex: debug.currentIndex,
+    totalSnapshots: debug.snapshots.length,
+
+    // Snapshot access
+    snapshots,
+    getSnapshotFacts: (id: number): Record<string, unknown> | null => {
+      const snap = debug.snapshots.find((s) => s.id === id);
+      return snap ? snap.facts : null;
+    },
+
+    // Navigation
+    goTo: (snapshotId: number) => debug.goTo(snapshotId),
+    goBack: (steps?: number) => debug.goBack(steps),
+    goForward: (steps?: number) => debug.goForward(steps),
+    replay: () => debug.replay(),
+
+    // Session persistence
+    exportSession: () => debug.export(),
+    importSession: (json: string) => debug.import(json),
+
+    // Changesets
+    beginChangeset: (label: string) => debug.beginChangeset(label),
+    endChangeset: () => debug.endChangeset(),
+
+    // Recording control
+    isPaused: debug.isPaused,
+    pause: () => debug.pause(),
+    resume: () => debug.resume(),
+  };
+}
+
+/**
+ * Pick specific fact values from a system's store.
+ * @internal
+ */
+export function pickFacts(
+  system: SystemLike,
+  keys: string[],
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const key of keys) {
+    result[key] = system.facts.$store.get(key);
+  }
+  return result;
+}
+
+// ============================================================================
+// Tracked Selector
+// ============================================================================
+
+/** Result of running a selector with tracking. @internal */
 export interface TrackedSelectorResult<R> {
   value: R;
   factKeys: string[];
   deriveKeys: string[];
 }
 
-export function assertSystem(hookName: string, system: unknown): void;
-export function assertSystem(): never {
-  return featureMissing("assertSystem", 13);
+/**
+ * Run a selector against a system with automatic dependency tracking.
+ * Creates a Proxy that intercepts property access to distinguish between
+ * fact reads (tracked via withTracking) and derivation reads (tracked manually).
+ *
+ * Used by useSelector in all framework adapters.
+ * @internal
+ */
+export function runTrackedSelector<R>(
+  system: SystemLike,
+  deriveKeySet: Set<string>,
+  selector: (state: Record<string, unknown>) => R,
+): TrackedSelectorResult<R> {
+  const accessedDeriveKeys: string[] = [];
+
+  const stateProxy = new Proxy(
+    {},
+    {
+      get(_, prop: string | symbol) {
+        if (typeof prop !== "string") return undefined;
+        if (deriveKeySet.has(prop)) {
+          accessedDeriveKeys.push(prop);
+          return system.read(prop);
+        }
+        return system.facts.$store.get(prop);
+      },
+      has(_, prop: string | symbol) {
+        if (typeof prop !== "string") return false;
+        return deriveKeySet.has(prop) || system.facts.$store.has(prop);
+      },
+      ownKeys() {
+        const factKeys = Object.keys(system.facts.$store.toObject());
+        const combined = new Set(factKeys);
+        for (const k of deriveKeySet) combined.add(k);
+        return [...combined];
+      },
+      getOwnPropertyDescriptor() {
+        return { configurable: true, enumerable: true, writable: true };
+      },
+    },
+  );
+
+  // 1.35's tracker is module-level; this system's is in its context. An
+  // object no system made (a hand-built SystemLike) has none, and nothing it
+  // reads could be recorded on either engine: a tracker of its own gives the
+  // same empty list.
+  const tracker: Tracker = scopes.get(system)?.tracker ?? {
+    deps: null,
+    effect_: undefined,
+  };
+  const { value, deps } = withTracking(tracker, () =>
+    selector(stateProxy as Record<string, unknown>),
+  );
+  return {
+    value,
+    factKeys: Array.from(deps) as string[],
+    deriveKeys: accessedDeriveKeys,
+  };
 }
 
-export function buildHistoryState(system: SystemLike): HistoryState | null;
-export function buildHistoryState(): never {
-  return featureMissing("buildHistoryState", 13);
-}
-
-export function computeInspectState(system: SystemLike): InspectState;
-export function computeInspectState(): never {
-  return featureMissing("computeInspectState", 13);
-}
-
-export function createCallbackPlugin(
-  name: string,
-  callbacks: AdapterCallbacks,
-): Plugin<any>;
-export function createCallbackPlugin(): never {
-  return featureMissing("createCallbackPlugin", 13);
-}
-
-export function createThrottle<T extends (...args: unknown[]) => void>(
-  callback: T,
-  ms: number,
-): {
-  throttled: T;
-  cleanup: () => void;
-};
-export function createThrottle(): never {
-  return featureMissing("createThrottle", 13);
-}
-
-export function defaultEquality<T>(a: T, b: T): boolean;
-export function defaultEquality(): never {
-  return featureMissing("defaultEquality", 13);
-}
-
+/**
+ * Check if tracked dependency keys have changed.
+ * @internal
+ */
 export function depsChanged(
   prevFacts: string[],
   newFacts: string[],
   prevDerived: string[],
   newDerived: string[],
-): boolean;
-export function depsChanged(): never {
-  return featureMissing("depsChanged", 13);
+): boolean {
+  const factsChanged =
+    newFacts.length !== prevFacts.length ||
+    newFacts.some((k, i) => k !== prevFacts[i]);
+  const derivedChanged =
+    newDerived.length !== prevDerived.length ||
+    newDerived.some((k, i) => k !== prevDerived[i]);
+  return factsChanged || derivedChanged;
 }
 
-export function getBridgeFact<V>(facts: Facts<Schema>, key: string): V;
-export function getBridgeFact(): never {
-  return featureMissing("getBridgeFact", 13);
-}
+// ============================================================================
+// The bridge helpers (1.35 core/types/adapter-utils.ts) and shallowEqual
+// ============================================================================
 
-export function mergeHydrationFacts(
-  snapshot:
-    | {
-        data?: Record<string, unknown>;
-      }
-    | Record<string, unknown>
-    | undefined
-    | null,
-  initialFacts?: Record<string, unknown>,
-): Record<string, unknown>;
-export function mergeHydrationFacts(): never {
-  return featureMissing("mergeHydrationFacts", 13);
-}
-
-export function pickFacts(
-  system: SystemLike,
-  keys: string[],
-): Record<string, unknown>;
-export function pickFacts(): never {
-  return featureMissing("pickFacts", 13);
-}
-
-export function requirementGuard<R extends Requirement>(
-  type: R["type"],
-): (req: Requirement) => req is R;
-export function requirementGuard(): never {
-  return featureMissing("requirementGuard", 13);
-}
-
-export function requirementGuardMultiple<R extends Requirement>(
-  types: R["type"][],
-): (req: Requirement) => req is R;
-export function requirementGuardMultiple(): never {
-  return featureMissing("requirementGuardMultiple", 13);
-}
-
-export function runTrackedSelector<R>(
-  system: SystemLike,
-  deriveKeySet: Set<string>,
-  selector: (state: Record<string, unknown>) => R,
-): TrackedSelectorResult<R>;
-export function runTrackedSelector(): never {
-  return featureMissing("runTrackedSelector", 13);
-}
-
+/**
+ * Set a bridge fact without strict typing.
+ * Use for adapter-internal bridge fields like `__adapterState`.
+ */
 export function setBridgeFact<V>(
   facts: Facts<Schema>,
   key: string,
   value: V,
-): void;
-export function setBridgeFact(): never {
-  return featureMissing("setBridgeFact", 13);
+): void {
+  (facts as Record<string, unknown>)[key] = value;
 }
 
-export function shallowEqual<T extends Record<string, unknown>>(
-  a: T,
-  b: T,
-): boolean;
-export function shallowEqual(): never {
-  return featureMissing("shallowEqual", 13);
+/**
+ * Get a bridge fact without strict typing.
+ * Use for adapter-internal bridge fields.
+ */
+export function getBridgeFact<V>(facts: Facts<Schema>, key: string): V {
+  return (facts as Record<string, unknown>)[key] as V;
+}
+
+// 1.35 declares this in core/types/adapter-utils.ts; this entry does not
+// export it.
+interface AdapterCallbacks {
+  onRequirementCreated?: (req: Requirement) => void;
+  onRequirementResolved?: (req: Requirement) => void;
+  onError?: (error: Error) => void;
+}
+
+/**
+ * Create a callback plugin for adapter events.
+ * Wraps adapter callbacks in a Directive plugin.
+ *
+ * @param name - Plugin name (for debugging)
+ * @param callbacks - Callback functions to invoke
+ */
+export function createCallbackPlugin(
+  name: string,
+  callbacks: AdapterCallbacks,
+): Plugin<any> {
+  return {
+    name,
+    onRequirementCreated: callbacks.onRequirementCreated
+      ? (req) => callbacks.onRequirementCreated!(req.requirement)
+      : undefined,
+    onRequirementMet: callbacks.onRequirementResolved
+      ? (req) => callbacks.onRequirementResolved!(req.requirement)
+      : undefined,
+    onError: callbacks.onError,
+  };
+}
+
+/**
+ * Create a type guard for a specific requirement type.
+ * Simplifies the common pattern of checking req.type.
+ */
+export function requirementGuard<R extends Requirement>(
+  type: R["type"],
+): (req: Requirement) => req is R {
+  return (req): req is R => req.type === type;
+}
+
+/** Create a type guard that matches multiple requirement types. */
+export function requirementGuardMultiple<R extends Requirement>(
+  types: R["type"][],
+): (req: Requirement) => req is R {
+  const typeSet = new Set(types);
+  return (req): req is R => typeSet.has(req.type);
+}
+
+// The root's, which is built (the RFC's section C).
+export { shallowEqual } from "./api/utils.js";
+
+/**
+ * Merge a DistributableSnapshot's data into initialFacts for SSR hydration.
+ * Used by all framework adapters' hydration hooks/controllers.
+ *
+ * Accepts both shapes:
+ * - DistributableSnapshot (`{ data: Record<string, unknown> }`) — used by React's DirectiveHydrator
+ * - Plain `Record<string, unknown>` — used by Lit/Vue/Svelte/Solid adapters
+ */
+export function mergeHydrationFacts(
+  snapshot:
+    | { data?: Record<string, unknown> }
+    | Record<string, unknown>
+    | undefined
+    | null,
+  initialFacts?: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!snapshot) {
+    return { ...initialFacts };
+  }
+
+  // If snapshot has a .data property that is a non-null object, treat as DistributableSnapshot
+  const data =
+    "data" in snapshot &&
+    typeof snapshot.data === "object" &&
+    snapshot.data !== null
+      ? (snapshot.data as Record<string, unknown>)
+      : (snapshot as Record<string, unknown>);
+
+  return { ...initialFacts, ...data };
 }

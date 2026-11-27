@@ -71,22 +71,24 @@ function inlineIsDevelopment(
 export const DEV_CHECK =
   'typeof process === "undefined" ? false : !process.env ? false : process.env.NODE_ENV !== "production"';
 
-// The four built entries package.json `exports` serves.
+// The built entries package.json `exports` serves. `adapter-utils` is here,
+// not below, because its selector reads the engine's `scopes` (api/plugins.ts):
+// built on its own it would carry a second, empty copy of that WeakMap.
 const entry = {
   index: "src/index.ts",
   internals: "src/internals.ts",
   plugins: "src/plugins/index.ts",
   testing: "src/utils/testing.ts",
+  "adapter-utils": "src/adapter-utils.ts",
 };
 
-// 1.35's other three entries, which 2.0 has not built: 1.35's export names,
-// each function throwing `featureMissing` (src/api/missing.ts). Built on their
-// own so the four entries above split into the same chunks as before and
-// their ESM output does not change (slice P3-F5).
+// The entries that share no state with the engine, built on their own so the
+// entries above keep their chunks (slice P3-F5). `migration` is built (L13b)
+// and imports nothing; `worker` is still 1.35's export names, each function
+// throwing `featureMissing` (src/api/missing.ts).
 const stubEntry = {
   worker: "src/worker.ts",
   migration: "src/migration.ts",
-  "adapter-utils": "src/adapter-utils.ts",
 };
 
 const shared: Options = {
