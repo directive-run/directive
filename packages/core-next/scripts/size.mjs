@@ -343,9 +343,26 @@ const engines = {
   "core-next": {
     entry: new URL("../src/index.ts", import.meta.url).pathname,
     mangleProps: /_$/,
+    // The other six entries, for the all-in fixture (B2 of the L13 RFC).
+    subpaths: {
+      plugins: "../src/plugins/index.ts",
+      testing: "../src/utils/testing.ts",
+      "adapter-utils": "../src/adapter-utils.ts",
+      worker: "../src/worker.ts",
+      migration: "../src/migration.ts",
+      internals: "../src/internals.ts",
+    },
   },
   "core 1.35": {
     entry: new URL("../../core/src/index.ts", import.meta.url).pathname,
+    subpaths: {
+      plugins: "../../core/src/plugins/index.ts",
+      testing: "../../core/src/utils/testing.ts",
+      "adapter-utils": "../../core/src/adapter-utils.ts",
+      worker: "../../core/src/adapters/worker.ts",
+      migration: "../../core/src/utils/migration.ts",
+      internals: "../../core/src/internals.ts",
+    },
   },
 };
 // The same transform tsup.config.ts does (keep in step): esbuild does not fold
@@ -506,7 +523,15 @@ async function measure(label, contents, resolveDir, engine, extra = []) {
     logLevel: "silent",
     conditions: ["production"],
     define: { "process.env.NODE_ENV": '"production"' },
-    alias: { "@directive-run/core": engine.entry },
+    alias: {
+      "@directive-run/core": engine.entry,
+      ...Object.fromEntries(
+        Object.entries(engine.subpaths ?? {}).map(([name, file]) => [
+          `@directive-run/core/${name}`,
+          new URL(file, import.meta.url).pathname,
+        ]),
+      ),
+    },
     // Both engines get the `#is-development` inlining, so each is measured
     // as its own production build ships (packages/core/tsup.config.ts does
     // the same transform, with the flag written as `false`). Without it,
@@ -690,6 +715,20 @@ const fullEntry = await measure(
 );
 console.log(`core-next full entry (every export): ${fullEntry.text}`);
 checkBudget("full-entry", "core-next full entry (every export)", fullEntry.gz);
+// The all-in (B2 of the L13 RFC): one bundle of the seven entries on both
+// engines, so shared code is counted once (separately gzipped pieces
+// double-count). A ceiling, not a price: no app imports every entry. Reported;
+// core-next's is budgeted from L13a (see its entry in size-budgets.next.json).
+const allIn = readFileSync(join(fixtures, "all-in.ts"), "utf8");
+for (const [name, engine] of Object.entries(engines)) {
+  const m = await measure("all-in", allIn, fixtures, engine);
+  console.log(
+    `fixture all-in (seven entries, one bundle) on ${name}: ${m.text}`,
+  );
+  if (name === "core-next") {
+    checkBudget("all-in", "fixture all-in on core-next", m.gz);
+  }
+}
 // A budget for something this script no longer measures would never fire.
 const unmeasured = Object.keys(budgets).filter((key) => !budgeted.has(key));
 if (unmeasured.length > 0) {
