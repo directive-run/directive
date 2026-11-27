@@ -106,7 +106,7 @@ const NEEDLE_MIN = 20;
 // gate was removed) or been deleted; `--check` also fails when it finds more,
 // so the count rises with the dev text and a later removal is caught. Set it to
 // the count the guard prints, in the commit that adds or deletes dev text.
-const DEV_STRINGS_MIN = 181;
+const DEV_STRINGS_MIN = 182;
 const RUN_SPLIT = /[^\x20-\x7e]|["'`\\]/;
 const sourcesIn = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -411,9 +411,10 @@ const inlineIsDevelopment = {
 // strings, so an under-derived list fails loudly.
 // The /testing entry is in it too: since L12d no /plugins stub throws
 // featureMissing, and /testing's stubs are the ones that still do, so
-// missing.ts's development text is reached only from there.
+// missing.ts's development text is reached only from there. /adapter-utils
+// is in it since L13b: `assertSystem` throws in development only (AU3).
 const entryContents =
-  'export * as a from "./index.ts"; export * as b from "./internals.ts"; export * as c from "./plugins/index.ts"; export * as d from "./utils/testing.ts";';
+  'export * as a from "./index.ts"; export * as b from "./internals.ts"; export * as c from "./plugins/index.ts"; export * as d from "./utils/testing.ts"; export * as e from "./adapter-utils.ts";';
 const bundleEntry = async (nodeEnv) =>
   Buffer.from(
     (
