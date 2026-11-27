@@ -57,6 +57,7 @@
     "dev": "tsup --watch",
     "test": "cd ../.. && vitest run packages/svelte/",
     "typecheck": "tsc --noEmit",
+    "typecheck:v2": "tsc --noEmit -p tsconfig.v2.json",
     "clean": "rm -rf dist"
   },
   "peerDependencies": {

@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@directive-run/core": ["./packages/core-next/dist/index.d.ts"],
+      "@directive-run/core/internals": [
+        "./packages/core-next/dist/internals.d.ts"
+      ],
+      "@directive-run/core/plugins": ["./packages/core-next/dist/plugins.d.ts"],
+      "@directive-run/core/testing": ["./packages/core-next/dist/testing.d.ts"],
+      "@directive-run/core/migration": [
+        "./packages/core-next/dist/migration.d.ts"
+      ],
+      "@directive-run/core/adapter-utils": [
+        "./packages/core-next/dist/adapter-utils.d.ts"
+      ],
+      "@directive-run/core/worker": ["./packages/core-next/dist/worker.d.ts"]
+    }
+  }
+}
