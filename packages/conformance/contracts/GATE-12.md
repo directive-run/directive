@@ -847,9 +847,11 @@ needs its own narrow entry and probe in a follow-up slice. Traces:
 Survived or NoCoverage there; run 3's six "L12 gate mutation pins" (the
 full unknown-key warnings, "(none)", exclusions in a snapshot and a watch,
 metadata) kill them in a local Stryker run at ceiling L12
-(`mutate:file engine.ts:4135-4260`). None is left. **CI confirmation of
-the 18 is pending**: a gate=L12 mutation run on this branch, which the
-coordinator dispatches after pushing.
+(`mutate:file engine.ts:4135-4260`). None is left. **CI confirms the 18**: the gate=L12 mutation run
+46051610259 on this branch (at 3a1ba664) passes all 12 shards and the
+layer-gate score step ("every later-layer and feature-layer entry at or
+below L12 is killed by the tests at or below L12"). The one later commit
+(7267278a) changes only the diff harness and its self-tests.
 
 ## Results (run 3)
 
@@ -1024,7 +1026,6 @@ PR seed 15 by quirk b's batch-pairing entries.
 
 - Seed 17 is on the nightly report list (the owner's 2026-11-27 answer). Running it on the nightly schedule needs a change to `.github/workflows/diff-fuzz-nightly.yml` (a second job, or a matrix, that runs `DIFF_FUZZ_SEED=17` at the PR count in report mode); this PR touches no workflow, so the coordinator makes it. Until then seed 17 is run by hand in report mode at each gate.
 - `pr17l`, seed 17's twelfth case: row (ay)'s knock-on where 1.35's snapshot after a paused goTo drops a forward snapshot. Covering it would widen `l12-fuzz-ay-external-history-changed-snapshots` to a replaced snapshot, an owner call; not needed for the gate.
-- A gate=L12 mutation run on this branch to confirm the 18 entries killed only locally (the coordinator dispatches it after pushing).
 - Deep seeds 1, 2 and 24301 in full once seed 17 is decided.
 - The reported batched cases of run 4's deep seeds, one line each (run-5 replays, `$G/r5/replay/cases-*`; none has an entry in this PR):
   - 1/1, 2/2, 24301/1, 24301/4: completion and met records on the other side of a reconcile pass in a `settle` step (the same records, extra and missing). Row (as), as 24301/1 above; needs its entry and probe.
