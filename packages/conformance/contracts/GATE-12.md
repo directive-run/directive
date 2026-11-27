@@ -1035,11 +1035,11 @@ PR seed 15 by quirk b's batch-pairing entries.
   - 1/2: one batch `start` changed after quirk g's stop (`l7-fuzz-g-after-*`). Untriaged.
   - 1/3: 9 changes in history steps after quirk h's stop. Untriaged.
   - 1/4: batch `start` and `wrote` changed in an `advance` step after quirk b's batch stop. Untriaged.
-  - 1/5: three reconcile passes missing on 2.0 after quirk g's stop. Untriaged.
+  - 1/5: four pass records (`onReconcileStart`, `reconcile.start`, `onReconcileEnd`, `reconcile.end`) missing on 2.0 in each of steps 15 to 17, before quirk g's stop at step 18. Triaged in the L12 principal review (2026-11-27): row (av)'s knock-on, not a 2.0 bug. A `replay` leaves 1.35's batch queue holding items it then queues a second time, and 1.35 schedules one more empty pass while its queue is non-empty; 2.0 holds a requirement once. No signed entry has this shape (the `l8-fuzz-av-nav-*` entries need `batchMaxSize` and cover only the external `start`); needs its entry and probe. At step 18 1.35 also runs the batch for the orphaned items, which quirk g's entry ends today; check that row too.
   - 2/1: two fallback `start` changes after quirk p's stop. Untriaged.
-  - 2/4 (up to L12): one batch `start` missing and three `onReconcileEnd` changes in a `settle` step. Untriaged.
+  - 2/4 (up to L12): triaged in the L12 principal review (2026-11-27): row (ap), the same batch `start` 1 ms earlier on 2.0, not a missing start. Needs its entry and probe.
   - 2/5 (data forms): one `onResolverRetry` extra and one missing in a `settle` step. Untriaged.
-  - 2/7 (plugins, with a fact-including watch): 11 changes in a `ledger` step's record. Untriaged; (az)'s or (bx)'s ledger echo is the first thing to check.
+  - 2/7 (plugins, with a fact-including watch): 11 changes in a `ledger` step's record (2 `ts`, 9 `prevHash`). Triaged in the L12 principal review (2026-11-27): row (as)'s knock-on, not a 2.0 bug and not an (az) or (bx) echo. 2.0's `settle()` is still waiting for batch call 1, so the next call starts one window earlier than on 1.35, whose `settle()` had resolved; the ledger stamps the completions 5 ms apart. The queue rule is the same on both engines. No signed entry has this shape; needs its entry and probe.
   - 24301/3: one batch `wrote` missing after quirk g's stop. Untriaged.
   - 24301/5 (up to L12): one `onReconcileEnd` extra and one missing after quirk a's stop. Untriaged.
 - `/principal` on L12 (the RFC's gate row).
