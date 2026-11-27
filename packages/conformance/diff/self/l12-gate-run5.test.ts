@@ -3330,12 +3330,14 @@ describe("row (ay)'s knock-on in the history record: ids, index and length diffe
     // Another navigation under the pause: the snapshot is row (ay)'s, the record is not covered.
     const back = pair(PR17K, {}, { nav: "back" });
     expect(left(back.v1, back.v2, ON).sort()).toEqual([IDS, INDEX, LENGTH]);
-    // A goTo with no pause set before it.
+    // A goTo with no pause set before it: no pause is kept, so the snapshot
+    // fails too (`pauseKept`; diff/self/l12-review-resume.test.ts).
     const unpaused = pair(PR17K, {}, { first: "resume" });
     expect(left(unpaused.v1, unpaused.v2, ON).sort()).toEqual([
       IDS,
       INDEX,
       LENGTH,
+      "missing hook onSnapshot 3",
     ]);
     // A case without the row's trigger: the snapshot fails too.
     const bare = pair(PR17K);

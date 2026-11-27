@@ -547,7 +547,20 @@
       "L12 gate mutation pins (development) > U4: excludeDerivations leaves those derivations out, with or without an include list": "L12",
       "L12 gate mutation pins (development) > U4: metadata is carried as given": "L12",
       "L12 gate mutation pins (development) > a watch with no include list watches every derivation, less its exclusions": "L12",
-      "L12 gate mutation pins (development) > a watch whose exclusions remove every derivation warns and never calls": "L12"
+      "L12 gate mutation pins (development) > a watch whose exclusions remove every derivation warns and never calls": "L12",
+      "L12 review pins: a signature is checked whole (development) > a wrong, missing or differently cased algorithm does not verify": "L12",
+      "L12 review pins: a signature is checked whole (development) > a signature right only in its first 8 hex characters does not verify": "L12",
+      "L12 review pins: a signature is checked whole (development) > a signature of the wrong length does not verify, though every character it has is right": "L12",
+      "L12 review pins: the audit ledger's payload, field by field (development) > system.init, system.start and system.stop carry the kind alone": "L12",
+      "L12 review pins: the audit ledger's payload, field by field (development) > fact.change: key, prior, next and origin; no prior on a first write": "L12",
+      "L12 review pins: the audit ledger's payload, field by field (development) > constraint.evaluate: constraintId, active and a function when's source hash": "L12",
+      "L12 review pins: the audit ledger's payload, field by field (development) > resolver.complete: resolverId, requirementId and a duration": "L12",
+      "L12 review pins: the audit ledger's payload, field by field (development) > resolver.error: resolverId, requirementId and the error as a string": "L12",
+      "L12 review pins: the audit ledger's payload, field by field (development) > system.snapshot: snapshotId and trigger, and no facts": "L12",
+      "L12 review pins: the audit ledger's payload, field by field (development) > system.history.navigate: from and to": "L12",
+      "L12 review pins: the audit ledger's payload, field by field (development) > resolver.write.rejected: a rejection names the fact and both values, the summary the count dropped": "L12",
+      "L12 review pins: the audit ledger's payload, field by field (development) > the clobber-loop entries: every field of the event, and the overlap's verdict alone": "L12",
+      "L12 review pins: the audit ledger's payload, field by field (development) > source.attach, source.detach and source.error: the source, its module, and an error's phase and message": "L12"
     },
     "tests/core/l2-constraints-oracle-state.test.ts": {
       "a disabled constraint is not asked while it is waiting on another > is not asked when the constraint it follows finishes and the finishing write wakes a pass": "L2",
@@ -800,7 +813,9 @@
       "the members of system.history (U12) > takeSnapshot takes one snapshot now, with the trigger it is given": "L8",
       "the members of system.history (U12) > is null when history is not asked for": "L8",
       "pause() inside a changeset (U18) > records no range when the only write was paused, so goBack moves one snapshot": "L8",
-      "pause() inside a changeset (U18) > a later goBack from two snapshots past it still moves one snapshot, not to the changeset's start": "L8"
+      "pause() inside a changeset (U18) > a later goBack from two snapshots past it still moves one snapshot, not to the changeset's start": "L8",
+      "resume() after a navigation under a pause > clears the pause, and each later write takes a snapshot": "L8",
+      "resume() after a navigation under a pause > the same after goBack and goForward under the pause": "L8"
     },
     "tests/core/l9-meta-trace-gate-debt-oracle.test.ts": {
       "system.meta reads back each definition's authored meta (L9 gate debt) > as a frozen copy, for a module, a handler event, a patch event and each definition": "L9",

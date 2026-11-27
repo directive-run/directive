@@ -1538,6 +1538,9 @@ export function covers(
       (name === FUZZ_SCENARIO &&
         triggers !== undefined &&
         div.when.every((t) => triggers.includes(t)))) &&
+    (div.when?.includes(PAUSE_KEPT_TRIGGER) !== true ||
+      div.snapshotFollows === true ||
+      pauseKept(steps, engineStep(d))) &&
     (div.during === undefined ||
       (name === FUZZ_SCENARIO && steps?.get(engineStep(d)) === div.during)) &&
     div.stream === d.stream &&
@@ -1808,7 +1811,10 @@ export interface Ended {
  * an uncovered one still fails), whatever its stream, as is a changed one
  * with both records before the stop ("A pair with both halves before the
  * stop is still checked, so no difference from before the quirk is
- * hidden"). Only an `ends` entry stops, and only in a case
+ * hidden"). A row (ay) stop (its entry's `when` lists `navigatedPaused`)
+ * still compares a snapshot only 1.35 takes after a later `resume` step,
+ * until the next navigation (`resumedAfterStop`): the row keeps the pause
+ * "until resume()", no longer. Only an `ends` entry stops, and only in a case
  * with its `when` triggers; each engine is walked on its own, and a hand
  * scenario never stops: there `ends` is just an entry.
  */
@@ -1855,7 +1861,10 @@ export function explain(
 
     return undefined;
   };
-  const cuts = new Map<string, { at: Difference; id: string }>();
+  const cuts = new Map<
+    string,
+    { at: Difference; id: string; keptPause: boolean }
+  >();
   if (name === FUZZ_SCENARIO) {
     for (const d of differences) {
       const div = coverOf(d);
@@ -1865,7 +1874,11 @@ export function explain(
         (!cut ||
           comparePositions(latestPosition(d), latestPosition(cut.at)) < 0)
       ) {
-        cuts.set(d.engine, { at: d, id: div.id });
+        cuts.set(d.engine, {
+          at: d,
+          id: div.id,
+          keptPause: div.when?.includes(PAUSE_KEPT_TRIGGER) === true,
+        });
       }
     }
   }
@@ -1877,6 +1890,15 @@ export function explain(
 
     return (
       cut !== undefined &&
+      // A row (ay) stop does not drop a snapshot only 1.35 takes after a
+      // later `resume` (`resumedAfterStop`): it is matched like any other.
+      !(
+        cut.keptPause &&
+        d.op === "missing" &&
+        d.stream === "hook" &&
+        d.kind === "onSnapshot" &&
+        resumedAfterStop(steps, cut.at.step, d.step)
+      ) &&
       (isPastSharedPoint(d, cut.at) ||
         isPastStop(d, cut.at) ||
         straddlesStop(d, cut.at) ||
@@ -2104,6 +2126,98 @@ export function counterExplained(
   return net !== 0 && d.reference - d.candidate === net;
 }
 
+/** The trigger of row (ay)'s entries (diff/fuzz/model.ts `navigatedPaused`). */
+export const PAUSE_KEPT_TRIGGER = "navigatedPaused";
+
+/** The fuzz steps that restore a snapshot (model.ts `NAVIGATIONS`). */
+const NAVIGATION_OPS: ReadonlySet<string> = new Set([
+  "back",
+  "forward",
+  "goTo",
+  "replay",
+  "roundtrip",
+]);
+
+/**
+ * Whether row (ay)'s kept pause is in force at fuzz step `step`: a
+ * navigation step at or before it ran while a `pause` step's pause was
+ * set, and no `resume` step has run since, up to and including `step`
+ * itself. Row (ay) keeps the pause "until resume()", so its entries excuse
+ * nothing from the `resume` step on (the L12 principal review, 2026-11-27:
+ * a planted "resume() does not clear a navigation-restored pause" passed,
+ * since the trigger `navigatedPaused` reads the whole case). `covers`
+ * reads it for every entry whose `when` lists `navigatedPaused`, bar the
+ * history-record rule (`snapshotFollows`), whose record still shows the
+ * kept pause's missing snapshots after a resume and which counts only
+ * snapshots of steps where this holds (`historyFollows`). Without the
+ * case's steps nothing is excused.
+ */
+export function pauseKept(
+  steps: ReadonlyMap<number, string> | undefined,
+  step: number,
+): boolean {
+  if (steps === undefined) {
+    return false;
+  }
+  let paused = false;
+  let kept = false;
+  for (const [i, op] of [...steps].sort((a, b) => a[0] - b[0])) {
+    if (i > step) {
+      break;
+    }
+    if (op === "pause") {
+      paused = true;
+    } else if (op === "resume") {
+      paused = false;
+      kept = false;
+    } else if (paused && NAVIGATION_OPS.has(op)) {
+      kept = true;
+    }
+  }
+
+  return kept;
+}
+
+/**
+ * Whether a row (ay) stop (an `ends` entry whose `when` lists
+ * `navigatedPaused`, at fuzz step `stop`) no longer drops a snapshot that
+ * only 1.35 takes in step `step`: a `resume` step ran after the stop, at
+ * or before `step`, and no navigation, `destroy`, `twin` or `restore` step
+ * ran after the stop up to `step`. Until one of those the engines hold the
+ * same facts and, once resumed, neither is paused, so each write takes a
+ * snapshot on both: one that 2.0 lacks there is not row (ay)'s (the L12
+ * principal review, 2026-11-27). After a navigation the engines may stand
+ * on different snapshots (1.35 has one more), so the stop drops as before.
+ */
+export function resumedAfterStop(
+  steps: ReadonlyMap<number, string> | undefined,
+  stop: number,
+  step: number,
+): boolean {
+  let resumed = false;
+  for (const [i, op] of [...(steps ?? [])].sort((a, b) => a[0] - b[0])) {
+    if (i <= stop) {
+      continue;
+    }
+    if (i > step) {
+      break;
+    }
+    if (
+      NAVIGATION_OPS.has(op) ||
+      op === "destroy" ||
+      op === "twin" ||
+      op === "restore"
+    ) {
+      return false;
+    }
+    if (op === "resume") {
+      resumed = true;
+    }
+  }
+
+  return resumed;
+}
+
 /** The fields of a fuzz history record `historyFollows` reads. */
 function historyOf(
   record: Json | undefined,
@@ -2141,7 +2255,8 @@ function historyOf(
  * missing onSnapshot record on `d`'s engine, before the history record in
  * 1.35's trace, in a step after a goTo step that ran while a `pause`
  * step's pause was set (no `resume` since), that goTo after the last
- * `destroy` or `twin` step. The whole record must then be 1.35's less those
+ * `destroy` or `twin` step, and the snapshot's own step before any later
+ * `resume` (`pauseKept`). The whole record must then be 1.35's less those
  * snapshots, consistently: 1.35's `ids` without theirs, each later id
  * lowered by the counted ids below it, are the engine's `ids`; `length`
  * and `index` each differ by the number of them in 1.35's `ids`. An index
@@ -2204,6 +2319,7 @@ export function historyFollows(
       x.op === "missing" &&
       r?.hook === "onSnapshot" &&
       x.step > from &&
+      pauseKept(steps, x.step) &&
       x.at.reference !== undefined &&
       x.at.reference < atRef &&
       typeof id === "number" &&

@@ -754,7 +754,7 @@
   {
     "file": "src/core/__tests__/l12-plugins-pins-oracle.test.ts",
     "category": "black-box",
-    "cases": 29,
+    "cases": 42,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -1159,7 +1159,7 @@
   {
     "file": "src/core/__tests__/l8-history-pins-oracle.test.ts",
     "category": "black-box",
-    "cases": 24,
+    "cases": 26,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
