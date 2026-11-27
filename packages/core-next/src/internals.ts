@@ -4,7 +4,7 @@
  */
 
 // Only names 1.35's /internals exports (contracts/api-surface.json).
-export { createFactsProxy } from "./api/facts.js";
+export { createFactsProxy, safeStringify } from "./api/facts.js";
 export { createFacts, createFactsStore } from "./api/validate.js";
 export { createEffectsManager } from "./api/effects.js";
 export {
