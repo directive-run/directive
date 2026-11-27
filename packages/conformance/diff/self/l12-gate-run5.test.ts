@@ -32,6 +32,12 @@
 //   `PAIR.traceRunRecomputeInserted`);
 // - row (bx)'s unknown-key warning and the re-registered derivation (deep
 //   seed 2, `TEXT.distributableUnknownKeys`, `markStale`'s register rule).
+// - row (ay)'s knock-on in the history record (PR seed 17's eleventh case,
+//   `pr17k`; the owner's "Approve (ay) knock-on, keep going (Recommended)",
+//   2026-11-27): after a paused goTo, a history record's ids, index and
+//   length may differ only by the snapshots row (ay)'s entries explain as
+//   missing (`snapshotFollows`, `historyFollows`); any other history
+//   difference still fails.
 // Every (bx) entry applies only with a fact-including watch: the same
 // records without one still fail.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -48,6 +54,7 @@ import {
   counterOf,
   explain,
   fileMoves,
+  historyFollows,
   markAfterCancel,
   markAfterError,
   markAfterMet,
@@ -2883,6 +2890,343 @@ describe("the census validates counterFollows", () => {
       { scenario: "a hand scenario" },
     ]) {
       expect(withEntry(over)).toMatch(/counterFollows must be true/);
+    }
+  });
+});
+
+describe("row (ay)'s knock-on in the history record: ids, index and length differ only by the snapshots (ay) excuses (PR seed 17's eleventh case, pr17k)", () => {
+  const FOLLOWS = "l12-fuzz-ay-external-history-changed-snapshots";
+  const SNAPSHOT = "l8-fuzz-ay-hook-onSnapshot-missing-unannounced";
+  const ON = ["navigatedPaused"];
+  /** A fuzz step as the model records it: a history step is a labelled run. */
+  const opStep = (
+    i: number,
+    op: string,
+    records: TraceEntry[] = [],
+    after: TraceEntry[] = [],
+  ) =>
+    [
+      {
+        k: "step",
+        i,
+        step: ["pause", "resume", "goTo", "back"].includes(op)
+          ? { op: "run", label: JSON.stringify({ op }) }
+          : { op },
+      },
+      ...records,
+      { k: "async", i },
+      ...after,
+    ] as TraceEntry[];
+  const history = (h: Record<string, Json>) =>
+    ({
+      k: "external",
+      data: [
+        "history",
+        {
+          changes: 1,
+          ids: [1],
+          index: 0,
+          length: 1,
+          ordered: true,
+          paused: true,
+          ...h,
+        },
+      ],
+    }) as TraceEntry;
+  /** The snapshot 1.35's write takes after the goTo cleared the pause (pr17k's step 9). */
+  const snapshot = (id: number) =>
+    ({
+      k: "hook",
+      hook: "onSnapshot",
+      args: [
+        {
+          facts: {
+            "a::f0": 3,
+            "a::f1": 0,
+            "b::f0": 0,
+            "b::when": { $date: "1970-01-01T00:00:00.000Z" },
+          },
+          id,
+          trigger: "facts-changed:a::f0",
+          ordered: true,
+        },
+      ],
+    }) as TraceEntry;
+  /** pr17k's shape: pause, goTo, a write only 1.35 snapshots, then a history record. */
+  const pair = (
+    v1History: Record<string, Json>,
+    v2History: Record<string, Json> = {},
+    { nav = "goTo", first = "pause", v1Snapshot = true, snapshotId = 2 } = {},
+  ) => ({
+    v1: [
+      ...opStep(1, first, [history({})]),
+      ...opStep(2, nav),
+      ...opStep(3, "set", [], v1Snapshot ? [snapshot(snapshotId)] : []),
+      ...opStep(4, "pause", [history(v1History)]),
+    ],
+    v2: [
+      ...opStep(1, first, [history({})]),
+      ...opStep(2, nav),
+      ...opStep(3, "set"),
+      ...opStep(4, "pause", [history(v2History)]),
+    ],
+  });
+  const PR17K = { ids: [1, 2], index: 1, length: 2 };
+  const IDS = "changed external history 4 data[1].ids[1]";
+  const INDEX = "changed external history 4 data[1].index";
+  const LENGTH = "changed external history 4 data[1].length";
+  const usedBy = (v1: TraceEntry[], v2: TraceEntry[], triggers: string[]) =>
+    explain(
+      FUZZ_SCENARIO,
+      compareContract(v1, v2, "v2"),
+      ALL,
+      triggers,
+      stepOps(v1),
+    ).used;
+
+  it("the entry is signed on the owner's 2026-11-27 answer, in its narrowest form", () => {
+    const e = byId(FOLLOWS);
+    expect(e.snapshotFollows).toBe(true);
+    expect([e.scenario, e.stream, e.kind, e.engine, e.op, e.path]).toEqual([
+      FUZZ_SCENARIO,
+      "external",
+      "history",
+      "v2",
+      "changed",
+      "data[1]",
+    ]);
+    expect(e.when).toEqual(["navigatedPaused"]);
+    expect(e.group).toBe("row-ay");
+    expect(e.excuses).toBeUndefined();
+    expect(e.requires).toBeUndefined();
+    expect(e.bound).toBeUndefined();
+    expect(e.ends).toBeUndefined();
+    expect(e.reason).toContain("Signed on the owner's instruction");
+    expect(e.reason).toContain(
+      '"Approve (ay) knock-on, keep going (Recommended)" (2026-11-27)',
+    );
+    expect(e.reason).toContain(
+      '"Approve all as recommended (Recommended)", 2026-11-10',
+    );
+    expect(e.date).toBe("2026-11-27");
+    expect(
+      ALL.filter((x) => x.snapshotFollows === true).map((x) => x.id),
+    ).toEqual([FOLLOWS]);
+  });
+
+  it("control: pr17k's shape is explained, the record by the snapshot (ay) excuses", () => {
+    const { v1, v2 } = pair(PR17K);
+    expect(left(v1, v2, ON)).toEqual([]);
+    expect(usedBy(v1, v2, ON).sort()).toEqual([FOLLOWS, SNAPSHOT].sort());
+  });
+
+  it("an index or length off by more still fails, with the whole record", () => {
+    for (const over of [{ index: 2 }, { length: 3 }, { length: 1 }]) {
+      const { v1, v2 } = pair({ ...PR17K, ...over });
+      expect(left(v1, v2, ON).sort()).toEqual(
+        [IDS, INDEX, LENGTH].filter(
+          (x) => !(x === LENGTH && over.length === 1),
+        ),
+      );
+    }
+    // An index that does not move with the snapshot: off by less.
+    const less = pair({ ...PR17K, index: 0 });
+    expect(left(less.v1, less.v2, ON).sort()).toEqual([IDS, LENGTH]);
+    // The engine's side off instead: its length does not follow its ids.
+    const engine = pair(PR17K, { length: 0 });
+    expect(left(engine.v1, engine.v2, ON).sort()).toEqual([IDS, INDEX, LENGTH]);
+  });
+
+  it("an id difference the missing snapshot does not explain still fails", () => {
+    // 1.35 lists another id than the snapshot (ay) excuses (id 2).
+    const other = pair({ ids: [1, 3], index: 1, length: 2 });
+    expect(left(other.v1, other.v2, ON).sort()).toEqual([IDS, INDEX, LENGTH]);
+    // One more id than the excused snapshot.
+    const more = pair({ ids: [1, 2, 3], index: 2, length: 3 });
+    expect(left(more.v1, more.v2, ON).sort()).toEqual([
+      IDS,
+      "changed external history 4 data[1].ids[2]",
+      INDEX,
+      LENGTH,
+    ]);
+    // The engine's own ids differ as well.
+    const engine = pair(PR17K, { ids: [7] });
+    expect(left(engine.v1, engine.v2, ON).sort()).toEqual([
+      "changed external history 4 data[1].ids[0]",
+      IDS,
+      INDEX,
+      LENGTH,
+    ]);
+    // No snapshot behind the difference at all.
+    const none = pair(PR17K, {}, { v1Snapshot: false });
+    expect(left(none.v1, none.v2, ON).sort()).toEqual([IDS, INDEX, LENGTH]);
+  });
+
+  it("the same with no paused goTo still fails", () => {
+    // Another navigation under the pause: the snapshot is row (ay)'s, the record is not covered.
+    const back = pair(PR17K, {}, { nav: "back" });
+    expect(left(back.v1, back.v2, ON).sort()).toEqual([IDS, INDEX, LENGTH]);
+    // A goTo with no pause set before it.
+    const unpaused = pair(PR17K, {}, { first: "resume" });
+    expect(left(unpaused.v1, unpaused.v2, ON).sort()).toEqual([
+      IDS,
+      INDEX,
+      LENGTH,
+    ]);
+    // A case without the row's trigger: the snapshot fails too.
+    const bare = pair(PR17K);
+    expect(left(bare.v1, bare.v2, []).sort()).toEqual([
+      IDS,
+      INDEX,
+      LENGTH,
+      "missing hook onSnapshot 3",
+    ]);
+  });
+
+  it("any other history field still fails", () => {
+    // 1.35 paused and 2.0 not: the reverse of row (ay)'s own paused entry.
+    const paused = pair(PR17K, { paused: false });
+    expect(left(paused.v1, paused.v2, ON)).toEqual([
+      "changed external history 4 data[1].paused",
+    ]);
+    for (const [field, value] of [
+      ["ordered", false],
+      ["changes", 2],
+    ] as const) {
+      const { v1, v2 } = pair({ ...PR17K, [field]: value });
+      expect(left(v1, v2, ON)).toEqual([
+        `changed external history 4 data[1].${field}`,
+      ]);
+    }
+  });
+
+  it("historyFollows: later ids shift by the excused snapshot; a resume, destroy or twin ends the rule", () => {
+    const record = (h: Record<string, Json>) =>
+      ({ k: "external", data: ["history", h] }) as unknown as Json;
+    const d = (
+      path: string,
+      v1: Record<string, Json>,
+      v2: Record<string, Json>,
+    ) =>
+      ({
+        engine: "v2",
+        stream: "external",
+        kind: "history",
+        step: 6,
+        phase: "sync",
+        op: "changed",
+        path,
+        record: record(v1),
+        candidateRecord: record(v2),
+        at: { reference: 50, candidate: 48 },
+        where: {},
+      }) as unknown as Difference;
+    const missing = {
+      engine: "v2",
+      stream: "hook",
+      kind: "onSnapshot",
+      step: 3,
+      phase: "async",
+      op: "missing",
+      reference: snapshot(2) as unknown as Json,
+      at: { reference: 20 },
+      where: {},
+    } as unknown as Difference;
+    const steps = (ops: string[]) => new Map(ops.map((op, i) => [i + 1, op]));
+    const OPS = ["pause", "goTo", "set", "resume", "set", "pause"];
+    const v1 = { ids: [1, 2, 3], index: 2, length: 3 };
+    const v2 = { ids: [1, 2], index: 1, length: 2 };
+    for (const path of ["data[1].ids[2]", "data[1].index", "data[1].length"]) {
+      expect(historyFollows(d(path, v1, v2), [missing], steps(OPS))).toBe(true);
+    }
+    const ids = d("data[1].ids[2]", v1, v2);
+    // Not shifted: 2.0's later id is not 1.35's less the excused one.
+    expect(
+      historyFollows(
+        d("data[1].ids[1]", v1, { ...v2, ids: [1, 3] }),
+        [missing],
+        steps(OPS),
+      ),
+    ).toBe(false);
+    // Any other path of the record.
+    expect(
+      historyFollows(d("data[1].paused", v1, v2), [missing], steps(OPS)),
+    ).toBe(false);
+    // No explained snapshot; one after the record; an extra, not a missing one.
+    expect(historyFollows(ids, [], steps(OPS))).toBe(false);
+    expect(
+      historyFollows(
+        ids,
+        [{ ...missing, at: { reference: 60 } } as Difference],
+        steps(OPS),
+      ),
+    ).toBe(false);
+    expect(
+      historyFollows(
+        ids,
+        [{ ...missing, op: "extra" } as Difference],
+        steps(OPS),
+      ),
+    ).toBe(false);
+    // The snapshot before the paused goTo; the goTo after a resume; a destroy or twin since.
+    expect(
+      historyFollows(
+        ids,
+        [missing],
+        steps(["pause", "set", "set", "goTo", "set", "pause"]),
+      ),
+    ).toBe(false);
+    expect(
+      historyFollows(
+        ids,
+        [missing],
+        steps(["pause", "resume", "goTo", "set", "set", "pause"]),
+      ),
+    ).toBe(false);
+    for (const op of ["destroy", "twin"]) {
+      expect(
+        historyFollows(
+          ids,
+          [{ ...missing, step: 4 } as Difference],
+          steps(["pause", "goTo", "set", "set", op, "pause"]),
+        ),
+      ).toBe(false);
+    }
+    expect(historyFollows(ids, [missing], undefined)).toBe(false);
+  });
+});
+
+describe("the census validates snapshotFollows", () => {
+  const root = mkdtempSync(join(tmpdir(), "conformance-run5-history-"));
+  mkdirSync(join(root, "diff"), { recursive: true });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  const entry = () => byId("l12-fuzz-ay-external-history-changed-snapshots");
+  const withEntry = (over: object) => {
+    writeFileSync(
+      join(root, "diff/divergences.json"),
+      JSON.stringify([{ ...entry(), ...over }]),
+    );
+
+    return checkDivergences(root, new Set([entry().id])).join("\n");
+  };
+
+  it("accepts the entry as signed, and rejects any other shape", () => {
+    expect(withEntry({})).toBe("");
+    expect(checkExcuses(root, null)).toEqual([]);
+    for (const over of [
+      { snapshotFollows: false },
+      { op: "missing" },
+      { stream: "hook" },
+      { kind: "performance" },
+      { path: "data[1].ids" },
+      { group: "row-az" },
+      { when: ["replayedOrImported"] },
+      { when: undefined },
+      { bound: { match: [] } },
+      { ends: true },
+      { scenario: "a hand scenario" },
+    ]) {
+      expect(withEntry(over)).toMatch(/snapshotFollows must be true/);
     }
   });
 });

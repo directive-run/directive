@@ -5433,5 +5433,226 @@
         "inserted": []
       }
     }
+  },
+  {
+    "group": "row-ay-history-record",
+    "why": "PR seed 17 at L12, its eleventh case in run 5 of the L12 gate (diff-notes l12gate/r5/specs/pr17k): after a pause and a goTo 2.0 keeps the history paused, so step 9's write takes no snapshot (row (ay), l8-fuzz-ay-hook-onSnapshot-missing-unannounced), and step 10's history record has ids [1, 2], index 1 and length 2 on 1.35 against ids [1], index 0 and length 1 on 2.0. The history-record entry (l12-fuzz-ay-external-history-changed-snapshots, signed on the owner's instruction, 2026-11-27) explains those three fields by that approved missing snapshot. Pinned so the entry stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [1],
+              "derived": [],
+              "threshold": null,
+              "throwsAt": 7
+            },
+            {
+              "facts": [0, 1],
+              "derived": [],
+              "threshold": 0,
+              "throwsAt": 8
+            },
+            {
+              "facts": [0, 1],
+              "derived": [0],
+              "threshold": null,
+              "throwsAt": 5
+            }
+          ],
+          "events": [
+            {
+              "target": 1,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 1,
+              "atLeast": 4,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 1,
+              "value": -2,
+              "delay": 0,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 50
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": true,
+              "cleanup": false,
+              "throwsAt": 3
+            },
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": 3
+            }
+          ],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 4,
+              "crossAtLeast": 3,
+              "priority": 1,
+              "writes": 0,
+              "value": 0,
+              "delay": 20,
+              "fails": 1,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": 3,
+              "onNavigate": "skip"
+            },
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": 3
+            }
+          ],
+          "source": {
+            "gated": true
+          },
+          "snapshotEvents": []
+        }
+      ],
+      "boundary": "retry-later",
+      "history": true,
+      "trace": true,
+      "steps": [
+        {
+          "op": "roundtrip"
+        },
+        {
+          "op": "pause"
+        },
+        {
+          "op": "goTo",
+          "position": 0
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "publish",
+          "event": "unknown",
+          "value": 4
+        },
+        {
+          "op": "advance",
+          "ms": 25
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1488228114,
+          "value": 3
+        },
+        {
+          "op": "pause"
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1607700606,
+          "value": 0
+        },
+        {
+          "op": "publish",
+          "event": "own",
+          "value": -2
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[1900789376, 1]]
+        },
+        {
+          "op": "advance",
+          "ms": 1
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 502221525,
+          "value": -1
+        },
+        {
+          "op": "restore"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 2,
+            "atLeast": 2,
+            "items": 1,
+            "abortOn": true
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": 2,
+        "delay": 1,
+        "fails": 1,
+        "retry": 0,
+        "timeout": null,
+        "writes": 2,
+        "value": 2
+      },
+      "maxSnapshots": 3,
+      "respectsAbort": false,
+      "maxRuns": 1,
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": false,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
   }
 ]

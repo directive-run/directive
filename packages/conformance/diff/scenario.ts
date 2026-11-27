@@ -634,6 +634,18 @@ export interface Divergence {
    * lacks. `explain` reads it in a second pass, after every other entry.
    */
   counterFollows?: true;
+  /**
+   * Fuzz only, op `changed`, stream `external`, kind `history` (L12 gate
+   * run 5, row (ay)'s knock-on in the history record; the owner's "Approve
+   * (ay) knock-on, keep going (Recommended)", 2026-11-27): the entry covers
+   * a history record's `ids`, `index` and `length` only where the
+   * snapshots row (ay)'s own entries already explain as missing on the
+   * engine, after a paused goTo in the same case, account for all three
+   * exactly (`historyFollows`). The explained records are those of the
+   * entries of this entry's `group`. `explain` reads it in a second pass,
+   * after every other entry.
+   */
+  snapshotFollows?: true;
   reason: string;
   approvedBy: string;
   date: string;
@@ -1513,6 +1525,10 @@ export function covers(
       (name === FUZZ_SCENARIO &&
         explained !== undefined &&
         counterExplained(d, explained, steps))) &&
+    (div.snapshotFollows !== true ||
+      (name === FUZZ_SCENARIO &&
+        explained !== undefined &&
+        historyFollows(d, explained, steps))) &&
     (div.when === undefined ||
       (name === FUZZ_SCENARIO &&
         triggers !== undefined &&
@@ -1881,15 +1897,28 @@ export function explain(
   // The plugin-counter rule (`Divergence.counterFollows`): a counter is
   // read against the records the first pass explained, never the other
   // way round, so no counter entry excuses a record.
-  const explainedRecords = covered.map((c) => c.difference);
+  // The history-record rule (`Divergence.snapshotFollows`) is read the
+  // same way, against the first pass's records of its own group's entries
+  // only (row (ay)'s missing snapshots).
+  const firstCovered = [...covered];
+  const explainedRecords = firstCovered.map((c) => c.difference);
+  const groupOf = new Map(divergences.map((x) => [x.id, x.group]));
+  const explainedBy = (x: Divergence) =>
+    x.snapshotFollows === true
+      ? firstCovered
+          .filter((c) => x.group !== undefined && groupOf.get(c.id) === x.group)
+          .map((c) => c.difference)
+      : explainedRecords;
   const unexplained =
     name === FUZZ_SCENARIO &&
     firstPass.length > 0 &&
-    divergences.some((x) => x.counterFollows === true)
+    divergences.some(
+      (x) => x.counterFollows === true || x.snapshotFollows === true,
+    )
       ? firstPass.filter((d) => {
           const div = divergences.find(
             (x) =>
-              x.counterFollows === true &&
+              (x.counterFollows === true || x.snapshotFollows === true) &&
               covers(
                 x,
                 name,
@@ -1898,7 +1927,7 @@ export function explain(
                 steps,
                 differences,
                 divergences,
-                explainedRecords,
+                explainedBy(x),
               ),
           );
           if (div) {
@@ -2067,6 +2096,129 @@ export function counterExplained(
   const net = reference - candidate;
 
   return net !== 0 && d.reference - d.candidate === net;
+}
+
+/** The fields of a fuzz history record `historyFollows` reads. */
+function historyOf(
+  record: Json | undefined,
+): { ids: number[]; index: number; length: number } | undefined {
+  const h = (record as { data?: Json[] } | undefined)?.data?.[1] as
+    | Record<string, Json>
+    | null
+    | undefined;
+  if (h === null || typeof h !== "object") {
+    return undefined;
+  }
+  const { ids, index, length } = h;
+  if (
+    !Array.isArray(ids) ||
+    !ids.every((id) => Number.isInteger(id)) ||
+    !Number.isInteger(index) ||
+    !Number.isInteger(length)
+  ) {
+    return undefined;
+  }
+
+  return {
+    ids: ids as number[],
+    index: index as number,
+    length: length as number,
+  };
+}
+
+/**
+ * Whether the snapshots already explained as missing on the engine
+ * (`explained`: the differences row (ay)'s entries covered) account
+ * exactly for the difference `d` of a history record's `ids`, `index` or
+ * `length` (`Divergence.snapshotFollows`; the owner's "Approve (ay)
+ * knock-on, keep going (Recommended)", 2026-11-27). Counted: each explained
+ * missing onSnapshot record on `d`'s engine, before the history record in
+ * 1.35's trace, in a step after a goTo step that ran while a `pause`
+ * step's pause was set (no `resume` since), that goTo after the last
+ * `destroy` or `twin` step. The whole record must then be 1.35's less those
+ * snapshots, consistently: 1.35's `ids` without theirs, each later id
+ * lowered by the counted ids below it, are the engine's `ids`; `length`
+ * and `index` each differ by the number of them in 1.35's `ids`. An index
+ * or length off by more or less, an id the counted snapshots do not
+ * explain, a case with no paused goTo, and any other field of the record
+ * are not excused.
+ */
+export function historyFollows(
+  d: Difference,
+  explained: readonly Difference[],
+  steps?: ReadonlyMap<number, string>,
+): boolean {
+  const atRef = d.at.reference;
+  if (
+    d.stream !== "external" ||
+    d.kind !== "history" ||
+    d.op !== "changed" ||
+    typeof d.path !== "string" ||
+    !/^data\[1\]\.(ids(\[\d+\])?|index|length)$/.test(d.path) ||
+    atRef === undefined
+  ) {
+    return false;
+  }
+  const v1 = historyOf(d.record);
+  const v2 = historyOf(d.candidateRecord);
+  if (v1 === undefined || v2 === undefined) {
+    return false;
+  }
+  // The first goTo under a pause, after the last destroy or twin step.
+  let paused = false;
+  let from: number | undefined;
+  for (const [i, op] of [...(steps ?? new Map<number, string>())].sort(
+    (a, b) => a[0] - b[0],
+  )) {
+    if (i >= d.step) {
+      break;
+    }
+    if (op === "destroy" || op === "twin") {
+      paused = false;
+      from = undefined;
+    } else if (op === "pause") {
+      paused = true;
+    } else if (op === "resume") {
+      paused = false;
+    } else if (op === "goTo" && paused && from === undefined) {
+      from = i;
+    }
+  }
+  if (from === undefined) {
+    return false;
+  }
+  const skipped = new Set<number>();
+  for (const x of explained) {
+    const r = x.reference as { hook?: Json; args?: Json[] } | undefined;
+    const id = (r?.args?.[0] as { id?: Json } | null | undefined)?.id;
+    if (
+      x.engine === d.engine &&
+      x.stream === "hook" &&
+      x.kind === "onSnapshot" &&
+      x.op === "missing" &&
+      r?.hook === "onSnapshot" &&
+      x.step > from &&
+      x.at.reference !== undefined &&
+      x.at.reference < atRef &&
+      typeof id === "number" &&
+      Number.isInteger(id)
+    ) {
+      skipped.add(id);
+    }
+  }
+  const gone = v1.ids.filter((id) => skipped.has(id));
+  if (gone.length === 0) {
+    return false;
+  }
+  const rest = v1.ids
+    .filter((id) => !skipped.has(id))
+    .map((id) => id - [...skipped].filter((s) => s < id).length);
+
+  return (
+    JSON.stringify(rest) === JSON.stringify(v2.ids) &&
+    v1.length - v2.length === gone.length &&
+    v1.index - v2.index === gone.length
+  );
 }
 
 /**

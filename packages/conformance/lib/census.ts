@@ -896,6 +896,7 @@ export interface DivergenceEntry {
   extraCancelOf?: unknown;
   mispairedBy?: unknown;
   counterFollows?: unknown;
+  snapshotFollows?: unknown;
   afterOp?: unknown;
   repeats?: unknown;
   reason: string;
@@ -936,6 +937,7 @@ const DIVERGENCE_OPTIONAL = [
   "repeats",
   "requires",
   "same",
+  "snapshotFollows",
   "stale",
   "step",
   "when",
@@ -1359,6 +1361,26 @@ export function checkDivergences(
       );
     }
     if (
+      e.snapshotFollows !== undefined &&
+      (e.snapshotFollows !== true ||
+        e.scenario !== FUZZ_SCENARIO ||
+        e.op !== "changed" ||
+        e.stream !== "external" ||
+        e.kind !== "history" ||
+        e.path !== "data[1]" ||
+        e.group !== "row-ay" ||
+        !Array.isArray(e.when) ||
+        !e.when.includes("navigatedPaused") ||
+        e.excuses !== undefined ||
+        e.requires !== undefined ||
+        e.bound !== undefined ||
+        e.ends !== undefined)
+    ) {
+      fail(
+        `${label} snapshotFollows must be true, on a fuzz entry of op "changed" on stream "external" of kind "history" at path "data[1]", in group "row-ay" with \`when\` navigatedPaused, with no excuses, requires, bound or ends: it covers a history record's ids, index and length only by the missing snapshots row (ay)'s entries explain`,
+      );
+    }
+    if (
       e.kind === "*" &&
       (e.stream !== "notify" ||
         e.scenario !== FUZZ_SCENARIO ||
@@ -1421,7 +1443,8 @@ export function checkDivergences(
  *   one) and `from` and/or `to`. No two excuses of an entry name the same
  *   record (one excuse, a higher count).
  * - A fuzz entry has a `bound` and no `excuses` (`checkBound`), except a
- *   plugin-counter entry (`counterFollows`), which has neither.
+ *   plugin-counter entry (`counterFollows`) or history-record entry
+ *   (`snapshotFollows`), which has neither.
  *
  * `uses` counts, per `<id>\t<index>`, the records each excuse excused in
  * the run (null when not known). Each excuse of an entry the run used must
@@ -1460,7 +1483,9 @@ export function checkExcuses(
       // A plugin-counter entry (`counterFollows`) is bounded by the
       // records other entries explain (`counterExplained`), and has no
       // bound of its own (checkDivergences rejects one).
-      if (e.counterFollows !== true) {
+      // The same for a history-record entry (`snapshotFollows`), bounded by
+      // row (ay)'s explained snapshots (`historyFollows`).
+      if (e.counterFollows !== true && e.snapshotFollows !== true) {
         for (const m of checkBound(e)) {
           fail(m);
         }

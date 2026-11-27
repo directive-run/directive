@@ -1,6 +1,6 @@
 # Phase 3 gate decisions: the L12 gate
 
-Date: 2026-11-21 to 2026-11-26. Jason approved the L12 plugins RFC
+Date: 2026-11-21 to 2026-11-27. Jason approved the L12 plugins RFC
 (`rfc-l12-plugins.md`) on 2026-11-15 with "I approve you for to do
 everything"; each row was taken as its "Option taken" says, and (bw) is
 declined. Row (az) is an L8 row: "Approve all as recommended
@@ -27,11 +27,21 @@ cancel on 1.35' exception, he answered: "Apply it to all row t cancels
 (Recommended)". Also on 2026-11-26 he answered "Any history move
 (Recommended)" on `pr17i`, and, asked whether plugin counters may differ
 when approved exceptions explain extra or missing records, "Counters
-follow approved records (Recommended)".
+follow approved records (Recommended)". On 2026-11-27, asked how to finish
+seed 17, he answered: "Approve (ay) knock-on, keep going (Recommended)".
+The option said: sign a narrow entry (after a paused goTo, the history
+record's snapshot ids, index and length may differ only by the snapshot
+(ay) excuses; self-tests: any other history difference still fails), rerun
+all 21 seeds, and if seed 17 finds a 12th case, the gate opens on 20 seeds
+and seed 17 moves to the nightly report list, unless that case is a real
+2.0 bug, which still blocks.
 Claude signs the entries for approved rows on his behalf (GATE-2.md, rule
 1). This record covers gate runs 1 to 5; any further run goes back to him.
-**Run 5 is not green: PR seed 17 still exits 1, on a ninth case. Every
-check exits 0 and the other 20 PR seeds exit 0 on the final tree. Seed 17's
+**Run 5 opens the gate on 20 PR seeds, on his 2026-11-27 answer: every
+check exits 0 and 20 of the 21 PR seeds exit 0 on the final tree. Seed 17
+exits 1 on a twelfth case, `pr17l`, a variant of row (ay)'s knock-on and
+not a 2.0 bug, so seed 17 moves to the nightly report list ("Seed 17: the
+nightly report list", below). Its history in run 5 follows. Seed 17's
 sixth case, `pr17f`, was a gap in a harness marker inside the shape his two
 2026-11-23 answers approve; run 5 closed it in the harness, with no new
 entry and no new owner decision ("Run 5, `pr17f`", below). Its seventh,
@@ -51,9 +61,11 @@ second-cancel entries (`afterOp` goTo) do not cover; it is closed on his
 closed on his "Counters follow approved records (Recommended)"
 (2026-11-26) by one shared plugin-counter rule ("Run 5, the owner's answer
 on `pr17j`"). Its ten cases replay with 0 unexplained. Its eleventh,
-`pr17k`, is a new stop (below): row (ay)'s missing snapshot after a paused
-`goTo` shows again in the history record's `ids`, `index` and `length`,
-which no entry names.**
+`pr17k`, row (ay)'s missing snapshot after a paused `goTo` shown again in
+the history record's `ids`, `index` and `length`, is closed on his
+"Approve (ay) knock-on, keep going (Recommended)" (2026-11-27) by one
+history-record entry ("Run 5, the owner's answer on `pr17k`"). Its eleven
+cases replay with 0 unexplained. Its twelfth, `pr17l`, is not signed.**
 
 ## What the L12 gate does
 
@@ -177,6 +189,7 @@ owner's answer on `pr17i`"). All 21 PR seeds then run on the next tree: 20 exit 
 | 5 | the same group, its mispaired form, the owner's 2026-11-24 answer | `l12-cand-t-batch-second-cancel-*-changed` (the same three records, where 1.35's further cancel is paired with 2.0's cancel of another requirement both engines cancel) and `l12-cand-t-batch-second-cancel-*-unpaired-missing` (1.35's own cancel of that other requirement, left unpaired) |
 | 5 | row t, the shared mispairing rule, the owner's 2026-11-26 answer, group `quirk-t-mispaired-cancel` | `l12-cand-t-mispaired-cancel-*-changed` (the same three records, where a cancel that any listed row t entry approves on 1.35 is paired with 2.0's cancel of another requirement both engines cancel) and `l12-cand-t-mispaired-cancel-*-unpaired-missing` (1.35's own cancel of that other requirement, left unpaired, only where the pair is excused) |
 | 5 | the shared plugin-counter rule, the owner's 2026-11-26 answer on `pr17j`, group `plugin-counter-follows` | `l12-plugin-counter-follows-performance-changed` (a performance counter, only by the net number of records other approved entries explain, of the hook it counts, for its key) |
+| 5 | row (ay)'s knock-on in the history record, the owner's 2026-11-27 answer on `pr17k`, group `row-ay` | `l12-fuzz-ay-external-history-changed-snapshots` (a history record's `ids`, `index` and `length`, only by the snapshots row (ay)'s entries explain as missing after a paused goTo) |
 | 5 | (bx) knock-on, group `row-bx`, `when` watchIncludesFacts | `l12-fuzz-bx-hook-onError-repaired-changed`, `...-onErrorRecovery-repaired-changed`; `l12-fuzz-bx-hook-onDerivationCompute-repaired-changed`, `...-observe-derivation-compute-repaired-changed`; `l12-fuzz-bx-hook-onTraceComplete-recompute-inserted`, `...-state-settle-trace-...`, `...-state-end-trace-...`; `l12-fuzz-bx-console-warn-distributable-unknown-keys-extra` |
 
 The new trigger `watchIncludesFacts` is a watch with `includeFacts`
@@ -615,6 +628,92 @@ counter off by more, or with no approved record behind it, still fail.
   the census rule. No earlier result changed.
 - Pinned: `pr17j` (group `plugin-counter-follows`).
 
+## Run 5, the owner's answer on `pr17k`: the history record follows (ay)'s snapshot
+
+Seed 17's eleventh case was `pr17k` (`$G/r5/specs/pr17k.json`; traces
+`$G/r5/replay/f10b-pr17k.v1.jsonl`, `.v2.jsonl`; 3 differences, no plugin).
+After `pause` and a `goTo`, 2.0 keeps the history paused, so step 9's write
+takes no snapshot (row (ay), `l8-fuzz-ay-hook-onSnapshot-missing-unannounced`).
+Step 10's history record then has `ids` [1, 2], `index` 1 and `length` 2 on
+1.35, against [1], 0 and 1 on 2.0 (`changes` is row (az)'s). Jason was
+asked how to finish seed 17. He answered: **"Approve (ay) knock-on, keep
+going (Recommended)"** (2026-11-27). The option said: sign a narrow entry:
+after a paused goTo, the history record's snapshot ids, index and length
+may differ only by the snapshot (ay) excuses; self-tests: any other history
+difference still fails; rerun all 21 seeds; if seed 17 finds a 12th case,
+the gate opens on 20 seeds and seed 17 moves to the nightly report list,
+unless that case is a real 2.0 bug, which still blocks.
+
+| Entry | Signed on | What it covers |
+| --- | --- | --- |
+| `l12-fuzz-ay-external-history-changed-snapshots`, group `row-ay`, `when` navigatedPaused | the 2026-11-27 answer, next to row (ay)'s and row (az)'s "Approve all as recommended (Recommended)" (2026-11-10) | a changed `external` history record (`path` `data[1]`, `snapshotFollows`), its `ids`, `index` and `length` only, and only where the missing snapshots row (ay)'s entries explain account for all three exactly |
+
+- Harness: `historyFollows` (diff/scenario.ts) counts the missing
+  onSnapshot records that entries of the entry's own group (`row-ay`)
+  explained on the same engine, before the history record in 1.35's trace,
+  in a step after a `goTo` step that ran while a `pause` step's pause was
+  set (no `resume` since), with no `destroy` or `twin` step since. 1.35's
+  `ids` without those snapshots' ids, each later id lowered by the counted
+  ids below it, must be 2.0's `ids`; `length` and `index` must each differ
+  by the number of them in 1.35's `ids`. `explain` reads the entry in its
+  second pass, with the counter rule, so it never excuses a record. The
+  census accepts `snapshotFollows` only as `true` on a fuzz `changed`
+  `external` `history` entry at `data[1]`, in group `row-ay`, with `when`
+  navigatedPaused and no excuses, requires, bound or ends. The comparison
+  (diff/compare.ts) is unchanged.
+- Self-tests (113 in `diff/self/l12-gate-run5.test.ts`, 8 new): `pr17k`'s
+  shape is explained; still failing: an index or length off by more or by
+  less (on either engine), an id the missing snapshot does not explain
+  (another id, one more id, 2.0's own ids off, no snapshot behind it), the
+  same with no paused goTo (a `back` under the pause, a goTo with no pause
+  set, a case without the trigger), any other history field (`paused`,
+  `ordered`, `changes`), a snapshot before the paused goTo or after the
+  record, a `resume`, `destroy` or `twin` in between; the census rule. No
+  earlier result changed.
+- Pinned: `pr17k` (group `row-ay-history-record`).
+
+## Seed 17: the nightly report list
+
+On the final tree PR seed 17 exits 1 on a twelfth case, `pr17l`
+(`$G/r5/specs/pr17l.json`; traces `$G/r5/replay/f11b-pr17l.v1.jsonl`,
+`.v2.jsonl`; 2 differences, no plugin; `$G/r5/slow14-seed-17.log`).
+Diagnosis: a variant of row (ay)'s knock-on, not a 2.0 bug. Both engines
+hold snapshots 1 and 2; after `pause` and `goTo` 0, 2.0 keeps the history
+paused, so step 13's write takes no snapshot (row (ay),
+`l8-fuzz-ay-hook-onSnapshot-missing-unannounced`, as approved). 1.35, whose
+goTo cleared the pause, takes snapshot 3 from index 0, which drops the
+forward snapshot 2. Step 14's history record is `ids` [1, 3], `index` 1 on
+1.35 and `ids` [1, 2], `index` 0 on 2.0, `length` 2 on both. 2.0 does what
+row (ay) approved; 1.35 follows its own rules. The `pr17k` entry does not
+cover it, by design: the lists differ by more than the excused snapshot (it
+replaced another), so it stays unexplained and unsigned.
+
+Per the owner's 2026-11-27 answer the gate opens on the other 20 PR seeds
+(d, 1 to 16, 18 to 20), and **seed 17 moves to the nightly report list**:
+it is run in report mode and its cases are triaged, and it does not block.
+The PR seed list is this record's convention (the default seed and seeds 1
+to 20, run by hand at each gate); no file in the repository defines it, and
+PR CI pins only the default seed, so no code changed. Running seed 17 on
+the nightly schedule needs a workflow change, which this PR does not make
+(Follow-ups).
+
+Seed 17's twelve cases in run 5:
+
+| # | Case | Diagnosis | State |
+| --- | --- | --- | --- |
+| 1 | `pr17` | row t: 1.35 cancels a batch requirement after both engines reported it met | signed (`l12-cand-t-batch-completed-*`) |
+| 2 | `pr17b` | row t's error shape: 1.35 cancels a batch run after its own error | signed (`l12-cand-t-batch-error-*`) |
+| 3 | `pr17c` | the logging plugin's lines between the cancel's records hid it from a marker | harness gap, fixed |
+| 4 | `pr17d` | 1.35 cancels a finished batch run a second time after a `goTo` | signed, "2.0's single cancel; sign it (Recommended)" (2026-11-23) |
+| 5 | `pr17e` | the same second cancel after a batch run that errored | widened, "Widen to any outcome (Recommended)" (2026-11-23) |
+| 6 | `pr17f` | `pr17d`'s shape with the trace option on, where hook and observe pairings cross | marker fix, no new entry |
+| 7 | `pr17g` | the second cancel paired by the comparison with another requirement's cancel | signed, "Extend the exception, not the pairing (Recommended)" (2026-11-24) |
+| 8 | `pr17h` | the same mispairing for row t's cancel of a finished batch run, with no `goTo` | signed, "Apply it to all row t cancels (Recommended)" (2026-11-26) |
+| 9 | `pr17i` | `pr17e`'s shape after a history `back` | widened, "Any history move (Recommended)" (2026-11-26) |
+| 10 | `pr17j` | the performance plugin counts row t's approved extra cancel | signed, "Counters follow approved records (Recommended)" (2026-11-26) |
+| 11 | `pr17k` | row (ay)'s missing snapshot shown again in the history record's ids, index and length | signed, "Approve (ay) knock-on, keep going (Recommended)" (2026-11-27) |
+| 12 | `pr17l` | row (ay) again: 1.35's snapshot after a paused goTo to an earlier position drops the forward snapshot, so the ids differ by a replaced snapshot | not signed; knock-on variant, not a 2.0 bug; seed 17 reports nightly |
+
 ## Deep batched cases (run 4's report, triaged in run 5)
 
 Run 4's deep seeds each exited 1 on one hard failure and reported batched
@@ -691,15 +790,16 @@ coordinator dispatches after pushing.
 
 | Check | Exit | Result |
 | --- | --- | --- |
-| `pnpm census` | 0 | 10 projects, 15,761 tests; the census-seed fuzz compares its cases on v2 too |
+| `pnpm census` | 0 | 10 projects, 15,769 tests; the census-seed fuzz compares its cases on v2 too |
 | `check:expects` | 0 | |
 | `oracle:update` | 0 | after the last harness edit |
 | `conformance:checks` | 0 | 253 passed |
-| diff self-tests | 0 | 713 tests (105 new in run 5, `l12-gate-run5.test.ts`); one earlier test restated on the owner's 2026-11-26 `pr17h` answer and three on his 2026-11-26 `pr17i` answer (above), the others unchanged |
+| diff self-tests | 0 | 721 tests (113 new in run 5, `l12-gate-run5.test.ts`); one earlier test restated on the owner's 2026-11-26 `pr17h` answer and three on his 2026-11-26 `pr17i` answer (above), the others unchanged |
 | Root biome | 0 | |
 | `ratchet --update` | 0 | +0, none lost; 3,046 |
 | `pnpm -r --filter './packages/*' typecheck` | 1 | only the known gap (`ai-harness`, `cli`, `mcp`); core, core-next, conformance pass. Not rerun after the last six groups of changes; conformance's own `tsc --noEmit` exits 0 on the final tree |
-| **All 21 PR seeds at L12 on the final tree** (after the plugin-counter rule; one at a time, nohup, 8 GB heap) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (300 s limit; `$G/r5/pr13-seeds.exit`); 7, 9, 11 exit 0 (1,800 s limit; 374, 505 and 676 s; `$G/r5/slow13-seeds.exit`); **17 exits 1** in 73 s on `pr17k`, 3 differences (Stops (run 5); `$G/r5/slow13-seed-17.log`) |
+| **All 21 PR seeds at L12 on the final tree** (after the history-record entry; one at a time, nohup, 8 GB heap) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (300 s limit; `$G/r5/pr14-seeds.exit`); 7, 9, 11 exit 0 (1,800 s limit; 352, 499 and 625 s; `$G/r5/slow14-seeds.exit`); **17 exits 1** in 63 s on `pr17l`, 2 differences: its twelfth case, a variant of row (ay)'s knock-on, so seed 17 moves to the nightly report list and the gate opens on the other 20 ("Seed 17: the nightly report list"; `$G/r5/slow14-seed-17.log`) |
+| All 21 PR seeds at L12 on 80448635 (after the plugin-counter rule; one at a time, nohup, 8 GB heap) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (300 s limit; `$G/r5/pr13-seeds.exit`); 7, 9, 11 exit 0 (1,800 s limit; 374, 505 and 676 s; `$G/r5/slow13-seeds.exit`); **17 exits 1** in 73 s on `pr17k`, 3 differences (Stops (run 5); `$G/r5/slow13-seed-17.log`) |
 | All 21 PR seeds at L12 on 03100f6b (after the widening to any history move; one at a time, nohup, 8 GB heap) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (300 s limit; `$G/r5/pr12-seeds.exit`); 7, 9 exit 0 (1,800 s limit; 450 and 650 s; `$G/r5/slow12-seeds.exit`); 11 was ended by a SIGTERM at 241 s (exit 143, no output after its case count, not the limit) and exits 0 in 810 s rerun alone at the 1,800 s limit (`$G/r5/slow12b-seeds.exit`); **17 exits 1** in 104 s on `pr17j`, 1 difference (Stops (run 5); `$G/r5/slow12-seed-17.log`) |
 | All 21 PR seeds at L12 on a8c2c5bf (after the shared mispairing rule, before the widening to any history move; one at a time, nohup, 8 GB heap) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (120 s limit; `$G/r5/pr11-seeds.exit`); 7, 9, 11 exit 0 (1,800 s limit; 374, 525 and 637 s); **17 exits 1** in 78 s on `pr17i`, 3 differences (Stops (run 5); `$G/r5/slow11-seeds.exit`, `$G/r5/slow11-seed-17.log`). A first run on the same harness (`$G/r5/pr10-seeds.exit`, `slow10-seeds.exit`) gave the same, except that seed 18 timed out at the 120 s limit (121 s, no difference reported, with the machine loaded); alone at the 1,800 s limit it exits 0 in 96 s (`$G/r5/f8s18-seeds.exit`), and in this run in 90 s |
 | All 21 PR seeds at L12 on 0ef12282 (after the `pr17g` twins, before the shared rule; one at a time, nohup, 8 GB heap) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (120 s limit; `$G/r5/pr9-seeds.exit`); 7, 9, 11 exit 0 (1,800 s limit; 398, 528 and 609 s); **17 exits 1** in 64 s on `pr17h`, 8 differences (closed by the shared rule, above; `$G/r5/slow9-seeds.exit`, `$G/r5/slow9-seed-17.log`) |
@@ -707,24 +807,22 @@ coordinator dispatches after pushing.
 | PR seed 17 at L12 on 6de52109 (after the widening, before the marker fix; nohup, 8 GB heap) | 1 | at the 120 s limit: timed out with no difference reported (`$G/r5/pr7-seed-17.log`); again at the 1,800 s limit: **exits 1** in 104 s on `pr17f`, 1 difference (closed by the marker fix, above; `$G/r5/slow7-seed-17.log`). The other 20 seeds were not rerun: the widening changes only `markAfterCancel` and the three entries' reasons |
 | All 21 PR seeds at L12, one at a time, 8 GB heap, on d29001ab (after the `pr17d` entries, before the widening; nohup) | 1 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (120 s limit); **17 exits 1** on `pr17e` (closed by the widening, above); 7, 9, 11 exit 0 (1,800 s limit; 374, 496 and 604 s) |
 | PR seed 17's reruns between the entries | 1 | after the error-shape entries: its third shrink `pr17c` (the logging plugin's lines between the cancel's records, a marker gap, fixed), then `pr17d` (signed on the owner's 2026-11-23 answer, above); after the `pr17d` entries: exits 1 on `pr17e` (widened on the owner's second 2026-11-23 answer, above); after the widening: exits 1 on `pr17f` (the marker gap, fixed: "Run 5, `pr17f`", above) |
-| Replays of the hard failures | 0 | PR 6, 11, 15 (both shrinks), 17 (first shrink), deep 1, 2, 24301: 0 unexplained each; the no-facts and no-watch twins: 0 differences. On the final tree: `pr17d`, `pr17`, `pr17b`, `pr17c` 0 unexplained each (`$G/r5/replay/k1-*`); `pr17e` 3 unexplained (`k2-*`). On the final tree, after the widening: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e` 0 unexplained each (`$G/r5/replay/q1-*`); `pr17f` 1 unexplained (`q2-*`). On the final tree, after the marker fix: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e`, `pr17f` 0 unexplained each (`$G/r5/replay/u1-*`); `pr17g` 8 unexplained (`u2-*`). On the final tree, after the `pr17g` twins: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e`, `pr17f`, `pr17g` 0 unexplained each (`$G/r5/replay/z1-*`); `pr17h` 8 unexplained (`z2-*`, the stop). After the shared rule: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e`, `pr17f`, `pr17g`, `pr17h` 0 unexplained each (`$G/r5/replay/f8a-*`); `pr17i` 3 unexplained (`f8a-pr17i`). On the final tree, after the widening to any history move: `pr17`, `pr17b` to `pr17i` 0 unexplained each (`$G/r5/replay/f9a-*`); `pr17j` 1 unexplained (`f9b-pr17j`). On the final tree, after the plugin-counter rule: `pr17`, `pr17b` to `pr17j` 0 unexplained each (`$G/r5/replay/f10a-*`); `pr17k` 3 unexplained (`f10b-pr17k`, the stop) |
+| Replays of the hard failures | 0 | PR 6, 11, 15 (both shrinks), 17 (first shrink), deep 1, 2, 24301: 0 unexplained each; the no-facts and no-watch twins: 0 differences. On the final tree: `pr17d`, `pr17`, `pr17b`, `pr17c` 0 unexplained each (`$G/r5/replay/k1-*`); `pr17e` 3 unexplained (`k2-*`). On the final tree, after the widening: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e` 0 unexplained each (`$G/r5/replay/q1-*`); `pr17f` 1 unexplained (`q2-*`). On the final tree, after the marker fix: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e`, `pr17f` 0 unexplained each (`$G/r5/replay/u1-*`); `pr17g` 8 unexplained (`u2-*`). On the final tree, after the `pr17g` twins: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e`, `pr17f`, `pr17g` 0 unexplained each (`$G/r5/replay/z1-*`); `pr17h` 8 unexplained (`z2-*`, the stop). After the shared rule: `pr17`, `pr17b`, `pr17c`, `pr17d`, `pr17e`, `pr17f`, `pr17g`, `pr17h` 0 unexplained each (`$G/r5/replay/f8a-*`); `pr17i` 3 unexplained (`f8a-pr17i`). On the final tree, after the widening to any history move: `pr17`, `pr17b` to `pr17i` 0 unexplained each (`$G/r5/replay/f9a-*`); `pr17j` 1 unexplained (`f9b-pr17j`). On the final tree, after the plugin-counter rule: `pr17`, `pr17b` to `pr17j` 0 unexplained each (`$G/r5/replay/f10a-*`); `pr17k` 3 unexplained (`f10b-pr17k`, the stop). On the final tree, after the history-record entry: `pr17`, `pr17b` to `pr17k` 0 unexplained each (`$G/r5/replay/f11a-*`); `pr17l` 2 unexplained (`f11b-pr17l`, reported, not signed) |
 | Deep seeds 1, 2, 24301 | — | not rerun (run 5's brief). Run 4's report: each exited 1 on one hard failure, now covered (above), and reported 5, 7 and 5 batched cases (triaged above and in the follow-ups) |
 
 ## Stops (run 5)
 
-- **PR seed 17, its eleventh case (history on, no plugin): row (ay)'s
-  missing snapshot shows again in the history record.** Found by seed 17's
-  run on the final tree, after the plugin-counter rule. Shrunk case
-  `$G/r5/specs/pr17k.json` (3 differences); traces
-  `$G/r5/replay/f10b-pr17k.v1.jsonl`, `.v2.jsonl` (replay `f10b`: 3
-  unexplained). After `pause` and a `goTo`, 2.0 keeps the history paused,
-  so step 9's write takes no snapshot (row (ay), explained by
-  `l8-fuzz-ay-hook-onSnapshot-missing-unannounced`). At step 10's `pause`
-  the history record differs: `ids` [1, 2] against [1], `index` 1 against
-  0, `length` 2 against 1; `changes` is excused by
-  `l8-fuzz-az-external-history-changed-changes`, the other three fields by
-  no entry. A knock-on of an approved row in the history record's other
-  fields. Owner call. Not fixed; no engine code was changed.
+None open. PR seed 17's twelfth case, `pr17l`, is not a stop: it is a
+variant of row (ay)'s knock-on and not a 2.0 bug, so on the owner's
+2026-11-27 answer seed 17 moves to the nightly report list and the gate
+opens on the other 20 seeds ("Seed 17: the nightly report list", above). No
+engine code was changed.
+
+The eleventh case, `pr17k`, was reported as a stop (row (ay)'s missing
+snapshot shown again in the history record's `ids`, `index` and `length`)
+and is closed on the owner's "Approve (ay) knock-on, keep going
+(Recommended)" (2026-11-27) ("Run 5, the owner's answer on `pr17k`",
+above).
 
 The tenth case, `pr17j`, was reported as a stop (the performance plugin
 counting row t's error-shape cancel) and is closed on the owner's
@@ -785,7 +883,13 @@ Closed in run 5, all from PR seed 17:
   comparison's pairing unchanged;
 - its ninth case (`pr17e`'s shape after a history `back`, with no `goTo`;
   `pr17i`), by widening the second-cancel entries' step condition to any
-  history move on his "Any history move (Recommended)" (2026-11-26).
+  history move on his "Any history move (Recommended)" (2026-11-26);
+- its tenth case (the performance plugin counting row t's approved extra
+  cancel; `pr17j`), by the shared plugin-counter rule signed on his
+  "Counters follow approved records (Recommended)" (2026-11-26);
+- its eleventh case (row (ay)'s missing snapshot shown again in the history
+  record; `pr17k`), by the history-record entry signed on his "Approve (ay)
+  knock-on, keep going (Recommended)" (2026-11-27).
 
 Run 4's two stops are closed: PR seed 6 by the (bx) error-pairing entries,
 PR seed 15 by quirk b's batch-pairing entries.
@@ -824,7 +928,8 @@ PR seed 15 by quirk b's batch-pairing entries.
 
 ## Follow-ups
 
-- Decide run 5's stop: PR seed 17's `pr17k`, row (ay)'s missing snapshot shown again in the history record's `ids`, `index` and `length` (owner call).
+- Seed 17 is on the nightly report list (the owner's 2026-11-27 answer). Running it on the nightly schedule needs a change to `.github/workflows/diff-fuzz-nightly.yml` (a second job, or a matrix, that runs `DIFF_FUZZ_SEED=17` at the PR count in report mode); this PR touches no workflow, so the coordinator makes it. Until then seed 17 is run by hand in report mode at each gate.
+- `pr17l`, seed 17's twelfth case: row (ay)'s knock-on where 1.35's snapshot after a paused goTo drops a forward snapshot. Covering it would widen `l12-fuzz-ay-external-history-changed-snapshots` to a replaced snapshot, an owner call; not needed for the gate.
 - A gate=L12 mutation run on this branch to confirm the 18 entries killed only locally (the coordinator dispatches it after pushing).
 - Deep seeds 1, 2 and 24301 in full once seed 17 is decided.
 - The reported batched cases of run 4's deep seeds, one line each (run-5 replays, `$G/r5/replay/cases-*`; none has an entry in this PR):
