@@ -18,6 +18,14 @@ export default {
     "packages/core/src/core/*.ts",
     "!packages/core/src/core/types.ts",
     "!packages/core/src/core/__tests__/**",
+    // L13 (the L13 RFC's B3): the subpaths' own files, for a `gate: L13` run
+    // (`mutate:file` overrides this list, as for every shard). Their tests
+    // sit at L13, so a run below L13 reports them untested, not weak.
+    "packages/core/src/utils/testing.ts",
+    "packages/core/src/utils/migration.ts",
+    "packages/core/src/adapter-utils.ts",
+    "packages/core/src/core/types/adapter-utils.ts",
+    "packages/core/src/adapters/worker.ts",
   ],
   coverageAnalysis: "perTest",
   incremental: true,

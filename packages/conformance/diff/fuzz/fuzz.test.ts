@@ -37,6 +37,11 @@
  *   `pluginArbitrary`), from their own seed, for the same reason: the three
  *   phases above draw what they drew before L12-pre
  *   (diff/self/l12-plugins.test.ts).
+ * - Then testSystemCases(RUNS) cases (a sixth of RUNS, rounded up): single-
+ *   module base cases built through `createTestSystem` (L13, model.ts
+ *   `testSystemArbitrary`), each checkpoint also recording the test system's
+ *   facts history, requirements and event history, from their own seed
+ *   (diff/self/l13-testsystem.test.ts).
  *
  * Every engine run has a timer-callback budget (diff/scenario.ts
  * RUN_BUDGET). A case whose reference run passes it never settles on 1.35
@@ -115,6 +120,7 @@ import {
   pluginArbitrary,
   specArbitrary,
   specTriggers,
+  testSystemArbitrary,
   toScenario,
 } from "./model.js";
 
@@ -151,6 +157,12 @@ const PLUGIN_SEED = (SEED ^ 0x3c6ef372) | 0;
 
 /** How many plugin cases a run of `runs` adds: a third, rounded up. */
 const pluginCases = (runs: number) => Math.ceil(runs / 3);
+
+/** The test-system phase's seed (L13), derived from the first the same way. */
+const TEST_SYSTEM_SEED = (SEED ^ 0x6a09e667) | 0;
+
+/** How many test-system cases a run of `runs` adds: a sixth, rounded up. */
+const testSystemCases = (runs: number) => Math.ceil(runs / 6);
 
 /** Report mode: the nightly's deep runs only (lib/fuzz.ts `batchReportMode`). */
 const REPORT_MODE = batchReportMode();
@@ -262,6 +274,13 @@ describe("differential fuzz", () => {
         runs: pluginCases(RUNS),
         seed: PLUGIN_SEED,
         arbitrary: pluginArbitrary(),
+        examples: [] as [FuzzSpec][],
+      },
+      {
+        label: "built through createTestSystem (L13), on their own seed",
+        runs: testSystemCases(RUNS),
+        seed: TEST_SYSTEM_SEED,
+        arbitrary: testSystemArbitrary(),
         examples: [] as [FuzzSpec][],
       },
     ];

@@ -54,9 +54,14 @@
     "the audit ledger chains entries and verifies": "L12",
     "circuit breaker opens, rejects and half-opens": "L12",
     "snapshot signing and verification": "L12",
-    "every root and /plugins export, by name and kind": "L13",
-    "requirement helpers, typed helpers and the status plugin": "L13",
-    "createSystemWithStatus wires the status plugin in": "L13",
+    "every export of the seven entries, by name and kind (U16)": "L13",
+    "/adapter-utils over a live system (U10, U11)": "L13",
+    "/adapter-utils history state on and off (U10)": "L13",
+    "/adapter-utils history state is null with history off (U10)": "L13",
+    "/adapter-utils throttle: a trailing call with the latest arguments, and cleanup (U10)": "L13",
+    "/migration over a Redux, a Zustand and an XState fixture (U17)": "L13",
+    "requirement helpers, typed helpers and the status plugin": "L12",
+    "createSystemWithStatus wires the status plugin in": "L12",
     "a constraint requires, a resolver satisfies": "L2",
     "a resolver's own write satisfies its requirement (not a cancel)": "L2",
     "an outside retraction cancels the run and drops nothing it already wrote": "L2",
@@ -818,6 +823,14 @@
       "rule": "L12",
       "pin": true
     },
+    "tests/core/l13-adapter-utils-pins-oracle.test.ts": {
+      "rule": "L13",
+      "pin": true
+    },
+    "tests/core/l13-adapter-utils-pins-oracle-production.test.ts": {
+      "rule": "L13",
+      "pin": true
+    },
     "tests/core/predict.test.ts": {
       "rule": "L11"
     },
@@ -876,6 +889,14 @@
     },
     "tests/plugins/performance.test.ts": {
       "rule": "L12"
+    },
+    "tests/utils/l13-testing-pins-oracle.test.ts": {
+      "rule": "L13",
+      "pin": true
+    },
+    "tests/adapters/l13-worker-pins-oracle.test.ts": {
+      "rule": "L13",
+      "pin": true
     },
     "tests/utils/snapshot-signing.test.ts": {
       "rule": "L12"

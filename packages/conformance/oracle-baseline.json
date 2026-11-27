@@ -1,5 +1,6 @@
 {
   "pins": [
+    "tests/adapters/l13-worker-pins-oracle.test.ts",
     "tests/core/constraint-reevaluation.test.ts",
     "tests/core/constraints.test.ts",
     "tests/core/l1-derivations-effects.test.ts",
@@ -20,6 +21,8 @@
     "tests/core/l11-sweep-under-oracle.test.ts",
     "tests/core/l12-plugins-pins-oracle-production.test.ts",
     "tests/core/l12-plugins-pins-oracle.test.ts",
+    "tests/core/l13-adapter-utils-pins-oracle-production.test.ts",
+    "tests/core/l13-adapter-utils-pins-oracle.test.ts",
     "tests/core/l2-constraints-oracle-state.test.ts",
     "tests/core/l2-requirements-oracle.test.ts",
     "tests/core/l2-resolvers-oracle.test.ts",
@@ -43,9 +46,11 @@
     "tests/core/resolver-retracting-own-requirement.test.ts",
     "tests/core/resolver-satisfied-by-own-write.test.ts",
     "tests/core/settle-strands-invalidations.test.ts",
-    "tests/core/superseded-bodies-and-retry-timer.test.ts"
+    "tests/core/superseded-bodies-and-retry-timer.test.ts",
+    "tests/utils/l13-testing-pins-oracle.test.ts"
   ],
   "instruments": {
+    "tests/adapters/l13-worker-pins-oracle.test.ts": [],
     "tests/core/constraint-reevaluation.test.ts": ["option plugins"],
     "tests/core/constraints.test.ts": [],
     "tests/core/l1-derivations-effects.test.ts": ["option effect prev"],
@@ -66,6 +71,8 @@
     "tests/core/l11-sweep-under-oracle.test.ts": [],
     "tests/core/l12-plugins-pins-oracle-production.test.ts": [],
     "tests/core/l12-plugins-pins-oracle.test.ts": [],
+    "tests/core/l13-adapter-utils-pins-oracle-production.test.ts": [],
+    "tests/core/l13-adapter-utils-pins-oracle.test.ts": [],
     "tests/core/l2-constraints-oracle-state.test.ts": [
       "member .inspect",
       "option plugins"
@@ -97,9 +104,11 @@
     ],
     "tests/core/resolver-satisfied-by-own-write.test.ts": ["option plugins"],
     "tests/core/settle-strands-invalidations.test.ts": ["member .inspect"],
-    "tests/core/superseded-bodies-and-retry-timer.test.ts": []
+    "tests/core/superseded-bodies-and-retry-timer.test.ts": [],
+    "tests/utils/l13-testing-pins-oracle.test.ts": []
   },
   "allowAbove": {
+    "tests/adapters/l13-worker-pins-oracle.test.ts": [],
     "tests/core/constraint-reevaluation.test.ts": ["option error boundary"],
     "tests/core/constraints.test.ts": ["option predicate data form"],
     "tests/core/l1-derivations-effects.test.ts": ["option derive data form"],
@@ -120,6 +129,8 @@
     "tests/core/l11-sweep-under-oracle.test.ts": [],
     "tests/core/l12-plugins-pins-oracle-production.test.ts": [],
     "tests/core/l12-plugins-pins-oracle.test.ts": [],
+    "tests/core/l13-adapter-utils-pins-oracle-production.test.ts": [],
+    "tests/core/l13-adapter-utils-pins-oracle.test.ts": [],
     "tests/core/l2-constraints-oracle-state.test.ts": [],
     "tests/core/l2-requirements-oracle.test.ts": [],
     "tests/core/l2-resolvers-oracle.test.ts": [],
@@ -157,9 +168,18 @@
     ],
     "tests/core/superseded-bodies-and-retry-timer.test.ts": [
       "option error boundary"
-    ]
+    ],
+    "tests/utils/l13-testing-pins-oracle.test.ts": []
   },
   "layers": {
+    "tests/adapters/l13-worker-pins-oracle.test.ts": {
+      "L13 probe pins: /worker > U13: an unregistered module at INIT posts ERROR from INIT, and the worker stays uninitialised": "L13",
+      "L13 probe pins: /worker > U13: a fact key with no module posts ERROR naming the format, and one for an unknown module names the module": "L13",
+      "L13 probe pins: /worker > U14: a message before INIT is dropped with no reply (shows cc)": "L13",
+      "L13 probe pins: /worker > U14: a message after DESTROY is dropped with no reply, and a second INIT starts afresh (shows cc)": "L13",
+      "L13 probe pins: /worker > U15: START posts the init write's changes before STARTED; an equal write posts nothing": "L13",
+      "L13 probe pins: /worker > U15: GET_SNAPSHOT can post DERIVATION_CHANGED before its result, and SET_FACTS folds a key's run into one message": "L13"
+    },
     "tests/core/constraint-reevaluation.test.ts": {
       "constraint re-evaluation > a when that threw is woken by the write that fixes it": "L2",
       "constraint re-evaluation > an async when without deps is evaluated on every pass": "L2",
@@ -562,6 +582,13 @@
       "L12 review pins: the audit ledger's payload, field by field (development) > the clobber-loop entries: every field of the event, and the overlap's verdict alone": "L12",
       "L12 review pins: the audit ledger's payload, field by field (development) > source.attach, source.detach and source.error: the source, its module, and an error's phase and message": "L12"
     },
+    "tests/core/l13-adapter-utils-pins-oracle-production.test.ts": {
+      "L13 probe pins: /adapter-utils assertSystem (production) > U12: assertSystem returns for null and undefined": "L13"
+    },
+    "tests/core/l13-adapter-utils-pins-oracle.test.ts": {
+      "L13 probe pins: /adapter-utils assertSystem (development) > U12: assertSystem throws for null and undefined, naming the hook and what it got": "L13",
+      "L13 probe pins: /adapter-utils assertSystem (development) > U12: assertSystem accepts anything else, including a falsy non-nullish value": "L13"
+    },
     "tests/core/l2-constraints-oracle-state.test.ts": {
       "a disabled constraint is not asked while it is waiting on another > is not asked when the constraint it follows finishes and the finishing write wakes a pass": "L2",
       "a disabled constraint is not asked while it is waiting on another > asks it, once, after it is enabled again": "L2",
@@ -920,6 +947,19 @@
       "late writes from runs no longer in flight still land > timed out, re-dispatched, new run guarded on loading: the old finally lands (M3)": "L2",
       "the retry-later poller > stops polling once nothing is left to retry (K5)": "L3",
       "the retry-later poller > does not keep the process alive": "L0"
+    },
+    "tests/utils/l13-testing-pins-oracle.test.ts": {
+      "L13 probe pins: /testing (development) > U1: a test system's isRunning, isInitialized and isSettled keep their creation values after start() (shows bz)": "L13",
+      "L13 probe pins: /testing (development) > U2: eventHistory records dispatch only; events.* changes the fact and is not recorded (shows ca)": "L13",
+      "L13 probe pins: /testing (development) > U3: createFakeTimers has no way to add a timer: advance, next and runAll only move the clock (shows cb)": "L13",
+      "L13 probe pins: /testing (development) > U4: settleWithFakeTimers throws its message, naming the in-flight resolvers, when time runs out": "L13",
+      "L13 probe pins: /testing (development) > U4: settleWithFakeTimers returns at once when nothing is in flight, advancing nothing": "L13",
+      "L13 probe pins: /testing (development) > U5: mockResolver's calls and pending are plain properties holding the live arrays": "L13",
+      "L13 probe pins: /testing (development) > U6: the init write is the first getFactsHistory() row": "L13",
+      "L13 probe pins: /testing (development) > U7: assertFactSet(key, undefined) passes for any write of the key": "L13",
+      "L13 probe pins: /testing (development) > U8: a namespaced test system records the module as the namespace and matches a short or a full key": "L13",
+      "L13 probe pins: /testing (development) > U9: assertDynamic and assertNotDynamic switch over the four registries, with their messages": "L13",
+      "L13 probe pins: the spread keeps what the system defines > a test system has the system's own enumerable keys, plus its own members": "L13"
     }
   }
 }

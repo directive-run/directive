@@ -1,5 +1,6 @@
 {
   "tests/package/dist-types.test.ts": "packages/core/__tests__/dist-types.test.ts",
+  "tests/adapters/l13-worker-pins-oracle.test.ts": "packages/core/src/adapters/__tests__/l13-worker-pins-oracle.test.ts",
   "tests/adapters/worker-mirrors-batched-writes.test.ts": "packages/core/src/adapters/__tests__/worker-mirrors-batched-writes.test.ts",
   "tests/adapters/worker-set-fact.test.ts": "packages/core/src/adapters/__tests__/worker-set-fact.test.ts",
   "tests/adapters/worker.test.ts": "packages/core/src/adapters/__tests__/worker.test.ts",
@@ -79,6 +80,8 @@
   "tests/core/l12-debt-observe-oracle.test.ts": "packages/core/src/core/__tests__/l12-debt-observe-oracle.test.ts",
   "tests/core/l12-plugins-pins-oracle-production.test.ts": "packages/core/src/core/__tests__/l12-plugins-pins-oracle-production.test.ts",
   "tests/core/l12-plugins-pins-oracle.test.ts": "packages/core/src/core/__tests__/l12-plugins-pins-oracle.test.ts",
+  "tests/core/l13-adapter-utils-pins-oracle-production.test.ts": "packages/core/src/core/__tests__/l13-adapter-utils-pins-oracle-production.test.ts",
+  "tests/core/l13-adapter-utils-pins-oracle.test.ts": "packages/core/src/core/__tests__/l13-adapter-utils-pins-oracle.test.ts",
   "tests/core/l2-constraints-oracle-production.test.ts": "packages/core/src/core/__tests__/l2-constraints-oracle-production.test.ts",
   "tests/core/l2-constraints-oracle-state.test.ts": "packages/core/src/core/__tests__/l2-constraints-oracle-state.test.ts",
   "tests/core/l2-constraints-oracle.test.ts": "packages/core/src/core/__tests__/l2-constraints-oracle.test.ts",
@@ -203,6 +206,7 @@
   "tests/plugins/performance.test.ts": "packages/core/src/plugins/__tests__/performance.test.ts",
   "tests/plugins/persistence.test.ts": "packages/core/src/plugins/__tests__/persistence.test.ts",
   "tests/utils/history.test.ts": "packages/core/src/utils/__tests__/history.test.ts",
+  "tests/utils/l13-testing-pins-oracle.test.ts": "packages/core/src/utils/__tests__/l13-testing-pins-oracle.test.ts",
   "tests/utils/snapshot-signing.test.ts": "packages/core/src/utils/__tests__/snapshot-signing.test.ts",
   "tests/utils/testing-sees-batched-writes.test.ts": "packages/core/src/utils/__tests__/testing-sees-batched-writes.test.ts",
   "tests/utils/testing-utils.test.ts": "packages/core/src/utils/__tests__/testing-utils.test.ts",

@@ -23,6 +23,15 @@
     ]
   },
   {
+    "file": "src/adapters/__tests__/l13-worker-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 6,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/adapters/__tests__/worker-mirrors-batched-writes.test.ts",
     "category": "black-box",
     "cases": 3,
@@ -755,6 +764,24 @@
     "file": "src/core/__tests__/l12-plugins-pins-oracle.test.ts",
     "category": "black-box",
     "cases": 42,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l13-adapter-utils-pins-oracle-production.test.ts",
+    "category": "black-box",
+    "cases": 1,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l13-adapter-utils-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 2,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -2025,6 +2052,15 @@
       "createDisabledHistory",
       "createHistoryManager"
     ],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/utils/__tests__/l13-testing-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 11,
+    "internals": [],
+    "internalsValues": [],
     "typeOnlyNonPublic": [],
     "notes": []
   },

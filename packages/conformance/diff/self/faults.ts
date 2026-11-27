@@ -16,7 +16,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defaultRepoRoot } from "../../lib/core-entries.js";
-import { type EngineHandle, engineAt } from "../engines.js";
+import { type EngineHandle, engineAt, entryFilesUnder } from "../engines.js";
 
 export interface Patch {
   file: string;
@@ -239,7 +239,12 @@ export function faultedEngine(fault: SourceFault): {
   }
 
   return {
-    engine: engineAt(`local+${fault.name}`, join(dir, "src/index.ts")),
+    engine: engineAt(
+      `local+${fault.name}`,
+      join(dir, "src/index.ts"),
+      undefined,
+      entryFilesUnder(join(dir, "src")),
+    ),
     dispose: () => rmSync(dir, { recursive: true, force: true }),
   };
 }

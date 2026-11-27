@@ -1,0 +1,33 @@
+import { describe, expect, it } from "vitest";
+import { assertSystem } from "../../adapter-utils.js";
+
+// The L13 RFC's U12 (development): assertSystem throws for a missing system.
+// The production half is l13-adapter-utils-pins-oracle-production.
+
+function message(fn: () => unknown): string {
+  try {
+    fn();
+  } catch (error) {
+    return (error as Error).message;
+  }
+
+  return "did not throw";
+}
+
+describe("L13 probe pins: /adapter-utils assertSystem (development)", () => {
+  it("U12: assertSystem throws for null and undefined, naming the hook and what it got", () => {
+    expect(message(() => assertSystem("useFact", null))).toBe(
+      "[Directive] useFact() requires a system instance as the first argument. Received null.",
+    );
+    expect(message(() => assertSystem("useSelector", undefined))).toBe(
+      "[Directive] useSelector() requires a system instance as the first argument. Received undefined.",
+    );
+  });
+
+  it("U12: assertSystem accepts anything else, including a falsy non-nullish value", () => {
+    expect(() => assertSystem("h", {})).not.toThrow();
+    expect(() => assertSystem("h", 0)).not.toThrow();
+    expect(() => assertSystem("h", "")).not.toThrow();
+    expect(() => assertSystem("h", false)).not.toThrow();
+  });
+});

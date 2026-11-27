@@ -22,6 +22,7 @@ import {
   specArbitrary,
   specLayer,
   specTriggers,
+  testSystemArbitrary,
   toScenario,
   withoutDynamic,
   withoutHistory,
@@ -121,6 +122,10 @@ describe("fuzz generator ceiling", () => {
       plugins:
         specs.some((s) => s.plugins !== undefined) &&
         steps("distributable", "ledger"),
+      // Its own phase, not part of the generator (`testSystemArbitrary`).
+      testSystem: fc
+        .sample(testSystemArbitrary(), { seed: 7, numRuns: 20 })
+        .every((s) => s.via === "testSystem" && s.modules.length === 1),
     };
 
     expect(Object.keys(used).sort()).toEqual(
