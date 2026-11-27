@@ -348,7 +348,7 @@ const engines = {
       plugins: "../src/plugins/index.ts",
       testing: "../src/utils/testing.ts",
       "adapter-utils": "../src/adapter-utils.ts",
-      worker: "../src/worker.ts",
+      worker: "../src/adapters/worker.ts",
       migration: "../src/migration.ts",
       internals: "../src/internals.ts",
     },
