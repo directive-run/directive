@@ -209,8 +209,9 @@ describe("the census", () => {
   });
 
   describe("layer-tagged golden checks", () => {
-    // current is L11 in this repo: the ledger (L12) part is gated; history
-    // (L8), persistence (L6) and L0 are not.
+    // current is L12 in this repo: no golden part is gated (the signed and
+    // ledger parts are L12, history L8, persistence L6). A part above
+    // current is shown through goldenTagProblem with an earlier current.
     const LEDGER = "[L12] v2: the ledger golden round-trips with 1.35.0";
     const HISTORY = "[L8] v2: the history golden round-trips with 1.35.0";
     const PERSISTENCE =
@@ -241,17 +242,18 @@ describe("the census", () => {
     it("passes a part skipped above current and a script check that ran", () => {
       expect(
         inGolden([
-          [LEDGER, "skipped"],
+          [LEDGER, "passed"],
           [HISTORY, "passed"],
           ["[L0] the script's writes land", "passed"],
         ]),
       ).toBe("");
+      expect(goldenTagProblem(LEDGER, "skipped", "L11")).toBeNull();
     });
 
     it("fails when a tagged check is skipped at or below current, or runs above it", () => {
       const out = inGolden([
         ["[L0] the script's writes land", "skipped"],
-        [LEDGER, "passed"],
+        [LEDGER, "skipped"],
         [HISTORY, "skipped"],
       ]);
       expect(out).toMatch(
@@ -261,7 +263,10 @@ describe("the census", () => {
         /"\[L8\] v2: the history golden .*" is skipped but at or below the v2 layer/,
       );
       expect(out).toMatch(
-        /"\[L12\] v2: the ledger golden .*" is above the v2 layer but passed/,
+        /"\[L12\] v2: the ledger golden .*" is skipped but at or below the v2 layer/,
+      );
+      expect(goldenTagProblem(LEDGER, "passed", "L11")).toMatch(
+        /is above the v2 layer but passed/,
       );
     });
 

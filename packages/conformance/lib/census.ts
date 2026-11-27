@@ -28,7 +28,14 @@ import { join, relative } from "node:path";
 import { Node, Project, type SourceFile } from "ts-morph";
 import { PART_NAMES, partLayer } from "../contracts/lib/golden.js";
 import { describeDrift, gateBuiltNext } from "../contracts/lib/next-surface.js";
-import { LIKE, TEXT, canonicalJson, isLower } from "../diff/fingerprint.js";
+import {
+  LIKE,
+  PAIR,
+  PLUGIN_COUNTERS,
+  TEXT,
+  canonicalJson,
+  isLower,
+} from "../diff/fingerprint.js";
 import type { Json } from "../diff/normalize.js";
 import { coreEntries, v2DistEntries, v2Entries } from "./core-entries.js";
 import {
@@ -880,12 +887,25 @@ export interface DivergenceEntry {
   bound?: unknown;
   requires?: unknown;
   by?: unknown;
+  same?: unknown;
+  stale?: unknown;
+  afterMet?: unknown;
+  afterError?: unknown;
+  afterCancel?: unknown;
+  mispaired?: unknown;
+  extraCancelOf?: unknown;
+  mispairedBy?: unknown;
+  counterFollows?: unknown;
+  snapshotFollows?: unknown;
   afterOp?: unknown;
   repeats?: unknown;
   reason: string;
   approvedBy: string;
   date: string;
 }
+
+/** A row t entry's id (`extraCancelOf`): `l3-cand-t-…`, `l9-fuzz-t-…`. */
+const ROW_T_ID = /^l\d+-(cand|fuzz)-t-/;
 
 const DIVERGENCE_REQUIRED = [
   "approvedBy",
@@ -897,18 +917,28 @@ const DIVERGENCE_REQUIRED = [
   "stream",
 ];
 const DIVERGENCE_OPTIONAL = [
+  "afterCancel",
+  "afterError",
+  "afterMet",
   "afterOp",
   "bound",
   "by",
+  "counterFollows",
   "during",
   "ends",
   "engine",
   "excuses",
+  "extraCancelOf",
   "group",
+  "mispaired",
+  "mispairedBy",
   "op",
   "path",
   "repeats",
   "requires",
+  "same",
+  "snapshotFollows",
+  "stale",
   "step",
   "when",
 ];
@@ -1120,9 +1150,11 @@ export function checkDivergences(
         typeof r.kind !== "string" ||
         !["missing", "extra", "changed", "moved"].includes(r.op as string) ||
         Object.keys(r).some(
-          (k) => !["stream", "kind", "op", "bound", "order"].includes(k),
+          (k) =>
+            !["stream", "kind", "op", "bound", "order", "same"].includes(k),
         ) ||
         (r.order !== undefined && r.order !== "any") ||
+        (r.same !== undefined && (typeof r.same !== "string" || !r.same)) ||
         (r.bound !== undefined &&
           !Array.isArray((r.bound as { match?: unknown })?.match))
       ) {
@@ -1134,10 +1166,17 @@ export function checkDivergences(
     if (
       e.afterOp !== undefined &&
       (e.scenario !== FUZZ_SCENARIO ||
-        !FUZZ_STEP_OPS.includes(e.afterOp as string))
+        !(typeof e.afterOp === "string"
+          ? FUZZ_STEP_OPS.includes(e.afterOp)
+          : Array.isArray(e.afterOp) &&
+            e.afterOp.length > 1 &&
+            new Set(e.afterOp).size === e.afterOp.length &&
+            e.afterOp.every(
+              (op) => typeof op === "string" && FUZZ_STEP_OPS.includes(op),
+            )))
     ) {
       fail(
-        `${label} afterOp must be a fuzz step op (one of ${FUZZ_STEP_OPS.join(", ")}), on a fuzz entry only`,
+        `${label} afterOp must be a fuzz step op (one of ${FUZZ_STEP_OPS.join(", ")}), or a list of two or more distinct ones, on a fuzz entry only`,
       );
     }
     if (
@@ -1150,10 +1189,205 @@ export function checkDivergences(
     }
     if (
       e.by !== undefined &&
-      (e.op !== "moved" || ![1, -1].includes(e.by as number))
+      (e.op !== "moved" || ![1, -1, 0].includes(e.by as number))
     ) {
       fail(
-        `${label} has by, which only a moved entry may have, as 1 (one step later) or -1 (one step earlier)`,
+        `${label} has by, which only a moved entry may have, as 1 (one step later), -1 (one step earlier) or 0 (earlier in the same step)`,
+      );
+    }
+    if (
+      e.same !== undefined &&
+      (e.op !== "moved" || typeof e.same !== "string" || !e.same)
+    ) {
+      fail(
+        `${label} has same, which only a moved entry may have: the path both records must hold equal`,
+      );
+    }
+    if (
+      e.stale !== undefined &&
+      (e.stale !== true || e.scenario !== FUZZ_SCENARIO)
+    ) {
+      fail(
+        `${label} stale must be true, on a fuzz entry only: it covers a derivation's record while the reference's last compute of it threw or never ran`,
+      );
+    }
+    if (
+      e.afterMet !== undefined &&
+      (e.afterMet !== true ||
+        e.scenario !== FUZZ_SCENARIO ||
+        e.op !== "missing")
+    ) {
+      fail(
+        `${label} afterMet must be true, on a fuzz entry of op "missing" only: it covers a requirement's cancel record only after both engines reported the requirement met`,
+      );
+    }
+    if (
+      e.afterError !== undefined &&
+      (e.afterError !== true ||
+        e.scenario !== FUZZ_SCENARIO ||
+        e.op !== "missing")
+    ) {
+      fail(
+        `${label} afterError must be true, on a fuzz entry of op "missing" only: it covers a requirement's cancel record only after both engines reported the requirement's run failed`,
+      );
+    }
+    if (
+      e.afterCancel !== undefined &&
+      (e.afterCancel !== true ||
+        e.scenario !== FUZZ_SCENARIO ||
+        (e.op !== "missing" && e.op !== "changed"))
+    ) {
+      fail(
+        `${label} afterCancel must be true, on a fuzz entry of op "missing" or "changed" only: it covers a requirement's cancel record (or, changed, its pairing with another requirement's cancel that both engines made) only after both engines reported the requirement's run's outcome (complete and met, or its error) and one cancel of it`,
+      );
+    }
+    if (
+      e.mispaired !== undefined &&
+      (e.mispaired !== true ||
+        e.scenario !== FUZZ_SCENARIO ||
+        (e.op !== "missing" && e.op !== "changed"))
+    ) {
+      fail(
+        `${label} mispaired must be true, on a fuzz entry of op "changed" or "missing" only: it covers a cancel record's pairing with another requirement's cancel that both engines made (changed), or 1.35's own cancel of that other requirement left unpaired (missing)`,
+      );
+    }
+    if (
+      e.mispaired === true &&
+      e.op === "changed" &&
+      e.extraCancelOf === undefined
+    ) {
+      fail(
+        `${label} is a changed entry with mispaired, so it needs extraCancelOf: the approved row t entries that decide 1.35's side of the pair (without it it excuses any cancel 1.35 adds)`,
+      );
+    }
+    if (
+      e.mispaired === true &&
+      e.op === "missing" &&
+      e.mispairedBy === undefined
+    ) {
+      fail(
+        `${label} is a missing entry with mispaired, so it needs mispairedBy: the changed entries that must cover the pair (without it it excuses the unpaired cancel of a pair nothing approves)`,
+      );
+    }
+    if (e.mispairedBy !== undefined) {
+      const listed = e.mispairedBy;
+      if (
+        e.scenario !== FUZZ_SCENARIO ||
+        e.op !== "missing" ||
+        e.mispaired !== true ||
+        !Array.isArray(listed) ||
+        listed.length === 0 ||
+        listed.some((x) => typeof x !== "string") ||
+        new Set(listed).size !== listed.length
+      ) {
+        fail(
+          `${label} mispairedBy must be a non-empty list of distinct entry ids, on a fuzz entry of op "missing" with mispaired only: the changed entries, one of which must cover the pair that left this cancel unpaired`,
+        );
+      } else {
+        for (const id of listed as string[]) {
+          const other = (entries as (Partial<DivergenceEntry> | null)[]).find(
+            (x) => x?.id === id,
+          );
+          if (
+            !other ||
+            other.scenario !== FUZZ_SCENARIO ||
+            other.op !== "changed" ||
+            other.engine !== e.engine ||
+            other.stream !== e.stream ||
+            other.kind !== e.kind ||
+            other.mispaired !== true ||
+            other.extraCancelOf === undefined
+          ) {
+            fail(
+              `${label} mispairedBy names ${id}, which must be a fuzz entry of op "changed" on the same engine, stream and kind, with mispaired and extraCancelOf: the shared mispairing rule's entry for the pair`,
+            );
+          }
+        }
+      }
+    }
+    if (e.extraCancelOf !== undefined) {
+      const listed = e.extraCancelOf;
+      if (
+        e.scenario !== FUZZ_SCENARIO ||
+        e.op !== "changed" ||
+        e.mispaired !== true ||
+        !Array.isArray(listed) ||
+        listed.length === 0 ||
+        listed.some((x) => typeof x !== "string") ||
+        new Set(listed).size !== listed.length
+      ) {
+        fail(
+          `${label} extraCancelOf must be a non-empty list of distinct entry ids, on a fuzz entry of op "changed" with mispaired only: the approved row t entries, one of which must cover 1.35's record of the pair as a missing record`,
+        );
+      } else {
+        for (const id of listed as string[]) {
+          const other = (entries as (Partial<DivergenceEntry> | null)[]).find(
+            (x) => x?.id === id,
+          );
+          if (
+            !other ||
+            !ROW_T_ID.test(id) ||
+            other.scenario !== FUZZ_SCENARIO ||
+            other.op !== "missing" ||
+            other.engine !== e.engine ||
+            other.stream !== e.stream ||
+            other.kind !== e.kind ||
+            other.bound === undefined ||
+            other.requires !== undefined ||
+            other.mispaired !== undefined
+          ) {
+            fail(
+              `${label} extraCancelOf names ${id}, which must be a row t fuzz entry of op "missing" on the same engine, stream and kind, with a bound and no requires or mispaired: an approved exception for a cancel record 1.35 makes and the engine does not`,
+            );
+          }
+        }
+      }
+    }
+    if (
+      e.counterFollows !== undefined &&
+      (e.counterFollows !== true ||
+        e.scenario !== FUZZ_SCENARIO ||
+        e.op !== "changed" ||
+        e.stream !== "external" ||
+        typeof e.kind !== "string" ||
+        PLUGIN_COUNTERS[e.kind] === undefined ||
+        e.excuses !== undefined ||
+        e.requires !== undefined ||
+        e.bound !== undefined ||
+        e.ends !== undefined)
+    ) {
+      fail(
+        `${label} counterFollows must be true, on a fuzz entry of op "changed" on stream "external" of a plugin kind PLUGIN_COUNTERS maps (${Object.keys(PLUGIN_COUNTERS).join(", ")}), with no excuses, requires, bound or ends: it covers a plugin counter only by the records other approved entries explain`,
+      );
+    }
+    if (
+      e.snapshotFollows !== undefined &&
+      (e.snapshotFollows !== true ||
+        e.scenario !== FUZZ_SCENARIO ||
+        e.op !== "changed" ||
+        e.stream !== "external" ||
+        e.kind !== "history" ||
+        e.path !== "data[1]" ||
+        e.group !== "row-ay" ||
+        !Array.isArray(e.when) ||
+        !e.when.includes("navigatedPaused") ||
+        e.excuses !== undefined ||
+        e.requires !== undefined ||
+        e.bound !== undefined ||
+        e.ends !== undefined)
+    ) {
+      fail(
+        `${label} snapshotFollows must be true, on a fuzz entry of op "changed" on stream "external" of kind "history" at path "data[1]", in group "row-ay" with \`when\` navigatedPaused, with no excuses, requires, bound or ends: it covers a history record's ids, index and length only by the missing snapshots row (ay)'s entries explain`,
+      );
+    }
+    if (
+      e.kind === "*" &&
+      (e.stream !== "notify" ||
+        e.scenario !== FUZZ_SCENARIO ||
+        !Array.isArray((e.bound as { match?: unknown } | undefined)?.match))
+    ) {
+      fail(
+        `${label} has kind "*", which only a fuzz notify entry with a bound may have`,
       );
     }
     if (e.group !== undefined) {
@@ -1208,7 +1442,9 @@ export function checkDivergences(
  *   entry's each name the full `path` (inside the entry's `path`, if it has
  *   one) and `from` and/or `to`. No two excuses of an entry name the same
  *   record (one excuse, a higher count).
- * - A fuzz entry has a `bound` and no `excuses` (`checkBound`).
+ * - A fuzz entry has a `bound` and no `excuses` (`checkBound`), except a
+ *   plugin-counter entry (`counterFollows`) or history-record entry
+ *   (`snapshotFollows`), which has neither.
  *
  * `uses` counts, per `<id>\t<index>`, the records each excuse excused in
  * the run (null when not known). Each excuse of an entry the run used must
@@ -1244,8 +1480,15 @@ export function checkExcuses(
           "has excuses, which only a hand scenario's entry may have: a fuzz case's records differ from seed to seed (give a bound)",
         );
       }
-      for (const m of checkBound(e)) {
-        fail(m);
+      // A plugin-counter entry (`counterFollows`) is bounded by the
+      // records other entries explain (`counterExplained`), and has no
+      // bound of its own (checkDivergences rejects one).
+      // The same for a history-record entry (`snapshotFollows`), bounded by
+      // row (ay)'s explained snapshots (`historyFollows`).
+      if (e.counterFollows !== true && e.snapshotFollows !== true) {
+        for (const m of checkBound(e)) {
+          fail(m);
+        }
       }
       continue;
     }
@@ -1331,6 +1574,7 @@ const BOUND_LIKES = Object.keys(LIKE);
 
 /** The `$text` classes a fuzz entry's bound may name. */
 const BOUND_TEXTS = Object.keys(TEXT);
+const BOUND_PAIRS = Object.keys(PAIR);
 
 /**
  * A fuzz entry's `bound` (diff/scenario.ts `Bound`): `{ match }`, a
@@ -1435,7 +1679,13 @@ function checkBound(e: Partial<DivergenceEntry>): string[] {
     } else if (e.op === "changed") {
       const q = p as Record<string, unknown>;
       const keys = Object.keys(q).sort().join();
-      if (
+      if (keys === "pair,path") {
+        if (typeof q.path !== "string" || typeof q.pair !== "string") {
+          out.push(`${at} of a changed entry's { path, pair } needs strings`);
+        } else if (!BOUND_PAIRS.includes(q.pair)) {
+          out.push(`${at} names an unknown pair "${q.pair}"`);
+        }
+      } else if (
         (keys !== "from,path,to" && keys !== "from,path,record,to") ||
         typeof q.path !== "string" ||
         (keys === "from,path,record,to" &&

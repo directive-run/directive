@@ -48499,5 +48499,3231 @@
     "reason": "Keyed twin of `l3-quirk-a-fuzz-observe-resolver-start-changed` (same row, same approval): GATE-1 quirk a, under onResolverError \"retry\" 1.35 never runs the resolver again and 2.0 re-dispatches the requirement under its retry policy. A keyed resolver's requirement id is the bare key (`A1`, `keyedRequirementId`) and its requirement carries `at`, so the plain entry's `requirementId` bound does not reach it. Found by the L11 deep seed 24301, data-form phase (spec u24301, step 16: 2.0 starts `r1` again for `A1`, 1.35 leaves it unmet). Pinned with the public API (fix2/shrink/u24301.mjs): a failing resolver under \"retry\" runs once on 1.35 and four times on 2.0, keyed or not. Signed 2026-11-19 on the owner's instruction (\"Yes, run 5 (Recommended)\", 2026-11-19), in the L11 gate run 5: he approved this row on the decisions page (\"If all are better or non user facing they are all approved\", 2026-11-01) and \"I approve you for to do everything\" (2026-11-15).",
     "approvedBy": "Jason Comes",
     "date": "2026-11-19"
+  },
+  {
+    "id": "l12-bx-watch-hears-included-fact",
+    "scenario": "a watch misses an included fact's change until a derivation changes (U1)",
+    "stream": "external",
+    "kind": "watch",
+    "engine": "v2",
+    "step": 3,
+    "op": "extra",
+    "excuses": [
+      {
+        "count": 1,
+        "record": {
+          "k": "external",
+          "data": [
+            "watch",
+            {
+              "display": "Ada (1)",
+              "plan": "pro"
+            },
+            true
+          ]
+        }
+      }
+    ],
+    "reason": "Row (bx), the L12 RFC: a watched distributable snapshot also subscribes to its includeFacts keys, so the write of an included fact that changes data calls back (2.0 records one \"watch\" external in step 3, the `plan` write, carrying plan \"pro\"); 1.35 subscribes to the watched derivations only and stays silent until a derivation moves (probe D4). The version check is 1.35's, so a callback still means data changed, and the later `count` write's callback is identical on both engines. Pinned on 2.0's side by core-next's l12a-distributable \"(bx): a write to an included fact calls back; an equal write does not\". Signed on the owner's instruction: the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-21"
+  },
+  {
+    "id": "l12-fuzz-az-external-ledger-navigate-entry",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "{\"op\":\"ledger\"}",
+    "engine": "v2",
+    "op": "changed",
+    "when": ["replayedOrImported"],
+    "group": "row-az",
+    "bound": {
+      "match": [
+        {
+          "path": "data[1].entryCount",
+          "pair": "ledgerNavigateInserted"
+        },
+        {
+          "path": "data[2]",
+          "pair": "ledgerNavigateInserted"
+        }
+      ]
+    },
+    "reason": "Row (az) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): replay() and import() call onHistoryNavigate, as goTo does; 1.35 does not. The audit ledger (L12c) records each onHistoryNavigate as a system.history.navigate entry, so in a fuzz case with the ledger and a replay or roundtrip step 2.0's trail has a navigate entry 1.35's lacks for each replay or import. Reproduced (L12 gate run 1, PR fuzz at L12, phase with plugins, seed 24301): history.import(history.export()) gives 1.35 [system.init, fact.change, system.start, system.snapshot] and 2.0 the same plus system.history.navigate {from 0, to 0}. This covers the `ledger` step's two records only as a pair (diff/fingerprint.ts PAIR.ledgerNavigateInserted): verify() reports a higher entryCount with valid true and every other field equal, and the entries are 1.35's, in order, with navigate entries inserted, each later entry's seq raised by the insertions before it and its prevHash 1.35's until the first insertion. Any other change to either record is not covered. Signed on the owner's instruction: he approved this row (\"Approve all as recommended (Recommended)\", 2026-11-10) and asked Claude to sign for him.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-21"
+  },
+  {
+    "id": "l12-fuzz-bx-console-warn-distributable-skip-extra",
+    "scenario": "fuzz",
+    "stream": "console",
+    "kind": "warn",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "console",
+          "level": "warn",
+          "args": [
+            {
+              "$text": "distributableSkipped"
+            },
+            {
+              "$text": "derivationThrown"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. That read meets a throwing derivation and prints the development warning \"[Directive] getDistributableSnapshot: Skipping derivation \\\"<id>\\\" due to error:\" with the derivation's own error, once more on 2.0. This covers only that warning, extra on 2.0, word for word (`distributableSkipped`, `derivationThrown`: a derivation id and a fuzz derivation's thrown error). Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onError-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "extra",
+    "requires": {
+      "stream": "console",
+      "kind": "warn",
+      "op": "extra",
+      "order": "any",
+      "bound": {
+        "match": [
+          {
+            "k": "console",
+            "level": "warn",
+            "args": [
+              {
+                "$text": "distributableSkipped"
+              },
+              {
+                "$text": "derivationThrown"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onError",
+          "args": [
+            {
+              "$error": {
+                "name": "DirectiveError",
+                "message": {
+                  "$like": "derivationThrownMessage"
+                },
+                "context": {
+                  "$undefined": true
+                },
+                "recoverable": true,
+                "source": "derivation",
+                "sourceId": {
+                  "$like": "derivation"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. The same read reports the throwing derivation's error to onError once more on 2.0. This covers only an onError of a fuzz derivation's own error (source \"derivation\", recoverable), extra on 2.0, and only with that read's extra warning in the same case (`requires`). Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onErrorRecovery-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "extra",
+    "requires": {
+      "stream": "console",
+      "kind": "warn",
+      "op": "extra",
+      "order": "any",
+      "bound": {
+        "match": [
+          {
+            "k": "console",
+            "level": "warn",
+            "args": [
+              {
+                "$text": "distributableSkipped"
+              },
+              {
+                "$text": "derivationThrown"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onErrorRecovery",
+          "args": [
+            {
+              "$error": {
+                "name": "DirectiveError",
+                "message": {
+                  "$like": "derivationThrownMessage"
+                },
+                "context": {
+                  "$undefined": true
+                },
+                "recoverable": true,
+                "source": "derivation",
+                "sourceId": {
+                  "$like": "derivation"
+                }
+              }
+            },
+            "skip"
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. The same read reports the throwing derivation's recovery, \"skip\", once more on 2.0. This covers only an onErrorRecovery \"skip\" of a fuzz derivation's own error, extra on 2.0, and only with that read's extra warning in the same case (`requires`). Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-observe-derivation-compute-moved",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "snapshotDerivation"
+            },
+            "type": "derivation.compute",
+            "value": {
+              "$like": "derivedValue"
+            }
+          }
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. That read computes a derivation one step earlier than 1.35, which computes it at its next read. This covers only a derivation.compute that moved one step earlier on 2.0 (`by` -1); its value is still compared, and the two records must name the same derivation (`same` event.id, L12 gate run 4: an aligner pairing of two different derivations is never excused, PR seed 19). Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22",
+    "same": "event.id"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onDerivationCompute-moved",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "op": "moved",
+    "by": -1,
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": [
+            {
+              "$like": "snapshotDerivation"
+            },
+            {
+              "$like": "derivedValue"
+            },
+            {
+              "$like": "dependencyKeys"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. The same compute, as onDerivationCompute reports it, one step earlier on 2.0. This covers only that move (`by` -1); its value and dependencies are still compared, and the two records must name the same derivation (`same` args[0], L12 gate run 4, PR seed 19). Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22",
+    "same": "args[0]"
+  },
+  {
+    "id": "l12-fuzz-bx-external-watch-extra",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "watch",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "watch",
+            {
+              "$like": "distributableSnapshot"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 3): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds. 1.35's watch hears derivations only. Found by the census-seed fuzz (seed 24301, plugin phase, case 13, and its shrink diff-notes hang/shrunk-spec.json); with the watch's facts empty the same case passes. Row (bx) itself in the fuzz model (the U1 entry `l12-bx-watch-hears-included-fact` covers its scenario): the write of an included fact that changes the snapshot calls the watch back on 2.0, where 1.35 waits for a derivation to move. This covers only an extra \"watch\" callback carrying a distributable snapshot (`distributableSnapshot`), in a case whose watch includes facts. Signed on the owner's instruction: asked whether the (bx) exception should cover its knock-on effects, he answered \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-external-watch-missing",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "watch",
+    "engine": "v2",
+    "op": "missing",
+    "requires": {
+      "stream": "external",
+      "kind": "watch",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "watch",
+              {
+                "$like": "distributableSnapshot"
+              }
+            ]
+          }
+        ]
+      },
+      "same": "data[1].version"
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "external",
+          "data": [
+            "watch",
+            {
+              "$like": "distributableSnapshot"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 4): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty the same cases pass (diff-notes l12gate/triage, the nf replays). Found by PR seeds 6, 8 and 17: 2.0's fact subscription delivers a snapshot at the fact write, and 1.35 delivers the same snapshot (the same `version`) at a later step, when a derivation moves; 2.0 has nothing left to deliver there. This covers only a missing \"watch\" callback carrying a distributable snapshot, and only when 2.0 delivered a snapshot of the same version earlier in the case, as an extra \"watch\" callback (`requires`, `same` data[1].version, at or before). A missing callback with no earlier delivery of its version, or a snapshot without a version, is not covered. Signed on the owner's instruction: asked for a run 4 that signs the remaining (bx) knock-ons, he answered \"Yes, run 4 (Recommended)\" (2026-11-22), with his earlier \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-observe-derivation-compute-moved-same-step",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "op": "moved",
+    "by": 0,
+    "same": "event.id",
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "snapshotDerivation"
+            },
+            "type": "derivation.compute",
+            "value": {
+              "$like": "derivedValue"
+            }
+          }
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 4): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty the same cases pass (diff-notes l12gate/triage, the nf replays). Found by PR seed 15: the extra read computes a derivation earlier in the same step (in its sync phase, where 1.35 computes it in the async phase). This covers only a derivation.compute that 2.0 made earlier in the same step (`by` 0), of the same derivation (`same` event.id); its value is still compared. Signed on the owner's instruction: asked for a run 4 that signs the remaining (bx) knock-ons, he answered \"Yes, run 4 (Recommended)\" (2026-11-22), with his earlier \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onDerivationCompute-moved-same-step",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "op": "moved",
+    "by": 0,
+    "same": "args[0]",
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": [
+            {
+              "$like": "snapshotDerivation"
+            },
+            {
+              "$like": "derivedValue"
+            },
+            {
+              "$like": "dependencyKeys"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 4): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty the same cases pass (diff-notes l12gate/triage, the nf replays). Found by PR seed 15: the same compute, as onDerivationCompute reports it, earlier in the same step on 2.0. This covers only that move (`by` 0), of the same derivation (`same` args[0]); its value and dependencies are still compared. Signed on the owner's instruction: asked for a run 4 that signs the remaining (bx) knock-ons, he answered \"Yes, run 4 (Recommended)\" (2026-11-22), with his earlier \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onDerivationCompute-retracked-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "op": "extra",
+    "stale": true,
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": [
+            {
+              "$like": "snapshotDerivation"
+            },
+            {
+              "$like": "derivedValue"
+            },
+            {
+              "$like": "dependencyKeys"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 4): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty the same cases pass (diff-notes l12gate/triage, the nf replays). Found by PR seeds 3 and 10: the extra read computes a derivation whose last compute threw or that had never computed, so 2.0 tracks it again; from then on 2.0 invalidates, recomputes and notifies it on each write of its facts, where 1.35, which has not computed it since, does none of that until its closing read. This covers only an extra onDerivationCompute of a fuzz derivation while, on 1.35 at that point, that derivation's last compute threw or it has never computed (`stale`, diff/scenario.ts markStale). Signed on the owner's instruction: asked for a run 4 that signs the remaining (bx) knock-ons, he answered \"Yes, run 4 (Recommended)\" (2026-11-22), with his earlier \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-observe-derivation-compute-retracked-extra",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "op": "extra",
+    "stale": true,
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "snapshotDerivation"
+            },
+            "type": "derivation.compute",
+            "value": {
+              "$like": "derivedValue"
+            }
+          }
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 4): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty the same cases pass (diff-notes l12gate/triage, the nf replays). Found by PR seeds 3 and 10: the extra read computes a derivation whose last compute threw or that had never computed, so 2.0 tracks it again; from then on 2.0 invalidates, recomputes and notifies it on each write of its facts, where 1.35, which has not computed it since, does none of that until its closing read. This covers only an extra derivation.compute of a fuzz derivation while, on 1.35, its last compute threw or it has never computed (`stale`). Signed on the owner's instruction: asked for a run 4 that signs the remaining (bx) knock-ons, he answered \"Yes, run 4 (Recommended)\" (2026-11-22), with his earlier \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onDerivationInvalidate-retracked-extra",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onDerivationInvalidate",
+    "engine": "v2",
+    "op": "extra",
+    "stale": true,
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onDerivationInvalidate",
+          "args": [
+            {
+              "$like": "snapshotDerivation"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 4): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty the same cases pass (diff-notes l12gate/triage, the nf replays). Found by PR seeds 3 and 10: the extra read computes a derivation whose last compute threw or that had never computed, so 2.0 tracks it again; from then on 2.0 invalidates, recomputes and notifies it on each write of its facts, where 1.35, which has not computed it since, does none of that until its closing read. This covers only an extra onDerivationInvalidate of a fuzz derivation while, on 1.35, its last compute threw or it has never computed (`stale`). Signed on the owner's instruction: asked for a run 4 that signs the remaining (bx) knock-ons, he answered \"Yes, run 4 (Recommended)\" (2026-11-22), with his earlier \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-notify-derivation-retracked-extra",
+    "scenario": "fuzz",
+    "stream": "notify",
+    "kind": "*",
+    "engine": "v2",
+    "op": "extra",
+    "stale": true,
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "notify",
+          "id": {
+            "$like": "snapshotDerivation"
+          },
+          "value": {
+            "$like": "derivedValue"
+          }
+        },
+        {
+          "k": "notify",
+          "id": {
+            "$like": "snapshotDerivation"
+          },
+          "value": {
+            "$throws": {
+              "$error": {
+                "name": "Error",
+                "message": {
+                  "$like": "derivationThrownMessage"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 4): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty the same cases pass (diff-notes l12gate/triage, the nf replays). Found by PR seeds 3 and 10: the extra read computes a derivation whose last compute threw or that had never computed, so 2.0 tracks it again; from then on 2.0 invalidates, recomputes and notifies it on each write of its facts, where 1.35, which has not computed it since, does none of that until its closing read. This covers only an extra notify of a fuzz derivation (any derivation id, `kind` \"*\" with the bound naming it) with a plain value, or its own thrown error when the re-tracked derivation throws again (PR seed 17, run 4), while, on 1.35, its last compute threw or it has never computed (`stale`). Signed on the owner's instruction: asked for a run 4 that signs the remaining (bx) knock-ons, he answered \"Yes, run 4 (Recommended)\" (2026-11-22), with his earlier \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onDerivationCompute-closing-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "op": "missing",
+    "stale": true,
+    "requires": {
+      "stream": "hook",
+      "kind": "onDerivationCompute",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "hook",
+            "hook": "onDerivationCompute",
+            "args": [
+              {
+                "$like": "snapshotDerivation"
+              },
+              {
+                "$like": "derivedValue"
+              },
+              {
+                "$like": "dependencyKeys"
+              }
+            ]
+          }
+        ]
+      },
+      "same": "args[0]"
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onDerivationCompute",
+          "args": [
+            {
+              "$like": "snapshotDerivation"
+            },
+            {
+              "$like": "derivedValue"
+            },
+            {
+              "$like": "dependencyKeys"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 4): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty the same cases pass (diff-notes l12gate/triage, the nf replays). Found by PR seeds 3 and 10: the extra read computes a derivation whose last compute threw or that had never computed, so 2.0 tracks it again; from then on 2.0 invalidates, recomputes and notifies it on each write of its facts, where 1.35, which has not computed it since, does none of that until its closing read. 1.35's closing read then computes the derivation, which 2.0 already holds. This covers only that missing onDerivationCompute, while 1.35's last compute of it threw or never ran (`stale`), and only when 2.0 computed the same derivation earlier as an extra (`requires`, `same` args[0]). Signed on the owner's instruction: asked for a run 4 that signs the remaining (bx) knock-ons, he answered \"Yes, run 4 (Recommended)\" (2026-11-22), with his earlier \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-observe-derivation-compute-closing-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "op": "missing",
+    "stale": true,
+    "requires": {
+      "stream": "observe",
+      "kind": "derivation.compute",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "observe",
+            "event": {
+              "id": {
+                "$like": "snapshotDerivation"
+              },
+              "type": "derivation.compute",
+              "value": {
+                "$like": "derivedValue"
+              }
+            }
+          }
+        ]
+      },
+      "same": "event.id"
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "snapshotDerivation"
+            },
+            "type": "derivation.compute",
+            "value": {
+              "$like": "derivedValue"
+            }
+          }
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 4): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again through system.read (core-next src/api/distributable.ts:53 and :89, the subscription at :158), which computes the other derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty the same cases pass (diff-notes l12gate/triage, the nf replays). Found by PR seeds 3 and 10: the extra read computes a derivation whose last compute threw or that had never computed, so 2.0 tracks it again; from then on 2.0 invalidates, recomputes and notifies it on each write of its facts, where 1.35, which has not computed it since, does none of that until its closing read. This covers only the same closing compute as observed, missing on 2.0, while 1.35's last compute of it threw or never ran (`stale`), and only when 2.0 observed the same derivation computed earlier as an extra (`requires`, `same` event.id). Signed on the owner's instruction: asked for a run 4 that signs the remaining (bx) knock-ons, he answered \"Yes, run 4 (Recommended)\" (2026-11-22), with his earlier \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-b-batch-pair-hook-onError-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "ends": true,
+    "when": ["resolverRejects", "batched", "batchFails"],
+    "group": "quirk-b-batch-pairing",
+    "requires": {
+      "stream": "hook",
+      "kind": "onError",
+      "op": "missing",
+      "order": "any",
+      "bound": {
+        "match": [
+          {
+            "k": "hook",
+            "hook": "onError",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "batchAttemptError"
+                  },
+                  "context": {
+                    "fromConstraint": {
+                      "$like": "batchConstraint"
+                    },
+                    "id": {
+                      "$like": "batchRequirementId"
+                    },
+                    "requirement": {
+                      "item": {
+                        "$like": "batchItem"
+                      },
+                      "type": {
+                        "$like": "batchRequirementType"
+                      }
+                    }
+                  },
+                  "recoverable": true,
+                  "source": "resolver",
+                  "sourceId": {
+                    "$like": "batchResolver"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].$error.context.fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "batchConstraint"
+          }
+        },
+        {
+          "path": "args[0].$error.context.id",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        },
+        {
+          "path": "args[0].$error.context.requirement.item",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "args[0].$error.context.requirement.type",
+          "from": {
+            "$like": "requirementType"
+          },
+          "to": {
+            "$like": "batchRequirementType"
+          }
+        },
+        {
+          "path": "args[0].$error.message",
+          "from": {
+            "$like": "attemptError"
+          },
+          "to": {
+            "$like": "batchAttemptError"
+          }
+        },
+        {
+          "path": "args[0].$error.sourceId",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "batchResolver"
+          }
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk b (L2), paired with a batch run (L12 gate run 5; PR seed 15 in run 4's rerun): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run; 2.0 reports the cancel only. In a batched case whose batch run also fails, the comparison pairs 1.35's extra error for the single run (r0) with 2.0's error record of the batch run (rb), and leaves 1.35's own batch error unpaired (the missing record l7-fuzz-b-*-batchFails cover). Shrunk public-API probe: diff-notes l12gate/fix4/probe/p15.mjs (no batch: 1.35 adds onError r0 and onResolverError r0 after the cancel, 2.0 does not; with a batch: the same, plus rb's error on both). No new behaviour: this is quirk b's batch-pairing twin, as row t has (l11-cand-t-batch-*). This covers only the onError hook call changed field by field from a single run's classes to a batch run's, and only where 1.35 also made a batch run's record of that kind that 2.0 lacks (`requires`, op missing, with l7-fuzz-b-*-batchFails' bound): 1.35 made one more error record than 2.0, and the comparison left a batch one unpaired. A single run's error paired with a batch's where 1.35 made no more of them than 2.0 (deep case 2/3, before quirk p's stop) stays unexcused. Like quirk b's other entries it ends the case (`ends`): with more than one batch item the same shift pairs each later batch error with the next item's (PR seed 15's second shrink, diff-notes l12gate/r5/specs/pr15b), differently for each seed. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), next to quirk b's own approval on the decisions page (\"If all are better or non user facing they are all approved\"), as l7-fuzz-b-*-batchFails quote it.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-b-batch-pair-hook-onErrorRecovery-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "ends": true,
+    "when": ["resolverRejects", "batched", "batchFails"],
+    "group": "quirk-b-batch-pairing",
+    "requires": {
+      "stream": "hook",
+      "kind": "onErrorRecovery",
+      "op": "missing",
+      "order": "any",
+      "bound": {
+        "match": [
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "batchAttemptError"
+                  },
+                  "context": {
+                    "fromConstraint": {
+                      "$like": "batchConstraint"
+                    },
+                    "id": {
+                      "$like": "batchRequirementId"
+                    },
+                    "requirement": {
+                      "item": {
+                        "$like": "batchItem"
+                      },
+                      "type": {
+                        "$like": "batchRequirementType"
+                      }
+                    }
+                  },
+                  "recoverable": true,
+                  "source": "resolver",
+                  "sourceId": {
+                    "$like": "batchResolver"
+                  }
+                }
+              },
+              "skip"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": "a.d1 throws at 3",
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": "a::d1"
+                }
+              },
+              "skip"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "attemptError"
+                  },
+                  "context": {
+                    "fromConstraint": {
+                      "$like": "constraint"
+                    },
+                    "id": {
+                      "$like": "requirementId"
+                    },
+                    "requirement": {
+                      "type": {
+                        "$like": "requirementType"
+                      }
+                    }
+                  },
+                  "recoverable": true,
+                  "source": "resolver",
+                  "sourceId": {
+                    "$like": "resolver"
+                  }
+                }
+              },
+              "retry-later"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "attemptError"
+                  },
+                  "context": {
+                    "fromConstraint": {
+                      "$like": "constraint"
+                    },
+                    "id": {
+                      "$like": "requirementId"
+                    },
+                    "requirement": {
+                      "type": {
+                        "$like": "requirementType"
+                      }
+                    }
+                  },
+                  "recoverable": true,
+                  "source": "resolver",
+                  "sourceId": {
+                    "$like": "resolver"
+                  }
+                }
+              },
+              "throw"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "attemptError"
+                  },
+                  "context": {
+                    "fromConstraint": {
+                      "$like": "constraint"
+                    },
+                    "id": {
+                      "$like": "requirementId"
+                    },
+                    "requirement": {
+                      "type": {
+                        "$like": "requirementType"
+                      }
+                    }
+                  },
+                  "recoverable": true,
+                  "source": "resolver",
+                  "sourceId": {
+                    "$like": "resolver"
+                  }
+                }
+              },
+              "skip"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "batchAttemptError"
+                  },
+                  "context": {
+                    "fromConstraint": {
+                      "$like": "batchConstraint"
+                    },
+                    "id": {
+                      "$like": "batchRequirementId"
+                    },
+                    "requirement": {
+                      "item": {
+                        "$like": "batchItem"
+                      },
+                      "type": {
+                        "$like": "batchRequirementType"
+                      }
+                    }
+                  },
+                  "recoverable": true,
+                  "source": "resolver",
+                  "sourceId": {
+                    "$like": "batchResolver"
+                  }
+                }
+              },
+              "throw"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "attemptError"
+                  },
+                  "context": {
+                    "fromConstraint": {
+                      "$like": "constraint"
+                    },
+                    "id": {
+                      "$like": "requirementId"
+                    },
+                    "requirement": {
+                      "type": {
+                        "$like": "requirementType"
+                      }
+                    }
+                  },
+                  "recoverable": true,
+                  "source": "resolver",
+                  "sourceId": {
+                    "$like": "resolver"
+                  }
+                }
+              },
+              "disable"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "attemptError"
+                  },
+                  "context": {
+                    "fromConstraint": {
+                      "$like": "constraint"
+                    },
+                    "id": {
+                      "$like": "requirementId"
+                    },
+                    "requirement": {
+                      "type": {
+                        "$like": "requirementType"
+                      }
+                    }
+                  },
+                  "recoverable": true,
+                  "source": "resolver",
+                  "sourceId": {
+                    "$like": "resolver"
+                  }
+                }
+              },
+              "retry"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "batchAttemptError"
+                  },
+                  "context": {
+                    "fromConstraint": {
+                      "$like": "batchConstraint"
+                    },
+                    "id": {
+                      "$like": "batchRequirementId"
+                    },
+                    "requirement": {
+                      "item": {
+                        "$like": "batchItem"
+                      },
+                      "type": {
+                        "$like": "batchRequirementType"
+                      }
+                    }
+                  },
+                  "recoverable": true,
+                  "source": "resolver",
+                  "sourceId": {
+                    "$like": "batchResolver"
+                  }
+                }
+              },
+              "retry-later"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": "a.d1 throws at 5",
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": "d1"
+                }
+              },
+              "skip"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": "a.d1 throws at 4",
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": "d1"
+                }
+              },
+              "skip"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": "a.d0 throws at 4",
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": "a::d0"
+                }
+              },
+              "skip"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "batchAttemptError"
+                  },
+                  "context": {
+                    "fromConstraint": {
+                      "$like": "batchConstraint"
+                    },
+                    "id": {
+                      "$like": "batchRequirementId"
+                    },
+                    "requirement": {
+                      "item": {
+                        "$like": "batchItem"
+                      },
+                      "type": {
+                        "$like": "batchRequirementType"
+                      }
+                    }
+                  },
+                  "recoverable": true,
+                  "source": "resolver",
+                  "sourceId": {
+                    "$like": "batchResolver"
+                  }
+                }
+              },
+              "disable"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "batchAttemptError"
+                  },
+                  "context": {
+                    "fromConstraint": {
+                      "$like": "batchConstraint"
+                    },
+                    "id": {
+                      "$like": "batchRequirementId"
+                    },
+                    "requirement": {
+                      "item": {
+                        "$like": "batchItem"
+                      },
+                      "type": {
+                        "$like": "batchRequirementType"
+                      }
+                    }
+                  },
+                  "recoverable": true,
+                  "source": "resolver",
+                  "sourceId": {
+                    "$like": "batchResolver"
+                  }
+                }
+              },
+              "retry"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": "a.d1 throws at 3",
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": "d1"
+                }
+              },
+              "skip"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": "a.x0 throws at 5",
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "effect",
+                  "sourceId": "x0"
+                }
+              },
+              "skip"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": "a.d1 throws at 7",
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": "d1"
+                }
+              },
+              "skip"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": "a.x1 throws at 5",
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "effect",
+                  "sourceId": "x1"
+                }
+              },
+              "retry"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": "a.d0 throws at 3",
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": "d1"
+                }
+              },
+              "skip"
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": "a.d2 throws at 4",
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": "d2"
+                }
+              },
+              "skip"
+            ]
+          }
+        ]
+      }
+    },
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].$error.context.fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "batchConstraint"
+          }
+        },
+        {
+          "path": "args[0].$error.context.id",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        },
+        {
+          "path": "args[0].$error.context.requirement.item",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "args[0].$error.context.requirement.type",
+          "from": {
+            "$like": "requirementType"
+          },
+          "to": {
+            "$like": "batchRequirementType"
+          }
+        },
+        {
+          "path": "args[0].$error.message",
+          "from": {
+            "$like": "attemptError"
+          },
+          "to": {
+            "$like": "batchAttemptError"
+          }
+        },
+        {
+          "path": "args[0].$error.sourceId",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "batchResolver"
+          }
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk b (L2), paired with a batch run (L12 gate run 5; PR seed 15 in run 4's rerun): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run; 2.0 reports the cancel only. In a batched case whose batch run also fails, the comparison pairs 1.35's extra error for the single run (r0) with 2.0's error record of the batch run (rb), and leaves 1.35's own batch error unpaired (the missing record l7-fuzz-b-*-batchFails cover). Shrunk public-API probe: diff-notes l12gate/fix4/probe/p15.mjs (no batch: 1.35 adds onError r0 and onResolverError r0 after the cancel, 2.0 does not; with a batch: the same, plus rb's error on both). No new behaviour: this is quirk b's batch-pairing twin, as row t has (l11-cand-t-batch-*). This covers only the onErrorRecovery hook call changed field by field from a single run's classes to a batch run's, and only where 1.35 also made a batch run's record of that kind that 2.0 lacks (`requires`, op missing, with l7-fuzz-b-*-batchFails' bound): 1.35 made one more error record than 2.0, and the comparison left a batch one unpaired. A single run's error paired with a batch's where 1.35 made no more of them than 2.0 (deep case 2/3, before quirk p's stop) stays unexcused. Like quirk b's other entries it ends the case (`ends`): with more than one batch item the same shift pairs each later batch error with the next item's (PR seed 15's second shrink, diff-notes l12gate/r5/specs/pr15b), differently for each seed. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), next to quirk b's own approval on the decisions page (\"If all are better or non user facing they are all approved\"), as l7-fuzz-b-*-batchFails quote it.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-b-batch-pair-hook-onResolverError-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverError",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args",
+    "ends": true,
+    "when": ["resolverRejects", "batched", "batchFails"],
+    "group": "quirk-b-batch-pairing",
+    "requires": {
+      "stream": "hook",
+      "kind": "onResolverError",
+      "op": "missing",
+      "order": "any",
+      "bound": {
+        "match": [
+          {
+            "k": "hook",
+            "hook": "onResolverError",
+            "args": [
+              {
+                "$like": "batchResolver"
+              },
+              {
+                "fromConstraint": {
+                  "$like": "batchConstraint"
+                },
+                "id": {
+                  "$like": "batchRequirementId"
+                },
+                "requirement": {
+                  "item": {
+                    "$like": "batchItem"
+                  },
+                  "type": {
+                    "$like": "batchRequirementType"
+                  }
+                }
+              },
+              {
+                "$error": {
+                  "name": "Error",
+                  "message": {
+                    "$like": "batchAttemptError"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "k": "hook",
+            "hook": "onResolverError",
+            "args": [
+              {
+                "$like": "resolver"
+              },
+              {
+                "fromConstraint": {
+                  "$like": "constraint"
+                },
+                "id": {
+                  "$like": "requirementId"
+                },
+                "requirement": {
+                  "type": {
+                    "$like": "requirementType"
+                  }
+                }
+              },
+              {
+                "$error": {
+                  "name": "Error",
+                  "message": {
+                    "$like": "attemptError"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "bound": {
+      "match": [
+        {
+          "path": "args[0]",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "batchResolver"
+          }
+        },
+        {
+          "path": "args[1].fromConstraint",
+          "from": {
+            "$like": "constraint"
+          },
+          "to": {
+            "$like": "batchConstraint"
+          }
+        },
+        {
+          "path": "args[1].id",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        },
+        {
+          "path": "args[1].requirement.item",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "$like": "batchItem"
+          }
+        },
+        {
+          "path": "args[1].requirement.type",
+          "from": {
+            "$like": "requirementType"
+          },
+          "to": {
+            "$like": "batchRequirementType"
+          }
+        },
+        {
+          "path": "args[2].$error.message",
+          "from": {
+            "$like": "attemptError"
+          },
+          "to": {
+            "$like": "batchAttemptError"
+          }
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk b (L2), paired with a batch run (L12 gate run 5; PR seed 15 in run 4's rerun): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run; 2.0 reports the cancel only. In a batched case whose batch run also fails, the comparison pairs 1.35's extra error for the single run (r0) with 2.0's error record of the batch run (rb), and leaves 1.35's own batch error unpaired (the missing record l7-fuzz-b-*-batchFails cover). Shrunk public-API probe: diff-notes l12gate/fix4/probe/p15.mjs (no batch: 1.35 adds onError r0 and onResolverError r0 after the cancel, 2.0 does not; with a batch: the same, plus rb's error on both). No new behaviour: this is quirk b's batch-pairing twin, as row t has (l11-cand-t-batch-*). This covers only the onResolverError hook call changed field by field from a single run's classes to a batch run's, and only where 1.35 also made a batch run's record of that kind that 2.0 lacks (`requires`, op missing, with l7-fuzz-b-*-batchFails' bound): 1.35 made one more error record than 2.0, and the comparison left a batch one unpaired. A single run's error paired with a batch's where 1.35 made no more of them than 2.0 (deep case 2/3, before quirk p's stop) stays unexcused. Like quirk b's other entries it ends the case (`ends`): with more than one batch item the same shift pairs each later batch error with the next item's (PR seed 15's second shrink, diff-notes l12gate/r5/specs/pr15b), differently for each seed. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), next to quirk b's own approval on the decisions page (\"If all are better or non user facing they are all approved\"), as l7-fuzz-b-*-batchFails quote it.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-b-batch-pair-observe-resolver-error-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "resolver.error",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event",
+    "ends": true,
+    "when": ["resolverRejects", "batched", "batchFails"],
+    "group": "quirk-b-batch-pairing",
+    "requires": {
+      "stream": "observe",
+      "kind": "resolver.error",
+      "op": "missing",
+      "order": "any",
+      "bound": {
+        "match": [
+          {
+            "k": "observe",
+            "event": {
+              "error": {
+                "$error": {
+                  "name": "Error",
+                  "message": {
+                    "$like": "batchAttemptError"
+                  }
+                }
+              },
+              "requirementId": {
+                "$like": "batchRequirementId"
+              },
+              "resolver": {
+                "$like": "batchResolver"
+              },
+              "type": "resolver.error"
+            }
+          }
+        ]
+      }
+    },
+    "bound": {
+      "match": [
+        {
+          "path": "event.error.$error.message",
+          "from": {
+            "$like": "attemptError"
+          },
+          "to": {
+            "$like": "batchAttemptError"
+          }
+        },
+        {
+          "path": "event.requirementId",
+          "from": {
+            "$like": "requirementId"
+          },
+          "to": {
+            "$like": "batchRequirementId"
+          }
+        },
+        {
+          "path": "event.resolver",
+          "from": {
+            "$like": "resolver"
+          },
+          "to": {
+            "$like": "batchResolver"
+          }
+        }
+      ]
+    },
+    "reason": "GATE-1 quirk b (L2), paired with a batch run (L12 gate run 5; PR seed 15 in run 4's rerun): in 1.35 a run whose requirement is retracted during its retry backoff reports cancel, then also reports an error for the same run; 2.0 reports the cancel only. In a batched case whose batch run also fails, the comparison pairs 1.35's extra error for the single run (r0) with 2.0's error record of the batch run (rb), and leaves 1.35's own batch error unpaired (the missing record l7-fuzz-b-*-batchFails cover). Shrunk public-API probe: diff-notes l12gate/fix4/probe/p15.mjs (no batch: 1.35 adds onError r0 and onResolverError r0 after the cancel, 2.0 does not; with a batch: the same, plus rb's error on both). No new behaviour: this is quirk b's batch-pairing twin, as row t has (l11-cand-t-batch-*). This covers only the resolver.error observe event changed field by field from a single run's classes to a batch run's, and only where 1.35 also made a batch run's record of that kind that 2.0 lacks (`requires`, op missing, with l7-fuzz-b-*-batchFails' bound): 1.35 made one more error record than 2.0, and the comparison left a batch one unpaired. A single run's error paired with a batch's where 1.35 made no more of them than 2.0 (deep case 2/3, before quirk p's stop) stays unexcused. Like quirk b's other entries it ends the case (`ends`): with more than one batch item the same shift pairs each later batch error with the next item's (PR seed 15's second shrink, diff-notes l12gate/r5/specs/pr15b), differently for each seed. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), next to quirk b's own approval on the decisions page (\"If all are better or non user facing they are all approved\"), as l7-fuzz-b-*-batchFails quote it.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onError-repaired-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onError",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "requires": {
+      "stream": "hook",
+      "kind": "onError",
+      "op": "extra",
+      "order": "any",
+      "same": "args",
+      "bound": {
+        "match": [
+          {
+            "k": "hook",
+            "hook": "onError",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "derivationThrownMessage"
+                  },
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": {
+                    "$like": "derivation"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].$error.message",
+          "from": {
+            "$like": "derivationThrownMessage"
+          },
+          "to": {
+            "$like": "derivationThrownMessage"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onError",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "derivationThrownMessage"
+                  },
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": {
+                    "$like": "derivation"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "path": "args[0].$error.sourceId",
+          "from": {
+            "$like": "derivation"
+          },
+          "to": {
+            "$like": "derivation"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onError",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "derivationThrownMessage"
+                  },
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": {
+                    "$like": "derivation"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 5; found by run 4's rerun and triage 5): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again, which computes the derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty, and with no watch, the same case passes (diff-notes l12gate/r5/replay, the nf and nw replays). Found by PR seed 6 (plugin phase): two derivations throw, and 2.0's extra read reports their errors once more, d1 then d2, the definition order every snapshot read has on both engines (probe diff-notes l12gate/fix4/probe/p6.mjs: the two engines' outputs are byte-identical). The extra read sits in a run where notify-driven reads (d2, then d1) interleave with the watch's own (d1, d2), so the comparison pairs each derivation error after the inserted read with the neighbouring one: onError changed in $error.message and $error.sourceId from one fuzz derivation to another. This covers only that, in a recoverable derivation error record (`record`), and only where 2.0 also made, unpaired, an extra onError equal to 1.35's half of the pair (`requires`, op extra, `same` args: 1.35's record is one 2.0 made too, paired the other way); that extra record is itself covered only by l12-fuzz-bx-hook-onError-extra, which needs the extra read's warning. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), with his \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onErrorRecovery-repaired-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onErrorRecovery",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0].$error",
+    "requires": {
+      "stream": "hook",
+      "kind": "onErrorRecovery",
+      "op": "extra",
+      "order": "any",
+      "same": "args",
+      "bound": {
+        "match": [
+          {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "derivationThrownMessage"
+                  },
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": {
+                    "$like": "derivation"
+                  }
+                }
+              },
+              "skip"
+            ]
+          }
+        ]
+      }
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].$error.message",
+          "from": {
+            "$like": "derivationThrownMessage"
+          },
+          "to": {
+            "$like": "derivationThrownMessage"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "derivationThrownMessage"
+                  },
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": {
+                    "$like": "derivation"
+                  }
+                }
+              },
+              "skip"
+            ]
+          }
+        },
+        {
+          "path": "args[0].$error.sourceId",
+          "from": {
+            "$like": "derivation"
+          },
+          "to": {
+            "$like": "derivation"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onErrorRecovery",
+            "args": [
+              {
+                "$error": {
+                  "name": "DirectiveError",
+                  "message": {
+                    "$like": "derivationThrownMessage"
+                  },
+                  "context": {
+                    "$undefined": true
+                  },
+                  "recoverable": true,
+                  "source": "derivation",
+                  "sourceId": {
+                    "$like": "derivation"
+                  }
+                }
+              },
+              "skip"
+            ]
+          }
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 5; found by run 4's rerun and triage 5): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again, which computes the derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty, and with no watch, the same case passes (diff-notes l12gate/r5/replay, the nf and nw replays). Found by PR seed 6 (plugin phase): two derivations throw, and 2.0's extra read reports their errors once more, d1 then d2, the definition order every snapshot read has on both engines (probe diff-notes l12gate/fix4/probe/p6.mjs: the two engines' outputs are byte-identical). The extra read sits in a run where notify-driven reads (d2, then d1) interleave with the watch's own (d1, d2), so the comparison pairs each derivation error after the inserted read with the neighbouring one: onErrorRecovery changed in $error.message and $error.sourceId from one fuzz derivation to another. This covers only that, in a recoverable derivation error record (`record`), and only where 2.0 also made, unpaired, an extra onErrorRecovery equal to 1.35's half of the pair (`requires`, op extra, `same` args: 1.35's record is one 2.0 made too, paired the other way); that extra record is itself covered only by l12-fuzz-bx-hook-onErrorRecovery-extra, which needs the extra read's warning. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), with his \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-cand-t-batch-completed-hook-onResolverCancel-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "afterMet": true,
+    "when": ["writeRetracts", "batched"],
+    "group": "quirk-t-batch-completed",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, its third path (owner-approved 2026-11-01, decisions page row t; signed as l3-cand-t-fuzz-*: \"a reconcile pass retracts a run after the run reported complete but before it left flight ... 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only\"), where the completed run is the batch run (L12 gate run 5; PR seed 17 in run 4's rerun, triage 5). The batch call writes a fact, a single resolver that write starts writes it back, and the pass that follows retracts the batch source's constraint while reporting the batch run complete. Both engines report onResolverComplete and onRequirementMet for the batch requirement, abort its signal (\"aborted\") and list it under onReconcileEnd's canceled; 1.35 then also reports onResolverCancel for it, carrying only its id, and 2.0 does not. The signed l3-cand-t entries name a single resolver, and l11-cand-t-batch-* require a single run's missing cancel first; this case has neither. This covers only that record for a batch requirement in the id-only shape, and only after met (`afterMet`, diff/scenario.ts markAfterMet): both engines' last lifecycle record of that requirement before it is its onRequirementMet, with no create or cancel of it since. A batch cancel 2.0 lacks for a requirement still in flight, or one only 1.35 reported met, stays unexcused. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), next to row t's own approval on the decisions page (owner-approved 2026-11-01, row t: \"If all are better or non user facing they are all approved\"), as l3-cand-t-fuzz-* quote it.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-cand-t-batch-completed-hook-onRequirementCanceled-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterMet": true,
+    "when": ["writeRetracts", "batched"],
+    "group": "quirk-t-batch-completed",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, its third path (owner-approved 2026-11-01, decisions page row t; signed as l3-cand-t-fuzz-*: \"a reconcile pass retracts a run after the run reported complete but before it left flight ... 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only\"), where the completed run is the batch run (L12 gate run 5; PR seed 17 in run 4's rerun, triage 5). The batch call writes a fact, a single resolver that write starts writes it back, and the pass that follows retracts the batch source's constraint while reporting the batch run complete. Both engines report onResolverComplete and onRequirementMet for the batch requirement, abort its signal (\"aborted\") and list it under onReconcileEnd's canceled; 1.35 then also reports onRequirementCanceled for it, carrying only its id, and 2.0 does not. The signed l3-cand-t entries name a single resolver, and l11-cand-t-batch-* require a single run's missing cancel first; this case has neither. This covers only that record for a batch requirement in the id-only shape, and only after met (`afterMet`, diff/scenario.ts markAfterMet): both engines' last lifecycle record of that requirement before it is its onRequirementMet, with no create or cancel of it since. A batch cancel 2.0 lacks for a requirement still in flight, or one only 1.35 reported met, stays unexcused. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), next to row t's own approval on the decisions page (owner-approved 2026-11-01, row t: \"If all are better or non user facing they are all approved\"), as l3-cand-t-fuzz-* quote it.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-cand-t-batch-completed-observe-requirement-canceled-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterMet": true,
+    "when": ["writeRetracts", "batched"],
+    "group": "quirk-t-batch-completed",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row t, its third path (owner-approved 2026-11-01, decisions page row t; signed as l3-cand-t-fuzz-*: \"a reconcile pass retracts a run after the run reported complete but before it left flight ... 1.35 then also reports onResolverCancel, onRequirementCanceled and the requirement.canceled observe event for it; 2.0 reports the completion only\"), where the completed run is the batch run (L12 gate run 5; PR seed 17 in run 4's rerun, triage 5). The batch call writes a fact, a single resolver that write starts writes it back, and the pass that follows retracts the batch source's constraint while reporting the batch run complete. Both engines report onResolverComplete and onRequirementMet for the batch requirement, abort its signal (\"aborted\") and list it under onReconcileEnd's canceled; 1.35 then also reports the requirement.canceled observe event for it, carrying only its id, and 2.0 does not. The signed l3-cand-t entries name a single resolver, and l11-cand-t-batch-* require a single run's missing cancel first; this case has neither. This covers only that record for a batch requirement in the id-only shape, and only after met (`afterMet`, diff/scenario.ts markAfterMet): both engines' last lifecycle record of that requirement before it is its onRequirementMet, with no create or cancel of it since. A batch cancel 2.0 lacks for a requirement still in flight, or one only 1.35 reported met, stays unexcused. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), next to row t's own approval on the decisions page (owner-approved 2026-11-01, row t: \"If all are better or non user facing they are all approved\"), as l3-cand-t-fuzz-* quote it.",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onDerivationCompute-repaired-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onDerivationCompute",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[1]",
+    "requires": {
+      "stream": "hook",
+      "kind": "onDerivationCompute",
+      "op": "extra",
+      "order": "any",
+      "same": "args",
+      "bound": {
+        "match": [
+          {
+            "k": "hook",
+            "hook": "onDerivationCompute",
+            "args": [
+              {
+                "$like": "snapshotDerivation"
+              },
+              {
+                "$like": "derivedValue"
+              },
+              {
+                "$like": "dependencyKeys"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "path": "args[1]",
+          "from": {
+            "$like": "derivedValue"
+          },
+          "to": {
+            "$like": "derivedValue"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onDerivationCompute",
+            "args": [
+              {
+                "$like": "snapshotDerivation"
+              },
+              {
+                "$like": "derivedValue"
+              },
+              {
+                "$like": "dependencyKeys"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 5; found by run 4's rerun and triage 5): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again, which computes the derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty, and with no watch, the same case passes (diff-notes l12gate/r5/replay, the nf and nw replays). Found by PR seed 11 and deep seed 24301 (up to L12): a derivation's fact is written twice before 1.35 reads the derivation. 2.0's read at each write computes it (true at the first write, false at the second, each right for the fact at that moment); 1.35 computes it once, at its closing read (false). The final state is the same on both. The comparison pairs 1.35's one compute with 2.0's first, so it shows as a changed value, and 2.0's second compute, which is 1.35's record, is left as an extra. This covers only the changed value of a snapshot derivation's compute (`args[1]`, in a compute record of that shape: `record`), and only where 2.0 also made, unpaired, an extra compute equal to 1.35's whole record: the same derivation, 1.35's value and dependencies (`requires`, op extra, `same` args; diff/scenario.ts pairedHalf reads 1.35's half of the changed pair). A changed value with no such extra compute, or with one of another derivation or value, stays unexcused. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), with his \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-observe-derivation-compute-repaired-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "derivation.compute",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event.value",
+    "requires": {
+      "stream": "observe",
+      "kind": "derivation.compute",
+      "op": "extra",
+      "order": "any",
+      "same": "event",
+      "bound": {
+        "match": [
+          {
+            "k": "observe",
+            "event": {
+              "id": {
+                "$like": "snapshotDerivation"
+              },
+              "type": "derivation.compute",
+              "value": {
+                "$like": "derivedValue"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "path": "event.value",
+          "from": {
+            "$like": "derivedValue"
+          },
+          "to": {
+            "$like": "derivedValue"
+          },
+          "record": {
+            "k": "observe",
+            "event": {
+              "id": {
+                "$like": "snapshotDerivation"
+              },
+              "type": "derivation.compute",
+              "value": {
+                "$like": "derivedValue"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 5; found by run 4's rerun and triage 5): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again, which computes the derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty, and with no watch, the same case passes (diff-notes l12gate/r5/replay, the nf and nw replays). Found by PR seed 11 and deep seed 24301 (up to L12): a derivation's fact is written twice before 1.35 reads the derivation. 2.0's read at each write computes it (true at the first write, false at the second, each right for the fact at that moment); 1.35 computes it once, at its closing read (false). The final state is the same on both. The comparison pairs 1.35's one compute with 2.0's first, so it shows as a changed value, and 2.0's second compute, which is 1.35's record, is left as an extra. This covers only the changed value of a snapshot derivation's compute (`event.value`, in a compute record of that shape: `record`), and only where 2.0 also made, unpaired, an extra compute equal to 1.35's whole record: the same derivation, 1.35's value and dependencies (`requires`, op extra, `same` event; diff/scenario.ts pairedHalf reads 1.35's half of the changed pair). A changed value with no such extra compute, or with one of another derivation or value, stays unexcused. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), with his \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-hook-onTraceComplete-recompute-inserted",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onTraceComplete",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0]",
+    "requires": {
+      "stream": "external",
+      "kind": "watch",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "watch",
+              {
+                "$like": "distributableSnapshot"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0]",
+          "pair": "traceRunRecomputeInserted"
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 5; found by run 4's rerun and triage 5): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again, which computes the derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty, and with no watch, the same case passes (diff-notes l12gate/r5/replay, the nf and nw replays). Found by deep seed 1 (up to L12; `trace` on): a resolver's write inside a run triggers 2.0's extra read, which computes a derivation inside that run; 1.35 computes the same derivation one step later, outside it (that move is covered by l12-fuzz-bx-hook-onDerivationCompute-moved). So 2.0's record of the run lists the compute: one more `derivationsRecomputed` entry and its \"<id> recomputed\" link in `causalChain`; every other field of the run is equal. This covers only that (onTraceComplete's run, `args[0]`): 2.0's runs are 1.35's with compute entries of snapshot derivations inserted and their chain links, nothing else changed (`pair` traceRunRecomputeInserted, diff/fingerprint.ts), and only when 2.0 delivered an extra watch snapshot at or before it (`requires`). A run with any other field changed, an entry removed, another derivation's entry or a chain differing in any other link stays unexcused. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), with his \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-state-settle-trace-recompute-inserted",
+    "scenario": "fuzz",
+    "stream": "state",
+    "kind": "settle",
+    "engine": "v2",
+    "op": "changed",
+    "path": "inspect.trace",
+    "requires": {
+      "stream": "external",
+      "kind": "watch",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "watch",
+              {
+                "$like": "distributableSnapshot"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "path": "inspect.trace",
+          "pair": "traceRunRecomputeInserted"
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 5; found by run 4's rerun and triage 5): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again, which computes the derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty, and with no watch, the same case passes (diff-notes l12gate/r5/replay, the nf and nw replays). Found by deep seed 1 (up to L12; `trace` on): a resolver's write inside a run triggers 2.0's extra read, which computes a derivation inside that run; 1.35 computes the same derivation one step later, outside it (that move is covered by l12-fuzz-bx-hook-onDerivationCompute-moved). So 2.0's record of the run lists the compute: one more `derivationsRecomputed` entry and its \"<id> recomputed\" link in `causalChain`; every other field of the run is equal. This covers only that (the \"settle\" state's `inspect.trace` runs): 2.0's runs are 1.35's with compute entries of snapshot derivations inserted and their chain links, nothing else changed (`pair` traceRunRecomputeInserted, diff/fingerprint.ts), and only when 2.0 delivered an extra watch snapshot at or before it (`requires`). A run with any other field changed, an entry removed, another derivation's entry or a chain differing in any other link stays unexcused. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), with his \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-state-end-trace-recompute-inserted",
+    "scenario": "fuzz",
+    "stream": "state",
+    "kind": "end",
+    "engine": "v2",
+    "op": "changed",
+    "path": "inspect.trace",
+    "requires": {
+      "stream": "external",
+      "kind": "watch",
+      "op": "extra",
+      "bound": {
+        "match": [
+          {
+            "k": "external",
+            "data": [
+              "watch",
+              {
+                "$like": "distributableSnapshot"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "path": "inspect.trace",
+          "pair": "traceRunRecomputeInserted"
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 5; found by run 4's rerun and triage 5): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again, which computes the derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty, and with no watch, the same case passes (diff-notes l12gate/r5/replay, the nf and nw replays). Found by deep seed 1 (up to L12; `trace` on): a resolver's write inside a run triggers 2.0's extra read, which computes a derivation inside that run; 1.35 computes the same derivation one step later, outside it (that move is covered by l12-fuzz-bx-hook-onDerivationCompute-moved). So 2.0's record of the run lists the compute: one more `derivationsRecomputed` entry and its \"<id> recomputed\" link in `causalChain`; every other field of the run is equal. This covers only that (the \"end\" state's `inspect.trace` runs): 2.0's runs are 1.35's with compute entries of snapshot derivations inserted and their chain links, nothing else changed (`pair` traceRunRecomputeInserted, diff/fingerprint.ts), and only when 2.0 delivered an extra watch snapshot at or before it (`requires`). A run with any other field changed, an entry removed, another derivation's entry or a chain differing in any other link stays unexcused. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), with his \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-fuzz-bx-console-warn-distributable-unknown-keys-extra",
+    "scenario": "fuzz",
+    "stream": "console",
+    "kind": "warn",
+    "engine": "v2",
+    "op": "extra",
+    "when": ["watchIncludesFacts"],
+    "group": "row-bx",
+    "bound": {
+      "match": [
+        {
+          "k": "console",
+          "level": "warn",
+          "args": [
+            {
+              "$text": "distributableUnknownKeys"
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row (bx)'s knock-on (L12 gate run 5; found by run 4's rerun and triage 5): a watched distributable snapshot that includes facts (`when` watchIncludesFacts) also subscribes to them, and on a fact write 2.0 reads the snapshot again, which computes the derivations it holds; 1.35's watch hears derivations only. With the watch's facts empty, and with no watch, the same case passes (diff-notes l12gate/r5/replay, the nf and nw replays). Found by deep seed 2 (plugins phase): a `module` unregister step removes the watched derivation. 1.35's watch, which hears only that derivation, goes silent; 2.0's fact subscription still reads on each fact write, and the read prints getDistributableSnapshot's own development warning for a key it no longer knows, \"[Directive] getDistributableSnapshot: Unknown derivation keys ignored: <ids>. Available: <ids>\" (the same text 1.35 prints on such a read: core src/core/engine.ts; core-next src/api/distributable.ts). This covers only that warning, extra on 2.0, word for word (`$text` distributableUnknownKeys, diff/fingerprint.ts). The same case's second difference needs no entry of its own: after a `define` step registers the watched derivation again, 2.0's read on the next fact write computes it, and 1.35's watch, which lost its subscription at the unregister, never does; the signed l12-fuzz-bx-*-retracked-extra entries cover that compute now that markStale (diff/scenario.ts) reads a derivation as never computed from its onDefinitionRegister. Visible effect, for the record: one development warning per fact write for as long as the watched derivation stays unregistered. Signed on the owner's instruction: asked whether to allow a fifth gate run that signs the six run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22), with his \"Yes, widen (bx) to its knock-on effects (Recommended)\" (2026-11-22), next to (bx)'s own approval, the L12 RFC's decision (bx), \"Option taken: approved, in L12a\", under \"I approve you for to do everything\" (2026-11-15).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-cand-t-batch-error-hook-onResolverCancel-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "afterError": true,
+    "when": ["writeRetracts", "batched", "batchFails"],
+    "group": "quirk-t-batch-error",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, its error shape (GATE-2: \"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01), where the run that errored is the batch run (L12 gate run 5; PR seed 17's second shrink, diff-notes l12gate/r5/specs/pr17b). The batch call writes a fact and fails its item, a single resolver that write starts writes the fact back, and the pass that follows retracts the batch source's constraint while reporting the batch run's error. Both engines report onError, onErrorRecovery, onResolverError and resolver.error for the batch requirement, abort its signal (\"aborted\") and list it under onReconcileEnd's canceled; 1.35 then also reports onResolverCancel for it, carrying only its id, and 2.0 does not. The signed l9-fuzz-t-disable-* entries name a single resolver's full requirement under the `disable` strategy, and l12-cand-t-batch-completed-* cover a batch cancel only after met; this case has neither. This covers only that record for a batch requirement in the id-only shape, in a case with a failing batch (`when` adds batchFails), and only after the run's own error (`afterError`, diff/scenario.ts markAfterError): both engines' last lifecycle hook of that requirement before the cancel is its onResolverError from the batch resolver, with no create, start, completion, met or cancel of it since. A batch cancel 2.0 lacks for a requirement still in flight, one whose error only 1.35 reported, or one created again after the error stays unexcused. Signed on the owner's instruction: GATE-2 records row t's error shape (\"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01, decisions page row t: \"If all are better or non user facing they are all approved\"), as l9-fuzz-t-disable-* quote it, and asked whether to allow a fifth gate run that signs the run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-cand-t-batch-error-hook-onRequirementCanceled-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterError": true,
+    "when": ["writeRetracts", "batched", "batchFails"],
+    "group": "quirk-t-batch-error",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, its error shape (GATE-2: \"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01), where the run that errored is the batch run (L12 gate run 5; PR seed 17's second shrink, diff-notes l12gate/r5/specs/pr17b). The batch call writes a fact and fails its item, a single resolver that write starts writes the fact back, and the pass that follows retracts the batch source's constraint while reporting the batch run's error. Both engines report onError, onErrorRecovery, onResolverError and resolver.error for the batch requirement, abort its signal (\"aborted\") and list it under onReconcileEnd's canceled; 1.35 then also reports onRequirementCanceled for it, carrying only its id, and 2.0 does not. The signed l9-fuzz-t-disable-* entries name a single resolver's full requirement under the `disable` strategy, and l12-cand-t-batch-completed-* cover a batch cancel only after met; this case has neither. This covers only that record for a batch requirement in the id-only shape, in a case with a failing batch (`when` adds batchFails), and only after the run's own error (`afterError`, diff/scenario.ts markAfterError): both engines' last lifecycle hook of that requirement before the cancel is its onResolverError from the batch resolver, with no create, start, completion, met or cancel of it since. A batch cancel 2.0 lacks for a requirement still in flight, one whose error only 1.35 reported, or one created again after the error stays unexcused. Signed on the owner's instruction: GATE-2 records row t's error shape (\"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01, decisions page row t: \"If all are better or non user facing they are all approved\"), as l9-fuzz-t-disable-* quote it, and asked whether to allow a fifth gate run that signs the run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-cand-t-batch-error-observe-requirement-canceled-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterError": true,
+    "when": ["writeRetracts", "batched", "batchFails"],
+    "group": "quirk-t-batch-error",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row t, its error shape (GATE-2: \"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01), where the run that errored is the batch run (L12 gate run 5; PR seed 17's second shrink, diff-notes l12gate/r5/specs/pr17b). The batch call writes a fact and fails its item, a single resolver that write starts writes the fact back, and the pass that follows retracts the batch source's constraint while reporting the batch run's error. Both engines report onError, onErrorRecovery, onResolverError and resolver.error for the batch requirement, abort its signal (\"aborted\") and list it under onReconcileEnd's canceled; 1.35 then also reports the requirement.canceled observe event for it, carrying only its id, and 2.0 does not. The signed l9-fuzz-t-disable-* entries name a single resolver's full requirement under the `disable` strategy, and l12-cand-t-batch-completed-* cover a batch cancel only after met; this case has neither. This covers only that record for a batch requirement in the id-only shape, in a case with a failing batch (`when` adds batchFails), and only after the run's own error (`afterError`, diff/scenario.ts markAfterError): both engines' last lifecycle hook of that requirement before the cancel is its onResolverError from the batch resolver, with no create, start, completion, met or cancel of it since. A batch cancel 2.0 lacks for a requirement still in flight, one whose error only 1.35 reported, or one created again after the error stays unexcused. Signed on the owner's instruction: GATE-2 records row t's error shape (\"1.35 reports the error and then a cancel for the same run, 2.0 the error only\"; owner-approved 2026-11-01, decisions page row t: \"If all are better or non user facing they are all approved\"), as l9-fuzz-t-disable-* quote it, and asked whether to allow a fifth gate run that signs the run-4 differences, he answered \"Yes, run 5 (Recommended)\" (2026-11-22).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-22"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onResolverCancel-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "afterCancel": true,
+    "afterOp": ["goTo", "back", "forward"],
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t and row (av): 1.35's further cancels of a batch run after a history goTo, once both engines reported the run's outcome and one cancel of it (L12 gate run 5; PR seed 17's fourth and fifth shrinks, diff-notes l12gate/r5/specs/pr17d and pr17e). A goTo restores the batch source's fact while a batch call is in flight, which retracts the batch requirement without ending the call; the call's late write raises the requirement again and a second call starts; the pass that follows retracts the batch source's constraint while reporting the batch run's outcome, with both calls in flight: finished (onResolverComplete and onRequirementMet; pr17d) or failed (onResolverError; pr17e, a failing batch). Both engines report that outcome, abort both calls' signals (\"aborted\") and cancel the requirement once (onResolverCancel, onRequirementCanceled, requirement.canceled; 1.35 in its id-only shape, row (aq)). 1.35 then reports the same cancel again; 2.0, as with row (av)'s requirement that 1.35 holds twice, reports it once. This covers only onResolverCancel of such a further cancel, for a batch requirement in the id-only shape, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a history move, a goTo, back or forward step (`afterOp`), and only after the outcome and a cancel both engines reported (`afterCancel`, diff/scenario.ts markAfterCancel): on both engines the requirement's lifecycle hooks before the record end with its run's outcome, the same on both (its onResolverComplete and its onRequirementMet, or its onResolverError), and then its cancel (onResolverCancel and onRequirementCanceled), exactly one cancel on 2.0 and one or more on 1.35, all naming the same batch resolver, with no create, start or other lifecycle hook of it since. Each engine's side is read in its own record order, not from the pairing: 2.0's cancel is the one right after the same outcome in 2.0's own hooks, by the end of the record's step and phase, so the excuse holds whichever of 1.35's cancels each stream's pairing leaves unpaired (PR seed 17's sixth case, diff-notes l12gate/r5/specs/pr17f: pr17d's shape with the trace option on, where the hook stream pairs 2.0's cancel with 1.35's second cancel and the observe stream with its first). A further cancel where 2.0 reported no cancel before it, one in a case without a history move, one of a run with no outcome reported (still in flight), an extra cancel on 2.0 instead of 1.35, and any other record that differs all stay unexcused. Signed on the owner's instruction: asked about pr17d (after a history goTo, a finished batched requirement with two calls in flight is cancelled once on both engines, and then 1.35 cancels it a second time), he answered \"2.0's single cancel; sign it (Recommended)\" (2026-11-23), the option that treats it as row t / (av): 1.35's second cancel of an already-cancelled finished run is an extra report, signed as a narrow entry that requires a goTo, a finished batch run and a cancel already reported on both engines, with a self-test. Asked then whether to widen these entries from a finished run to any outcome (pr17e: the same case with a batch run that failed), he answered \"Widen to any outcome (Recommended)\" (2026-11-23), the option that signs one rule: after a goTo, once both engines have reported a batched request's outcome (finished or failed) and one cancel, 1.35's further cancels of it are extra reports; self-tests: no prior cancel, no goTo, or a different difference still fail. Widened on the owner's instruction: asked whether to widen this exception from a goTo to any history navigation (PR seed 17's ninth case, diff-notes l12gate/r5/specs/pr17i: pr17e's shape after a history `back`, no goTo), he answered \"Any history move (Recommended)\" (2026-11-26), the option that lets goTo, back and forward all qualify, with every other condition unchanged (a batched request whose outcome was reported, one cancel already on both engines, the extra cancel only on 1.35); self-tests: no history move, or an extra cancel on 2.0, still fail. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-23"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onRequirementCanceled-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterCancel": true,
+    "afterOp": ["goTo", "back", "forward"],
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t and row (av): 1.35's further cancels of a batch run after a history goTo, once both engines reported the run's outcome and one cancel of it (L12 gate run 5; PR seed 17's fourth and fifth shrinks, diff-notes l12gate/r5/specs/pr17d and pr17e). A goTo restores the batch source's fact while a batch call is in flight, which retracts the batch requirement without ending the call; the call's late write raises the requirement again and a second call starts; the pass that follows retracts the batch source's constraint while reporting the batch run's outcome, with both calls in flight: finished (onResolverComplete and onRequirementMet; pr17d) or failed (onResolverError; pr17e, a failing batch). Both engines report that outcome, abort both calls' signals (\"aborted\") and cancel the requirement once (onResolverCancel, onRequirementCanceled, requirement.canceled; 1.35 in its id-only shape, row (aq)). 1.35 then reports the same cancel again; 2.0, as with row (av)'s requirement that 1.35 holds twice, reports it once. This covers only onRequirementCanceled of such a further cancel, for a batch requirement in the id-only shape, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a history move, a goTo, back or forward step (`afterOp`), and only after the outcome and a cancel both engines reported (`afterCancel`, diff/scenario.ts markAfterCancel): on both engines the requirement's lifecycle hooks before the record end with its run's outcome, the same on both (its onResolverComplete and its onRequirementMet, or its onResolverError), and then its cancel (onResolverCancel and onRequirementCanceled), exactly one cancel on 2.0 and one or more on 1.35, all naming the same batch resolver, with no create, start or other lifecycle hook of it since. Each engine's side is read in its own record order, not from the pairing: 2.0's cancel is the one right after the same outcome in 2.0's own hooks, by the end of the record's step and phase, so the excuse holds whichever of 1.35's cancels each stream's pairing leaves unpaired (PR seed 17's sixth case, diff-notes l12gate/r5/specs/pr17f: pr17d's shape with the trace option on, where the hook stream pairs 2.0's cancel with 1.35's second cancel and the observe stream with its first). A further cancel where 2.0 reported no cancel before it, one in a case without a history move, one of a run with no outcome reported (still in flight), an extra cancel on 2.0 instead of 1.35, and any other record that differs all stay unexcused. Signed on the owner's instruction: asked about pr17d (after a history goTo, a finished batched requirement with two calls in flight is cancelled once on both engines, and then 1.35 cancels it a second time), he answered \"2.0's single cancel; sign it (Recommended)\" (2026-11-23), the option that treats it as row t / (av): 1.35's second cancel of an already-cancelled finished run is an extra report, signed as a narrow entry that requires a goTo, a finished batch run and a cancel already reported on both engines, with a self-test. Asked then whether to widen these entries from a finished run to any outcome (pr17e: the same case with a batch run that failed), he answered \"Widen to any outcome (Recommended)\" (2026-11-23), the option that signs one rule: after a goTo, once both engines have reported a batched request's outcome (finished or failed) and one cancel, 1.35's further cancels of it are extra reports; self-tests: no prior cancel, no goTo, or a different difference still fail. Widened on the owner's instruction: asked whether to widen this exception from a goTo to any history navigation (PR seed 17's ninth case, diff-notes l12gate/r5/specs/pr17i: pr17e's shape after a history `back`, no goTo), he answered \"Any history move (Recommended)\" (2026-11-26), the option that lets goTo, back and forward all qualify, with every other condition unchanged (a batched request whose outcome was reported, one cancel already on both engines, the extra cancel only on 1.35); self-tests: no history move, or an extra cancel on 2.0, still fail. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-23"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-observe-requirement-canceled-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterCancel": true,
+    "afterOp": ["goTo", "back", "forward"],
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row t and row (av): 1.35's further cancels of a batch run after a history goTo, once both engines reported the run's outcome and one cancel of it (L12 gate run 5; PR seed 17's fourth and fifth shrinks, diff-notes l12gate/r5/specs/pr17d and pr17e). A goTo restores the batch source's fact while a batch call is in flight, which retracts the batch requirement without ending the call; the call's late write raises the requirement again and a second call starts; the pass that follows retracts the batch source's constraint while reporting the batch run's outcome, with both calls in flight: finished (onResolverComplete and onRequirementMet; pr17d) or failed (onResolverError; pr17e, a failing batch). Both engines report that outcome, abort both calls' signals (\"aborted\") and cancel the requirement once (onResolverCancel, onRequirementCanceled, requirement.canceled; 1.35 in its id-only shape, row (aq)). 1.35 then reports the same cancel again; 2.0, as with row (av)'s requirement that 1.35 holds twice, reports it once. This covers only the requirement.canceled observe event of such a further cancel, for a batch requirement in the id-only shape, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a history move, a goTo, back or forward step (`afterOp`), and only after the outcome and a cancel both engines reported (`afterCancel`, diff/scenario.ts markAfterCancel): on both engines the requirement's lifecycle hooks before the record end with its run's outcome, the same on both (its onResolverComplete and its onRequirementMet, or its onResolverError), and then its cancel (onResolverCancel and onRequirementCanceled), exactly one cancel on 2.0 and one or more on 1.35, all naming the same batch resolver, with no create, start or other lifecycle hook of it since. Each engine's side is read in its own record order, not from the pairing: 2.0's cancel is the one right after the same outcome in 2.0's own hooks, by the end of the record's step and phase, so the excuse holds whichever of 1.35's cancels each stream's pairing leaves unpaired (PR seed 17's sixth case, diff-notes l12gate/r5/specs/pr17f: pr17d's shape with the trace option on, where the hook stream pairs 2.0's cancel with 1.35's second cancel and the observe stream with its first). A further cancel where 2.0 reported no cancel before it, one in a case without a history move, one of a run with no outcome reported (still in flight), an extra cancel on 2.0 instead of 1.35, and any other record that differs all stay unexcused. Signed on the owner's instruction: asked about pr17d (after a history goTo, a finished batched requirement with two calls in flight is cancelled once on both engines, and then 1.35 cancels it a second time), he answered \"2.0's single cancel; sign it (Recommended)\" (2026-11-23), the option that treats it as row t / (av): 1.35's second cancel of an already-cancelled finished run is an extra report, signed as a narrow entry that requires a goTo, a finished batch run and a cancel already reported on both engines, with a self-test. Asked then whether to widen these entries from a finished run to any outcome (pr17e: the same case with a batch run that failed), he answered \"Widen to any outcome (Recommended)\" (2026-11-23), the option that signs one rule: after a goTo, once both engines have reported a batched request's outcome (finished or failed) and one cancel, 1.35's further cancels of it are extra reports; self-tests: no prior cancel, no goTo, or a different difference still fail. Widened on the owner's instruction: asked whether to widen this exception from a goTo to any history navigation (PR seed 17's ninth case, diff-notes l12gate/r5/specs/pr17i: pr17e's shape after a history `back`, no goTo), he answered \"Any history move (Recommended)\" (2026-11-26), the option that lets goTo, back and forward all qualify, with every other condition unchanged (a batched request whose outcome was reported, one cancel already on both engines, the extra cancel only on 1.35); self-tests: no history move, or an extra cancel on 2.0, still fail. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-23"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onResolverCancel-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args",
+    "afterCancel": true,
+    "afterOp": ["goTo", "back", "forward"],
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0]",
+          "from": {
+            "$like": "batchResolver"
+          },
+          "to": {
+            "$like": "resolver"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onResolverCancel",
+            "args": [
+              {
+                "$like": "batchResolver"
+              },
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "path": "args[1].fromConstraint",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "$like": "constraint"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onResolverCancel",
+            "args": [
+              {
+                "$like": "batchResolver"
+              },
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "path": "args[1].id",
+          "from": {
+            "$like": "batchRequirementId"
+          },
+          "to": {
+            "$like": "requirementId"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onResolverCancel",
+            "args": [
+              {
+                "$like": "batchResolver"
+              },
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "path": "args[1].requirement",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "type": {
+              "$like": "requirementType"
+            }
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onResolverCancel",
+            "args": [
+              {
+                "$like": "batchResolver"
+              },
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the onResolverCancel hook call of that pairing: 1.35's whole record is a batch requirement's cancel in the id-only shape (`record`), `from` names only the batch classes and `to` only a single resolver's (its resolver, constraint, requirement id and type), in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a history move, a goTo, back or forward step (`afterOp`), and only where (`afterCancel`, diff/scenario.ts markAfterCancel) 1.35's side is the approved further cancel, by the same per-engine rule as the `-missing` entries (on both engines the batch requirement's lifecycle hooks end with its run's outcome, the same on both, then its cancel, exactly one on 2.0 and one or more on 1.35 before this record, all naming the same batch resolver, each engine's side read in its own record order), and 2.0's side is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the same step and phase, as many times as 2.0 does. A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels less often, the same pairing where 1.35's batch cancel is its first, where its run had no outcome or where 2.0 reported no cancel of the batch requirement, a pairing in a case without a history move, and a change between two batch requirements or two single runs all stay unexcused. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Widened on the owner's instruction: asked whether to widen this exception from a goTo to any history navigation (PR seed 17's ninth case, diff-notes l12gate/r5/specs/pr17i: pr17e's shape after a history `back`, no goTo), he answered \"Any history move (Recommended)\" (2026-11-26), the option that lets goTo, back and forward all qualify, with every other condition unchanged (a batched request whose outcome was reported, one cancel already on both engines, the extra cancel only on 1.35); self-tests: no history move, or an extra cancel on 2.0, still fail. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onRequirementCanceled-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0]",
+    "afterCancel": true,
+    "afterOp": ["goTo", "back", "forward"],
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0].fromConstraint",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "$like": "constraint"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onRequirementCanceled",
+            "args": [
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "path": "args[0].id",
+          "from": {
+            "$like": "batchRequirementId"
+          },
+          "to": {
+            "$like": "requirementId"
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onRequirementCanceled",
+            "args": [
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "path": "args[0].requirement",
+          "from": {
+            "$like": "absent"
+          },
+          "to": {
+            "type": {
+              "$like": "requirementType"
+            }
+          },
+          "record": {
+            "k": "hook",
+            "hook": "onRequirementCanceled",
+            "args": [
+              {
+                "id": {
+                  "$like": "batchRequirementId"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the onRequirementCanceled hook call of that pairing: 1.35's whole record is a batch requirement's cancel in the id-only shape (`record`), `from` names only the batch classes and `to` only a single resolver's (its resolver, constraint, requirement id and type), in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a history move, a goTo, back or forward step (`afterOp`), and only where (`afterCancel`, diff/scenario.ts markAfterCancel) 1.35's side is the approved further cancel, by the same per-engine rule as the `-missing` entries (on both engines the batch requirement's lifecycle hooks end with its run's outcome, the same on both, then its cancel, exactly one on 2.0 and one or more on 1.35 before this record, all naming the same batch resolver, each engine's side read in its own record order), and 2.0's side is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the same step and phase, as many times as 2.0 does. A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels less often, the same pairing where 1.35's batch cancel is its first, where its run had no outcome or where 2.0 reported no cancel of the batch requirement, a pairing in a case without a history move, and a change between two batch requirements or two single runs all stay unexcused. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Widened on the owner's instruction: asked whether to widen this exception from a goTo to any history navigation (PR seed 17's ninth case, diff-notes l12gate/r5/specs/pr17i: pr17e's shape after a history `back`, no goTo), he answered \"Any history move (Recommended)\" (2026-11-26), the option that lets goTo, back and forward all qualify, with every other condition unchanged (a batched request whose outcome was reported, one cancel already on both engines, the extra cancel only on 1.35); self-tests: no history move, or an extra cancel on 2.0, still fail. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-observe-requirement-canceled-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event.id",
+    "afterCancel": true,
+    "afterOp": ["goTo", "back", "forward"],
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "event.id",
+          "from": {
+            "$like": "batchRequirementId"
+          },
+          "to": {
+            "$like": "requirementId"
+          },
+          "record": {
+            "k": "observe",
+            "event": {
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "type": "requirement.canceled"
+            }
+          }
+        }
+      ]
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the requirement.canceled observe event of that pairing: 1.35's whole record is a batch requirement's cancel in the id-only shape (`record`), `from` names only the batch classes and `to` only a single resolver's (its resolver, constraint, requirement id and type), in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a history move, a goTo, back or forward step (`afterOp`), and only where (`afterCancel`, diff/scenario.ts markAfterCancel) 1.35's side is the approved further cancel, by the same per-engine rule as the `-missing` entries (on both engines the batch requirement's lifecycle hooks end with its run's outcome, the same on both, then its cancel, exactly one on 2.0 and one or more on 1.35 before this record, all naming the same batch resolver, each engine's side read in its own record order), and 2.0's side is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the same step and phase, as many times as 2.0 does. A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels less often, the same pairing where 1.35's batch cancel is its first, where its run had no outcome or where 2.0 reported no cancel of the batch requirement, a pairing in a case without a history move, and a change between two batch requirements or two single runs all stay unexcused. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Widened on the owner's instruction: asked whether to widen this exception from a goTo to any history navigation (PR seed 17's ninth case, diff-notes l12gate/r5/specs/pr17i: pr17e's shape after a history `back`, no goTo), he answered \"Any history move (Recommended)\" (2026-11-26), the option that lets goTo, back and forward all qualify, with every other condition unchanged (a batched request whose outcome was reported, one cancel already on both engines, the extra cancel only on 1.35); self-tests: no history move, or an extra cancel on 2.0, still fail. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onResolverCancel-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "afterOp": ["goTo", "back", "forward"],
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "requirementId"
+              },
+              "requirement": {
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "hook",
+      "kind": "onResolverCancel",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "args[0]",
+            "from": {
+              "$like": "batchResolver"
+            },
+            "to": {
+              "$like": "resolver"
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onResolverCancel",
+              "args": [
+                {
+                  "$like": "batchResolver"
+                },
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "path": "args[1].fromConstraint",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "$like": "constraint"
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onResolverCancel",
+              "args": [
+                {
+                  "$like": "batchResolver"
+                },
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "path": "args[1].id",
+            "from": {
+              "$like": "batchRequirementId"
+            },
+            "to": {
+              "$like": "requirementId"
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onResolverCancel",
+              "args": [
+                {
+                  "$like": "batchResolver"
+                },
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "path": "args[1].requirement",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "type": {
+                "$like": "requirementType"
+              }
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onResolverCancel",
+              "args": [
+                {
+                  "$like": "batchResolver"
+                },
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the onResolverCancel hook call of the other requirement's cancel left unpaired on 1.35's side, a single resolver's whole requirement, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a history move, a goTo, back or forward step (`afterOp`), and only where the case's 2.0 differences hold, at or before it, the batch-to-single change of `l12-cand-t-batch-second-cancel-hook-onResolverCancel-changed` (`requires`, with that entry's bound): the cancel of that requirement 2.0 does report was paired with 1.35's further batch cancel, so a single resolver's cancel 2.0 really lacks, with no such pairing, stays unexcused by this entry, and a case whose pairing that entry does not excuse still fails on the pairing. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Widened on the owner's instruction: asked whether to widen this exception from a goTo to any history navigation (PR seed 17's ninth case, diff-notes l12gate/r5/specs/pr17i: pr17e's shape after a history `back`, no goTo), he answered \"Any history move (Recommended)\" (2026-11-26), the option that lets goTo, back and forward all qualify, with every other condition unchanged (a batched request whose outcome was reported, one cancel already on both engines, the extra cancel only on 1.35); self-tests: no history move, or an extra cancel on 2.0, still fail. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-hook-onRequirementCanceled-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterOp": ["goTo", "back", "forward"],
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "requirementId"
+              },
+              "requirement": {
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "requires": {
+      "stream": "hook",
+      "kind": "onRequirementCanceled",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "args[0].fromConstraint",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "$like": "constraint"
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onRequirementCanceled",
+              "args": [
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "path": "args[0].id",
+            "from": {
+              "$like": "batchRequirementId"
+            },
+            "to": {
+              "$like": "requirementId"
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onRequirementCanceled",
+              "args": [
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "path": "args[0].requirement",
+            "from": {
+              "$like": "absent"
+            },
+            "to": {
+              "type": {
+                "$like": "requirementType"
+              }
+            },
+            "record": {
+              "k": "hook",
+              "hook": "onRequirementCanceled",
+              "args": [
+                {
+                  "id": {
+                    "$like": "batchRequirementId"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the onRequirementCanceled hook call of the other requirement's cancel left unpaired on 1.35's side, a single resolver's whole requirement, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a history move, a goTo, back or forward step (`afterOp`), and only where the case's 2.0 differences hold, at or before it, the batch-to-single change of `l12-cand-t-batch-second-cancel-hook-onRequirementCanceled-changed` (`requires`, with that entry's bound): the cancel of that requirement 2.0 does report was paired with 1.35's further batch cancel, so a single resolver's cancel 2.0 really lacks, with no such pairing, stays unexcused by this entry, and a case whose pairing that entry does not excuse still fails on the pairing. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Widened on the owner's instruction: asked whether to widen this exception from a goTo to any history navigation (PR seed 17's ninth case, diff-notes l12gate/r5/specs/pr17i: pr17e's shape after a history `back`, no goTo), he answered \"Any history move (Recommended)\" (2026-11-26), the option that lets goTo, back and forward all qualify, with every other condition unchanged (a batched request whose outcome was reported, one cancel already on both engines, the extra cancel only on 1.35); self-tests: no history move, or an extra cancel on 2.0, still fail. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-batch-second-cancel-observe-requirement-canceled-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "afterOp": ["goTo", "back", "forward"],
+    "when": ["batched", "navigated", "navigatedBusy"],
+    "group": "quirk-t-batch-second-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "requirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "requires": {
+      "stream": "observe",
+      "kind": "requirement.canceled",
+      "op": "changed",
+      "bound": {
+        "match": [
+          {
+            "path": "event.id",
+            "from": {
+              "$like": "batchRequirementId"
+            },
+            "to": {
+              "$like": "requirementId"
+            },
+            "record": {
+              "k": "observe",
+              "event": {
+                "id": {
+                  "$like": "batchRequirementId"
+                },
+                "type": "requirement.canceled"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "reason": "Row t and row (av), the mispaired form of 1.35's further cancel of a batch run after a history goTo (L12 gate run 5; PR seed 17's seventh case, diff-notes l12gate/r5/specs/pr17g). This is pr17d's shape (the `l12-cand-t-batch-second-cancel-*-missing` entries: both engines report the batch run's outcome and one cancel of it, and 1.35 then reports the same cancel again), where the same pass also cancels another requirement, a single resolver's, on both engines. The comparison pairs cancel records by kind, step and phase, so 1.35's extra second cancel of the batch requirement is paired with 2.0's cancel of the other requirement and shows as a change from the batch requirement's id-only record to the other requirement's record, and 1.35's own cancel of the other requirement is left unpaired, missing on 2.0. This covers only the requirement.canceled observe event of the other requirement's cancel left unpaired on 1.35's side, a single resolver's whole requirement, in a case with a batched resolver and a navigation that can run while work is in flight (`when`), in a step after a history move, a goTo, back or forward step (`afterOp`), and only where the case's 2.0 differences hold, at or before it, the batch-to-single change of `l12-cand-t-batch-second-cancel-observe-requirement-canceled-changed` (`requires`, with that entry's bound): the cancel of that requirement 2.0 does report was paired with 1.35's further batch cancel, so a single resolver's cancel 2.0 really lacks, with no such pairing, stays unexcused by this entry, and a case whose pairing that entry does not excuse still fails on the pairing. Signed on the owner's instruction: asked how to close pr17g (both engines also cancel another request, and the comparison pairs 1.35's extra second cancel with 2.0's cancel of that other request), he answered \"Extend the exception, not the pairing (Recommended)\" (2026-11-24), the option that leaves the comparison alone and lets the second-cancel exception also accept the mispaired form, where 1.35's extra cancel shows up as 'changed' against 2.0's cancel of another request that both engines cancelled, as the approved L11 row t exceptions (`l11-cand-t-batch-*`) handle the same mispairing; self-tests: a real wrong-request cancel on 2.0 still fails. It stands next to his two answers on this group's first entries: \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23). Widened on the owner's instruction: asked whether to widen this exception from a goTo to any history navigation (PR seed 17's ninth case, diff-notes l12gate/r5/specs/pr17i: pr17e's shape after a history `back`, no goTo), he answered \"Any history move (Recommended)\" (2026-11-26), the option that lets goTo, back and forward all qualify, with every other condition unchanged (a batched request whose outcome was reported, one cancel already on both engines, the extra cancel only on 1.35); self-tests: no history move, or an extra cancel on 2.0, still fail. Row t was owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"); row (av) on \"Approve: once (Recommended)\" (2026-11-07).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-24"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-hook-onResolverCancel-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args",
+    "mispaired": true,
+    "extraCancelOf": [
+      "l3-cand-t-fuzz-hook-onResolverCancel-missing",
+      "l9-fuzz-t-disable-hook-onResolverCancel-missing",
+      "l12-cand-t-batch-completed-hook-onResolverCancel-missing",
+      "l12-cand-t-batch-error-hook-onResolverCancel-missing",
+      "l12-cand-t-batch-second-cancel-hook-onResolverCancel-missing"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "args",
+          "pair": "cancelOfAnother"
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only a change inside the onResolverCancel hook between two cancel records that name different requirements (`PAIR.cancelOfAnother`, diff/fingerprint.ts), and only where both sides hold. 2.0's side (`mispaired`; diff/scenario.ts markMispaired and mispairedCancel): its record is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the pair's step and phase, as many times as 2.0 does. 1.35's side (`extraCancelOf`): one of the approved row t entries listed covers 1.35's record of the pair as the unpaired missing record it would otherwise be (unpairedHalf), by that entry's own conditions, each read on 1.35's record: its triggers (`when`), its step condition (`afterOp`), its bound and its marker (`afterMet`, `afterError`, `afterCancel`). A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels more or less often, and the same pairing where no listed entry approves 1.35's cancel (a run still in flight, a case without the row's triggers, an outcome only 1.35 reported), stay unexcused. It adds no trigger of its own: the listed entry's apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-hook-onRequirementCanceled-changed",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "args[0]",
+    "mispaired": true,
+    "extraCancelOf": [
+      "l3-cand-t-fuzz-hook-onRequirementCanceled-missing",
+      "l9-fuzz-t-disable-hook-onRequirementCanceled-missing",
+      "l12-cand-t-batch-completed-hook-onRequirementCanceled-missing",
+      "l12-cand-t-batch-error-hook-onRequirementCanceled-missing",
+      "l12-cand-t-batch-second-cancel-hook-onRequirementCanceled-missing"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "args[0]",
+          "pair": "cancelOfAnother"
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only a change inside the onRequirementCanceled hook between two cancel records that name different requirements (`PAIR.cancelOfAnother`, diff/fingerprint.ts), and only where both sides hold. 2.0's side (`mispaired`; diff/scenario.ts markMispaired and mispairedCancel): its record is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the pair's step and phase, as many times as 2.0 does. 1.35's side (`extraCancelOf`): one of the approved row t entries listed covers 1.35's record of the pair as the unpaired missing record it would otherwise be (unpairedHalf), by that entry's own conditions, each read on 1.35's record: its triggers (`when`), its step condition (`afterOp`), its bound and its marker (`afterMet`, `afterError`, `afterCancel`). A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels more or less often, and the same pairing where no listed entry approves 1.35's cancel (a run still in flight, a case without the row's triggers, an outcome only 1.35 reported), stay unexcused. It adds no trigger of its own: the listed entry's apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-observe-requirement-canceled-changed",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "changed",
+    "path": "event.id",
+    "mispaired": true,
+    "extraCancelOf": [
+      "l3-cand-t-fuzz-observe-requirement-canceled-missing",
+      "l9-fuzz-t-disable-observe-requirement-canceled-missing",
+      "l12-cand-t-batch-completed-observe-requirement-canceled-missing",
+      "l12-cand-t-batch-error-observe-requirement-canceled-missing",
+      "l12-cand-t-batch-second-cancel-observe-requirement-canceled-missing"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "path": "event.id",
+          "pair": "cancelOfAnother"
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only a change inside the requirement.canceled observe event between two cancel records that name different requirements (`PAIR.cancelOfAnother`, diff/fingerprint.ts), and only where both sides hold. 2.0's side (`mispaired`; diff/scenario.ts markMispaired and mispairedCancel): its record is a cancel of a different requirement that 1.35 also cancels, with a record of the same kind, in the pair's step and phase, as many times as 2.0 does. 1.35's side (`extraCancelOf`): one of the approved row t entries listed covers 1.35's record of the pair as the unpaired missing record it would otherwise be (unpairedHalf), by that entry's own conditions, each read on 1.35's record: its triggers (`when`), its step condition (`afterOp`), its bound and its marker (`afterMet`, `afterError`, `afterCancel`). A cancel on 2.0 of a requirement 1.35 never cancels (a real wrong-request cancel) or cancels more or less often, and the same pairing where no listed entry approves 1.35's cancel (a run still in flight, a case without the row's triggers, an outcome only 1.35 reported), stay unexcused. It adds no trigger of its own: the listed entry's apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-hook-onResolverCancel-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onResolverCancel",
+    "engine": "v2",
+    "op": "missing",
+    "mispaired": true,
+    "mispairedBy": [
+      "l12-cand-t-mispaired-cancel-hook-onResolverCancel-changed"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "resolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "requirementId"
+              },
+              "requirement": {
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onResolverCancel",
+          "args": [
+            {
+              "$like": "batchResolver"
+            },
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only the onResolverCancel hook of the other requirement's cancel that 1.35 made and the pairing left unpaired (a single or batch requirement's cancel, in the shapes the signed row t entries name; a keyed run's is left to `l3-cand-t-fuzz-*-missing`), and only where it is marked (`mispaired`, diff/scenario.ts markMispaired): in its step and phase a pair in the mispaired form took 2.0's cancel of this very requirement, a record of the same kind, which 2.0 reports as often as 1.35 does. It is excused only where that pair is: `l12-cand-t-mispaired-cancel-hook-onResolverCancel-changed` must cover the pair (`mispairedBy`), so where no row t entry approves 1.35's extra cancel, this cancel stays unexcused with it. A cancel 2.0 really lacks, with no such pair for its requirement, is never marked and stays unexcused by this entry. Earlier row t entries (`l3-cand-t-fuzz-*-missing`, `l9-fuzz-t-disable-*-missing`) take the record first where their triggers apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-hook-onRequirementCanceled-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "hook",
+    "kind": "onRequirementCanceled",
+    "engine": "v2",
+    "op": "missing",
+    "mispaired": true,
+    "mispairedBy": [
+      "l12-cand-t-mispaired-cancel-hook-onRequirementCanceled-changed"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "constraint"
+              },
+              "id": {
+                "$like": "requirementId"
+              },
+              "requirement": {
+                "type": {
+                  "$like": "requirementType"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "fromConstraint": {
+                "$like": "batchConstraint"
+              },
+              "id": {
+                "$like": "batchRequirementId"
+              },
+              "requirement": {
+                "item": {
+                  "$like": "batchItem"
+                },
+                "type": {
+                  "$like": "batchRequirementType"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "k": "hook",
+          "hook": "onRequirementCanceled",
+          "args": [
+            {
+              "id": {
+                "$like": "batchRequirementId"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only the onRequirementCanceled hook of the other requirement's cancel that 1.35 made and the pairing left unpaired (a single or batch requirement's cancel, in the shapes the signed row t entries name; a keyed run's is left to `l3-cand-t-fuzz-*-missing`), and only where it is marked (`mispaired`, diff/scenario.ts markMispaired): in its step and phase a pair in the mispaired form took 2.0's cancel of this very requirement, a record of the same kind, which 2.0 reports as often as 1.35 does. It is excused only where that pair is: `l12-cand-t-mispaired-cancel-hook-onRequirementCanceled-changed` must cover the pair (`mispairedBy`), so where no row t entry approves 1.35's extra cancel, this cancel stays unexcused with it. A cancel 2.0 really lacks, with no such pair for its requirement, is never marked and stays unexcused by this entry. Earlier row t entries (`l3-cand-t-fuzz-*-missing`, `l9-fuzz-t-disable-*-missing`) take the record first where their triggers apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-cand-t-mispaired-cancel-observe-requirement-canceled-unpaired-missing",
+    "scenario": "fuzz",
+    "stream": "observe",
+    "kind": "requirement.canceled",
+    "engine": "v2",
+    "op": "missing",
+    "mispaired": true,
+    "mispairedBy": [
+      "l12-cand-t-mispaired-cancel-observe-requirement-canceled-changed"
+    ],
+    "group": "quirk-t-mispaired-cancel",
+    "bound": {
+      "match": [
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "requirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        },
+        {
+          "k": "observe",
+          "event": {
+            "id": {
+              "$like": "batchRequirementId"
+            },
+            "type": "requirement.canceled"
+          }
+        }
+      ]
+    },
+    "reason": "Row t, the shared mispairing rule (L12 gate run 5; PR seed 17's eighth case, diff-notes l12gate/r5/specs/pr17h). Wherever an approved row t exception explains a cancel 1.35 reports and 2.0 does not, the comparison (diff/compare.ts, its pairing unchanged) can pair that cancel with 2.0's cancel of another requirement that both engines cancel in the same pass, because it pairs a step and phase's cancel records by kind, never by requirement id: 1.35's extra cancel then shows as op `changed`, and 1.35's own cancel of the other requirement is left unpaired. pr17h has no history: in one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape, `l12-cand-t-batch-completed-*`), which 2.0 never does; the comparison pairs that extra cancel with 2.0's cancel of the single requirement. The second-cancel group's `-changed` twins (2026-11-24) are the same form for that one group; this is one rule for every group. This covers only the requirement.canceled observe event of the other requirement's cancel that 1.35 made and the pairing left unpaired (a single or batch requirement's cancel, in the shapes the signed row t entries name; a keyed run's is left to `l3-cand-t-fuzz-*-missing`), and only where it is marked (`mispaired`, diff/scenario.ts markMispaired): in its step and phase a pair in the mispaired form took 2.0's cancel of this very requirement, a record of the same kind, which 2.0 reports as often as 1.35 does. It is excused only where that pair is: `l12-cand-t-mispaired-cancel-observe-requirement-canceled-changed` must cover the pair (`mispairedBy`), so where no row t entry approves 1.35's extra cancel, this cancel stays unexcused with it. A cancel 2.0 really lacks, with no such pair for its requirement, is never marked and stays unexcused by this entry. Earlier row t entries (`l3-cand-t-fuzz-*-missing`, `l9-fuzz-t-disable-*-missing`) take the record first where their triggers apply. Signed on the owner's instruction: asked whether to apply the mispairing rule he approved on 2026-11-24 (\"Extend the exception, not the pairing (Recommended)\") across every row t 'extra cancel on 1.35' exception, he answered \"Apply it to all row t cancels (Recommended)\" (2026-11-26), the option of one shared rule: wherever an approved row t exception explains 1.35's extra cancel, it also accepts the form where that cancel is paired as 'changed' against 2.0's cancel of another request that 1.35 also cancels in the same step; self-tests: a wrong-request cancel on 2.0, or a mispairing without an approved extra cancel, still fail. That answer stands next to each listed row's own approval, which still decides 1.35's side: row t itself, owner-approved 2026-11-01 (decisions page row t: \"If all are better or non user facing they are all approved\"), signed as l3-cand-t-fuzz-* (re-signed 2026-11-12, and on \"Allow a run 4 and sign both (Recommended)\", 2026-11-18) and as l9-fuzz-t-disable-* (2026-11-16, under \"I approve you for to do everything\", 2026-11-15); the batch-completed and batch-error entries on \"Yes, run 5 (Recommended)\" (2026-11-22); the second-cancel entries on \"2.0's single cancel; sign it (Recommended)\" (2026-11-23) and \"Widen to any outcome (Recommended)\" (2026-11-23).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-plugin-counter-follows-performance-changed",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "performance",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[1]",
+    "when": ["performancePlugin"],
+    "counterFollows": true,
+    "group": "plugin-counter-follows",
+    "reason": "The shared plugin-counter rule (L12 gate run 5; PR seed 17's tenth case, diff-notes l12gate/r5/specs/pr17j). The performance plugin counts hook records: each counter in its getSnapshot() adds 1 in one hook, keyed by the hook's first argument (packages/core/src/plugins/performance.ts and packages/core-next/src/plugins/performance.ts: resolvers' starts, completions, errors, retries and cancellations in onResolverStart, onResolverComplete, onResolverError, onResolverRetry and onResolverCancel; effects' runs and errors in onEffectRun and onEffectError; constraints' evaluations in onConstraintEvaluate; reconcile's runs in onReconcileEnd; `PLUGIN_COUNTERS`, diff/scenario.ts). So where an approved entry explains a hook record one engine makes and the other does not, the counter of that kind and key differs by one at the end, and nothing else excuses it: pr17j's resolvers.a::rb.cancellations is 5 on 1.35 and 4 on 2.0, the extra count being 1.35's row t error-shape cancel of the failed batch run in step 3 (l12-cand-t-batch-error-*). This covers a counter's change only where the records other approved entries already explain in the same case account for it exactly (`counterExplained`, read by `explain` in a second pass): its 1.35 value less its 2.0 value equals the number of explained records of the hook it counts, for its key, before the counter's own record and after the last destroy or twin step, that 1.35 has and 2.0 lacks, less those 2.0 has and 1.35 lacks. A counter off by more or less, the other way, with no explained record behind it, or one the map does not list (the status plugin's numbers are sizes of sets of requirement ids, not counts of records, and are not listed) stays unexcused. It adds no record exception of its own. Signed on the owner's instruction: asked whether plugin counters may differ when approved exceptions explain extra or missing records, he answered \"Counters follow approved records (Recommended)\" (2026-11-26), the option of one shared rule: a plugin counter (performance, status) may differ only by the number of records that approved exceptions explain in the same case, of the kind that counter counts (cancels for cancellations, and so on); self-tests: a counter off by more, or with no approved record behind it, still fail. The records it counts are each excused by their own row's entry and approval; the run-5 answer \"Yes, run 5 (Recommended)\" (2026-11-22).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-26"
+  },
+  {
+    "id": "l12-fuzz-ay-external-history-changed-snapshots",
+    "scenario": "fuzz",
+    "stream": "external",
+    "kind": "history",
+    "engine": "v2",
+    "op": "changed",
+    "path": "data[1]",
+    "when": ["navigatedPaused"],
+    "snapshotFollows": true,
+    "group": "row-ay",
+    "reason": "Row (ay)'s knock-on in the history record (L12 gate run 5; PR seed 17's eleventh case, diff-notes l12gate/r5/specs/pr17k). Row (ay) (L8; owner-approved 2026-11-10, \"Approve all as recommended (Recommended)\"): a navigation puts back the pause it found, so after pause() a goTo leaves the history paused and the next write takes no snapshot until resume(); 1.35's restore clears the pause in its finally, so its next write takes one (the L8 RFC's N5, probe H5; U4). The row's own entries explain that onSnapshot call, which 1.35 makes and 2.0 does not (l8-fuzz-ay-hook-onSnapshot-missing-unannounced and its twins). The history record the fuzz model writes at the next history step then shows the same snapshot again: pr17k's step 10 record has ids [1, 2], index 1 and length 2 on 1.35, and ids [1], index 0 and length 1 on 2.0, the snapshot with id 2 being the one step 9's write took on 1.35 only; nothing excused those three fields (its listener count, data[1].changes, is row (az)'s, l8-fuzz-az-external-history-changed-changes, approved \"Approve all as recommended (Recommended)\", 2026-11-10). In a fuzz case with a navigation under a pause (`when` navigatedPaused), this covers a changed history record's ids, index and length, and only where the snapshots this row's entries already explain as missing on 2.0 account for all three exactly (`snapshotFollows`, `historyFollows` in diff/scenario.ts, read by `explain` in a second pass): counted are the explained missing onSnapshot records of this group's entries, before the history record, in a step after a goTo step that ran while a pause step's pause was set, with no destroy or twin step since; 1.35's ids without the counted snapshots' ids, each later id lowered by the counted ids below it, must be 2.0's ids; the length and the index must each differ by the number of them in 1.35's ids. An index or length off by more or less, an id the counted snapshots do not explain, the same record in a case with no paused goTo or with no explained missing snapshot, and any other field of the record (paused, ordered, changes) stay unexcused here. It adds no record exception of its own. Signed on the owner's instruction: asked how to finish seed 17, he answered \"Approve (ay) knock-on, keep going (Recommended)\" (2026-11-27), the option of a narrow entry: after a paused goTo, the history record's snapshot ids, index and length may differ only by the snapshot (ay) excuses; self-tests: any other history difference still fails. The run-5 answer \"Yes, run 5 (Recommended)\" (2026-11-22).",
+    "approvedBy": "Jason Comes",
+    "date": "2026-11-27"
   }
 ]

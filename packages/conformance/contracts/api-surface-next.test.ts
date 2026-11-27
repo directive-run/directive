@@ -254,7 +254,7 @@ describe("core-next public API surface", () => {
 
   // Self-tests 1 and 2: before next-unshipped.json, the layer rule accepted
   // any missing name above `current`, so these drops passed silently.
-  it("a name core-next ships at an unbuilt layer may not be dropped (root, /plugins, /testing, stub entries)", () => {
+  it("a name core-next ships at an unbuilt layer may not be dropped (/testing, stub entries)", () => {
     /** A name `entry` ships, 1.35 has, at a layer above `current`. */
     const shippedUnbuilt = (entry: string) =>
       `${entry} ${Object.keys(next[entry] ?? {}).find(
@@ -264,9 +264,10 @@ describe("core-next public API surface", () => {
           layerIndex(layerOf(`${entry} ${n}`)) > layerIndex(current as Layer),
       )}`;
     for (const key of [
-      "./plugins loggingPlugin",
+      // Each is a name above `current`. From L12 every name core-next ships
+      // at the root and /plugins is built (the plugins are L12), so neither
+      // has one left to drop; /testing and the stub entries still do.
       "./testing CoverageReport",
-      shippedUnbuilt("."),
       shippedUnbuilt("./worker"),
     ]) {
       const [entry = "", name = ""] = key.split(" ");
@@ -288,6 +289,44 @@ describe("core-next public API surface", () => {
     );
     expect(gate(noWorker).failures).toHaveLength(workerNames.length);
   });
+
+  // Self-tests 1 and 2 at the root and /plugins. From L12 neither ships a
+  // name above `current` (the plugins are L12), so each is judged one layer
+  // below the newest layer its entry ships (gate run 3: a skip here fails
+  // the census): dropping a name at that layer must fail as unbuilt there.
+  // Once the entry ships a name above `current`, that name is used instead.
+  const dropsUnbuilt = (entry: string) => {
+    const shipped = Object.keys(next[entry] ?? {}).filter(
+      (n) => !n.startsWith("#ref:") && n in (frozen[entry] ?? {}),
+    );
+    const above = shipped.find(
+      (n) =>
+        layerIndex(layerOf(`${entry} ${n}`)) > layerIndex(current as Layer),
+    );
+    const name =
+      above ??
+      [...shipped].sort(
+        (x, y) =>
+          layerIndex(layerOf(`${entry} ${y}`)) -
+          layerIndex(layerOf(`${entry} ${x}`)),
+      )[0];
+    expect(name).toBeDefined();
+    const key = `${entry} ${name}`;
+    const layer = layerOf(key);
+    const at = (
+      above === undefined ? LAYERS[layerIndex(layer) - 1] : current
+    ) as Layer;
+    expect(layerIndex(layer)).toBeGreaterThan(layerIndex(at));
+    const tampered = copy(next);
+    delete tampered[entry]?.[name as string];
+    expect(gate(tampered, { current: at }).failures).toEqual([
+      `core-next ${key} (missing): 1.35 exports it and contracts/next-unshipped.json does not list it (layer ${layer}, unbuilt at current ${at}): a name core-next ships may not be dropped`,
+    ]);
+  };
+  it("a name core-next ships at an unbuilt layer may not be dropped (root)", () =>
+    dropsUnbuilt("."));
+  it("a name core-next ships at an unbuilt layer may not be dropped (/plugins)", () =>
+    dropsUnbuilt("./plugins"));
 
   // Self-test 3, and the list's other rules.
   it("a stale, built-layer, misplaced or unknown next-unshipped.json entry fails", () => {
@@ -315,18 +354,26 @@ describe("core-next public API surface", () => {
   });
 
   it(`a next-unshipped.json entry listed at the wrong unbuilt layer fails (stock ${stockKey ?? noStockReason})`, (ctx) => {
-    if (noStock || stock.wrong === undefined) {
-      ctx.skip(
-        noStock
-          ? noStockReason
-          : `skipped: no layer above current other than ${stock.layer}, so no wrong unbuilt layer to list ${stockKey} at`,
-      );
+    if (noStock) {
+      ctx.skip(noStockReason);
     }
-    const { key, layer, wrong } = stock;
+    const { key, layer } = stock;
+    // From L12 the stock's layer (L13) is the only one above `current`, so
+    // the case is judged one layer down, where the layer below the stock's
+    // is still unbuilt and so a wrong unbuilt layer to list it at.
+    const at =
+      stock.wrong === undefined
+        ? (LAYERS[layerIndex(current as Layer) - 1] as Layer)
+        : (current as Layer);
+    const wrong =
+      stock.wrong ??
+      LAYERS.find((l) => l !== layer && layerIndex(l) > layerIndex(at));
     expect(wrong).toBeDefined();
     expect(
-      gate(next, { unshipped: { ...unshipped, [key]: wrong as Layer } })
-        .failures,
+      gate(next, {
+        current: at,
+        unshipped: { ...unshipped, [key]: wrong as Layer },
+      }).failures,
     ).toEqual([
       `contracts/next-unshipped.json: ${key} is listed at ${wrong}, but lib/layers.ts places it at ${layer}`,
     ]);

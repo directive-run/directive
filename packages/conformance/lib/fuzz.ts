@@ -114,6 +114,7 @@ export const FUZZ_TRIGGERS = [
   // (diff/fuzz/model.ts `FuzzPlugins`, `PluginStep`).
   "distributable",
   "distributableWatch",
+  "watchIncludesFacts",
   "auditLedger",
   "loggingPlugin",
   "performancePlugin",

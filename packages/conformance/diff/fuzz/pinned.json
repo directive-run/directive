@@ -4601,5 +4601,1058 @@
         "inserted": []
       }
     }
+  },
+  {
+    "group": "quirk-b-batch-pairing",
+    "why": "PR seed 15 at L12, run 4's rerun of the L12 gate (diff-notes l12gate/r5/specs/pr15): quirk b with a batch run that also fails. r0's requirement is retracted during its retry backoff; 1.35 reports the cancel and then r0's error, 2.0 the cancel only, and the comparison pairs 1.35's r0 error with 2.0's batch error (the l12-fuzz-b-batch-pair-* entries, signed in run 5 on the owner's instruction). Pinned so the group stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 1,
+              "retry": 1,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 0,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": null,
+        "delay": 0,
+        "fails": 1,
+        "retry": 0,
+        "timeout": 3,
+        "writes": 0,
+        "value": -1
+      },
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": false,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
+  },
+  {
+    "group": "quirk-t-batch-completed",
+    "why": "PR seed 17 at L12, run 4's rerun of the L12 gate (diff-notes l12gate/r5/specs/pr17): row t's third path where the completed run is the batch run. The batch call's write starts a single resolver that writes the fact back, and the next pass retracts the batch source's constraint while reporting the batch run complete; 1.35 then also cancels the batch requirement, 2.0 reports the completion only (the l12-cand-t-batch-completed-* entries, signed in run 5 on the owner's instruction). Pinned so the group stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 0,
+          "value": 1
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": null,
+        "delay": 0,
+        "fails": 0,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": 2
+      },
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": false,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
+  },
+  {
+    "group": "quirk-t-batch-error",
+    "why": "PR seed 17 at L12, its second shrink in run 5 of the L12 gate (diff-notes l12gate/r5/specs/pr17b): row t's error shape where the run that errored is the batch run. The batch call's write starts a single resolver that writes the fact back, and the next pass retracts the batch source's constraint while reporting the batch run's error; 1.35 then also cancels the batch requirement, 2.0 reports the error only (the l12-cand-t-batch-error-* entries, signed in run 5 on the owner's instruction). Pinned so the group stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 0,
+          "value": 1
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": null,
+        "delay": 0,
+        "fails": 1,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": 2
+      },
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": false,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
+  },
+  {
+    "group": "quirk-t-batch-second-cancel",
+    "why": "PR seed 17 at L12, its fourth shrink in run 5 of the L12 gate (diff-notes l12gate/r5/specs/pr17d): a goTo while a batch call is in flight, the call's late write raises the batch requirement again, and the next pass reports the batch run complete and retracts it with two calls in flight. Both engines cancel the requirement once; 1.35 reports the cancel a second time, 2.0 does not (the l12-cand-t-batch-second-cancel-* entries, signed on the owner's instruction, 2026-11-23). Pinned so the group stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": true,
+      "trace": false,
+      "steps": [
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[0, 0]]
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 0,
+          "value": 1
+        },
+        {
+          "op": "goTo",
+          "position": 0
+        },
+        {
+          "op": "publish",
+          "event": "own",
+          "value": 0
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": 1,
+        "delay": 5,
+        "fails": 0,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": 2
+      },
+      "maxSnapshots": 3,
+      "respectsAbort": false,
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": false,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
+  },
+  {
+    "group": "quirk-t-batch-second-cancel",
+    "why": "PR seed 17 at L12, its seventh case in run 5 of the L12 gate (diff-notes l12gate/r5/specs/pr17g): pr17d's shape, where the same pass also cancels a single resolver's requirement on both engines. The comparison pairs 1.35's second cancel of the batch requirement with 2.0's cancel of that other requirement (the l12-cand-t-batch-second-cancel-*-changed entries, signed on the owner's instruction, 2026-11-24). Pinned so the mispaired form stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 0,
+              "crossAtLeast": 1,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": true,
+      "trace": false,
+      "steps": [
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[0, 0]]
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 0,
+          "value": 1
+        },
+        {
+          "op": "goTo",
+          "position": 0
+        },
+        {
+          "op": "publish",
+          "event": "own",
+          "value": 0
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": 1,
+        "delay": 5,
+        "fails": 0,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": 2
+      },
+      "maxSnapshots": 3,
+      "respectsAbort": false,
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": false,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
+  },
+  {
+    "group": "quirk-t-mispaired-cancel",
+    "why": "PR seed 17 at L12, its eighth case in run 5 of the L12 gate (diff-notes l12gate/r5/specs/pr17h): no history. In one pass both engines cancel a single resolver's requirement once, and 1.35 also cancels the batch requirement both engines had reported met (row t's batch-completed shape), which 2.0 never does. The comparison pairs that extra cancel with 2.0's cancel of the single requirement (the l12-cand-t-mispaired-cancel-*-changed entries, the shared mispairing rule, signed on the owner's instruction, 2026-11-26). Pinned so the shared rule stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 1,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 20,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            },
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 0,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": false,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [],
+          "effects": [],
+          "source": null
+        }
+      ],
+      "boundary": null,
+      "history": false,
+      "trace": false,
+      "steps": [
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 0,
+          "value": 1
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 0,
+          "value": 1
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "batch",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": null,
+        "delay": 0,
+        "fails": 0,
+        "retry": 0,
+        "timeout": null,
+        "writes": 0,
+        "value": 2
+      },
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": false,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
+  },
+  {
+    "group": "plugin-counter-follows",
+    "why": "PR seed 17 at L12, its tenth case in run 5 of the L12 gate (diff-notes l12gate/r5/specs/pr17j): the performance plugin's resolvers.a::rb.cancellations is 5 on 1.35 and 4 on 2.0 at the end, the extra count being 1.35's row t error-shape cancel of the failed batch run in step 3 (l12-cand-t-batch-error-*). The shared plugin-counter rule (l12-plugin-counter-follows-performance-changed, signed on the owner's instruction, 2026-11-26) explains it by that approved record. Pinned so the rule stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [
+            {
+              "facts": [0],
+              "derived": [],
+              "threshold": 5,
+              "throwsAt": 4
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": 1,
+              "throwsAt": 6
+            },
+            {
+              "facts": [0],
+              "derived": [0],
+              "threshold": 1,
+              "throwsAt": null
+            }
+          ],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 4,
+              "crossAtLeast": null,
+              "priority": 1,
+              "writes": 0,
+              "value": 6,
+              "delay": 20,
+              "fails": 0,
+              "retry": 2,
+              "timeout": null
+            },
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": null,
+              "priority": 2,
+              "writes": 0,
+              "value": 0,
+              "delay": 0,
+              "fails": 0,
+              "retry": 1,
+              "timeout": 10
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": false,
+              "throwsAt": null
+            }
+          ],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 2,
+              "crossAtLeast": 1,
+              "priority": 0,
+              "writes": 0,
+              "value": 4,
+              "delay": 1,
+              "fails": 0,
+              "retry": 1,
+              "timeout": 10
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": true,
+              "cleanup": true,
+              "throwsAt": 6
+            },
+            {
+              "reads": [0],
+              "explicitDeps": true,
+              "cleanup": true,
+              "throwsAt": 8
+            }
+          ],
+          "source": {
+            "gated": true
+          },
+          "snapshotEvents": [0]
+        }
+      ],
+      "boundary": "retry-later",
+      "history": true,
+      "trace": true,
+      "steps": [
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 1856579646,
+          "value": 1
+        },
+        {
+          "op": "twin"
+        },
+        {
+          "op": "roundtrip"
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "set",
+          "module": 1,
+          "fact": 736947150,
+          "value": 6
+        },
+        {
+          "op": "advance",
+          "ms": 1
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[1753281098, 3], [1635111560, 5]]
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[73899285, 5]]
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 848080140,
+          "value": 1
+        },
+        {
+          "op": "publish",
+          "event": "own",
+          "value": 2
+        },
+        {
+          "op": "settle"
+        },
+        {
+          "op": "dispatch",
+          "module": 0,
+          "event": 809240048,
+          "value": 0
+        },
+        {
+          "op": "back",
+          "steps": 2
+        },
+        {
+          "op": "settle"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 0,
+            "atLeast": 1,
+            "items": 1,
+            "abortOn": false
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 5,
+        "maxSize": 1,
+        "delay": 5,
+        "fails": 1,
+        "retry": 0,
+        "timeout": null,
+        "writes": 1,
+        "value": 4
+      },
+      "maxSnapshots": 3,
+      "respectsAbort": false,
+      "maxRuns": 100,
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": true,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
+  },
+  {
+    "group": "row-ay-history-record",
+    "why": "PR seed 17 at L12, its eleventh case in run 5 of the L12 gate (diff-notes l12gate/r5/specs/pr17k): after a pause and a goTo 2.0 keeps the history paused, so step 9's write takes no snapshot (row (ay), l8-fuzz-ay-hook-onSnapshot-missing-unannounced), and step 10's history record has ids [1, 2], index 1 and length 2 on 1.35 against ids [1], index 0 and length 1 on 2.0. The history-record entry (l12-fuzz-ay-external-history-changed-snapshots, signed on the owner's instruction, 2026-11-27) explains those three fields by that approved missing snapshot. Pinned so the entry stays reached when the census seed draws no such case.",
+    "spec": {
+      "modules": [
+        {
+          "facts": 2,
+          "date": false,
+          "derivations": [
+            {
+              "facts": [1],
+              "derived": [],
+              "threshold": null,
+              "throwsAt": 7
+            },
+            {
+              "facts": [0, 1],
+              "derived": [],
+              "threshold": 0,
+              "throwsAt": 8
+            },
+            {
+              "facts": [0, 1],
+              "derived": [0],
+              "threshold": null,
+              "throwsAt": 5
+            }
+          ],
+          "events": [
+            {
+              "target": 1,
+              "add": true
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 1,
+              "atLeast": 4,
+              "crossAtLeast": null,
+              "priority": 0,
+              "writes": 1,
+              "value": -2,
+              "delay": 0,
+              "fails": 2,
+              "retry": 0,
+              "timeout": 50
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": true,
+              "cleanup": false,
+              "throwsAt": 3
+            },
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": 3
+            }
+          ],
+          "source": null
+        },
+        {
+          "facts": 1,
+          "date": true,
+          "derivations": [],
+          "events": [
+            {
+              "target": 0,
+              "add": false
+            },
+            {
+              "target": 0,
+              "add": true
+            },
+            {
+              "target": 0,
+              "add": false
+            }
+          ],
+          "constraints": [
+            {
+              "fact": 0,
+              "atLeast": 4,
+              "crossAtLeast": 3,
+              "priority": 1,
+              "writes": 0,
+              "value": 0,
+              "delay": 20,
+              "fails": 1,
+              "retry": 0,
+              "timeout": null
+            }
+          ],
+          "effects": [
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": 3,
+              "onNavigate": "skip"
+            },
+            {
+              "reads": [0],
+              "explicitDeps": false,
+              "cleanup": true,
+              "throwsAt": 3
+            }
+          ],
+          "source": {
+            "gated": true
+          },
+          "snapshotEvents": []
+        }
+      ],
+      "boundary": "retry-later",
+      "history": true,
+      "trace": true,
+      "steps": [
+        {
+          "op": "roundtrip"
+        },
+        {
+          "op": "pause"
+        },
+        {
+          "op": "goTo",
+          "position": 0
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "publish",
+          "event": "unknown",
+          "value": 4
+        },
+        {
+          "op": "advance",
+          "ms": 25
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1488228114,
+          "value": 3
+        },
+        {
+          "op": "pause"
+        },
+        {
+          "op": "tick"
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 1607700606,
+          "value": 0
+        },
+        {
+          "op": "publish",
+          "event": "own",
+          "value": -2
+        },
+        {
+          "op": "batch",
+          "module": 0,
+          "writes": [[1900789376, 1]]
+        },
+        {
+          "op": "advance",
+          "ms": 1
+        },
+        {
+          "op": "set",
+          "module": 0,
+          "fact": 502221525,
+          "value": -1
+        },
+        {
+          "op": "restore"
+        }
+      ],
+      "batch": {
+        "sources": [
+          {
+            "fact": 2,
+            "atLeast": 2,
+            "items": 1,
+            "abortOn": true
+          }
+        ],
+        "handler": "results",
+        "failing": "all",
+        "windowMs": 0,
+        "maxSize": 2,
+        "delay": 1,
+        "fails": 1,
+        "retry": 0,
+        "timeout": null,
+        "writes": 2,
+        "value": 2
+      },
+      "maxSnapshots": 3,
+      "respectsAbort": false,
+      "maxRuns": 1,
+      "plugins": {
+        "ledger": false,
+        "logging": false,
+        "performance": false,
+        "clobber": null,
+        "watch": null,
+        "inserted": []
+      }
+    }
   }
 ]

@@ -8192,7 +8192,7 @@
           "layer": "L12",
           "by": ["member .getDistributableSnapshot"]
         },
-        "L12 probe pins (development) > U5: a snapshot holding undefined verifies in place and fails after JSON (S2)": {
+        "L12 probe pins (development) > U5: a snapshot holding undefined verifies in place (S2; row (bu))": {
           "layer": "L12",
           "by": [
             "import signSnapshot",
@@ -8200,7 +8200,7 @@
             "member .getDistributableSnapshot"
           ]
         },
-        "L12 probe pins (development) > U5: a snapshot holding a Date verifies in place and fails after JSON (S3)": {
+        "L12 probe pins (development) > U5: a snapshot holding a Date verifies in place (S3; row (bu))": {
           "layer": "L12",
           "by": ["import signSnapshot", "import verifySnapshotSignature"]
         },
@@ -8208,7 +8208,7 @@
           "layer": "L12",
           "by": ["import signSnapshot", "import verifySnapshotSignature"]
         },
-        "L12 probe pins (development) > U6: a change below 50 levels still verifies (S5)": {
+        "L12 probe pins (development) > U6: data 60 levels deep under a shallow snapshot's signature does not verify (S5; row (bv))": {
           "layer": "L12",
           "by": ["import signSnapshot", "import verifySnapshotSignature"]
         },
@@ -8216,7 +8216,7 @@
           "layer": "L12",
           "by": ["import signSnapshot", "import verifySnapshotSignature"]
         },
-        "L12 probe pins (development) > U6: \"[function]\" verifies for a function (S6)": {
+        "L12 probe pins (development) > U6: a snapshot holding a function signs and verifies in place (S6; row (bv))": {
           "layer": "L12",
           "by": ["import signSnapshot", "import verifySnapshotSignature"]
         },
@@ -8268,6 +8268,30 @@
         "L12 probe pins (development) > U17: registerModule and unregisterModule reach an observer as { type, id }": {
           "layer": "L10",
           "by": ["member .registerModule", "member .unregisterModule"]
+        },
+        "L12 gate mutation pins (development) > U4: the unknown-key warnings name the ignored keys and every available one": {
+          "layer": "L12",
+          "by": ["member .getDistributableSnapshot"]
+        },
+        "L12 gate mutation pins (development) > U4: with nothing available the warnings say (none)": {
+          "layer": "L12",
+          "by": ["member .getDistributableSnapshot"]
+        },
+        "L12 gate mutation pins (development) > U4: excludeDerivations leaves those derivations out, with or without an include list": {
+          "layer": "L12",
+          "by": ["member .getDistributableSnapshot"]
+        },
+        "L12 gate mutation pins (development) > U4: metadata is carried as given": {
+          "layer": "L12",
+          "by": ["member .getDistributableSnapshot"]
+        },
+        "L12 gate mutation pins (development) > a watch with no include list watches every derivation, less its exclusions": {
+          "layer": "L12",
+          "by": ["member .watchDistributableSnapshot"]
+        },
+        "L12 gate mutation pins (development) > a watch whose exclusions remove every derivation warns and never calls": {
+          "layer": "L12",
+          "by": ["member .watchDistributableSnapshot"]
         }
       }
     },

@@ -117,6 +117,70 @@ export const LIKE: Record<string, (v: Json | undefined) => boolean> = {
    */
   thrownError: (v) =>
     typeof v === "string" && /^[a-z]\.[dx]\d+ throws at \d+$/.test(v),
+  /**
+   * The error a fuzz derivation throws, derivations only: `a.d2 throws at
+   * 4` (row (bx)'s knock-on entries, L12 gate run 3). Hand-named.
+   */
+  derivationThrownMessage: (v) =>
+    typeof v === "string" && /^[a-z]\.d\d+ throws at \d+$/.test(v),
+  /**
+   * A fuzz derivation's value: a boolean (a threshold), a number (a sum) or
+   * a string (an L11 `$template`). Hand-named.
+   */
+  derivedValue: (v) =>
+    typeof v === "boolean" ||
+    typeof v === "string" ||
+    (typeof v === "number" && Number.isFinite(v)),
+  /**
+   * A derivation's dependency keys as `onDerivationCompute` passes them:
+   * fuzz fact or derivation keys, own or namespaced (`f0`, `a::d1`, the
+   * Date fact `when`, the L11 string fact `tx`), and a derivation read by
+   * another as 1.35 and 2.0 name it, `derive.<id>` (`derive.d0`,
+   * `derive.a::d0`; L12 gate run 4, PR seed 2), and the `module` step's
+   * module's facts `z::g0`, `z::g1` (PR seed 19). Hand-named.
+   */
+  dependencyKeys: (v) =>
+    Array.isArray(v) &&
+    v.every(
+      (x) =>
+        typeof x === "string" &&
+        (/^([a-z]::)?([fd]\d+|when|tx)$/.test(x) ||
+          /^derive\.([a-z]::)?d\d+$/.test(x) ||
+          /^(z::)?g[01]$/.test(x)),
+    ),
+  /**
+   * A derivation a distributable snapshot can hold (row (bx)'s knock-on,
+   * L12 gate run 4): a fuzz derivation (`derivation`), or `z::h0`, the one
+   * derivation of the module a `module` step registers, `h0` in a case
+   * with one module (diff/fuzz/model.ts `extraModule`; PR seeds 19, 8).
+   * Hand-named.
+   */
+  snapshotDerivation: (v) =>
+    typeof v === "string" && /^(([a-z]::)?d\d+|(z::)?h0)$/.test(v),
+  /**
+   * A distributable snapshot as a watch passes it (L12): `createdAt` and
+   * `data`, a plain object, with `version` (a string) and `expiresAt` (an
+   * integer) when the options ask for them. Row (bx)'s fuzz entry names it.
+   * Hand-named.
+   */
+  distributableSnapshot: (v) => {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      return false;
+    }
+    const o = v as Record<string, Json | undefined>;
+    const keys = Object.keys(o).filter((k) => o[k] !== undefined);
+    const allowed = new Set(["createdAt", "data", "version", "expiresAt"]);
+
+    return (
+      keys.every((k) => allowed.has(k)) &&
+      Number.isInteger(o.createdAt) &&
+      o.data !== null &&
+      typeof o.data === "object" &&
+      !Array.isArray(o.data) &&
+      (o.version === undefined || typeof o.version === "string") &&
+      (o.expiresAt === undefined || Number.isInteger(o.expiresAt))
+    );
+  },
   /** A derivation or effect id, own or namespaced: `d0`, `b::x1`. */
   thrower: (v) => typeof v === "string" && /^([a-z]::)?[dx]\d+$/.test(v),
   /** A fuzz fact's key, own or namespaced: `f0`, `a::f1`. */
@@ -421,6 +485,72 @@ export const TEXT: Record<string, (v: Json | undefined) => boolean> = {
    * only (bc)'s own failure, and any other import failure (a bad snapshot
    * list, a non-number index) stays unexplained.
    */
+  /**
+   * Row (bx)'s knock-on (L12 gate run 3): the development warning 2.0's
+   * extra distributable-snapshot read prints when a fuzz derivation throws
+   * (core-next api/distributable.ts), word for word:
+   * `[Directive] getDistributableSnapshot: Skipping derivation "a::d2" due
+   * to error:`. Only a derivation id, plain or namespaced. Hand-named.
+   */
+  distributableSkipped: (v) =>
+    typeof v === "string" &&
+    /^\[Directive\] getDistributableSnapshot: Skipping derivation "([a-z]::)?d\d+" due to error:$/.test(
+      v,
+    ),
+  /**
+   * Row (bx)'s knock-on (L12 gate run 5, deep seed 2): the development
+   * warning a distributable-snapshot read prints for an `includeDerivations`
+   * key it does not know, word for word (core-next api/distributable.ts;
+   * core engine.ts prints the same text on such a read):
+   * `[Directive] getDistributableSnapshot: Unknown derivation keys ignored:
+   * d0. Available: d1`. The unknown keys are derivations a fuzz watch can
+   * hold (`snapshotDerivation`); the available ones are derivation ids of a
+   * fuzz case (`dynamicDerivation`, or module z's `h0`), or `(none)`.
+   * Hand-named.
+   */
+  distributableUnknownKeys: (v) => {
+    const m =
+      typeof v === "string"
+        ? /^\[Directive\] getDistributableSnapshot: Unknown derivation keys ignored: (.+)\. Available: (.+)$/.exec(
+            v,
+          )
+        : null;
+    if (m === null) {
+      return false;
+    }
+    const available = (id: string) =>
+      /^(([a-z]::)?(d\d+|z[01]|zin)|(z::)?h0)$/.test(id);
+
+    return (
+      (m[1] as string)
+        .split(", ")
+        .every((id) => LIKE.snapshotDerivation?.(id) === true) &&
+      (m[2] === "(none)" || (m[2] as string).split(", ").every(available))
+    );
+  },
+  /**
+   * The error that warning carries: a fuzz derivation's own thrown error,
+   * exactly `{ $error: { name: "Error", message: "a.d2 throws at 4" } }`
+   * (an effect's, `a.x0 throws at 4`, is outside it). Hand-named.
+   */
+  derivationThrown: (v) => {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) {
+      return false;
+    }
+    const e = (v as Record<string, Json>).$error;
+    if (e === null || typeof e !== "object" || Array.isArray(e)) {
+      return false;
+    }
+    const o = e as Record<string, Json>;
+
+    return (
+      Object.keys(v).length === 1 &&
+      Object.keys(o).length === 2 &&
+      o.name === "Error" &&
+      typeof o.message === "string" &&
+      /^[a-z]\.d\d+ throws at \d+$/.test(o.message)
+    );
+  },
   historyIndexNotASnapshot: (v) => {
     if (v === null || typeof v !== "object" || Array.isArray(v)) {
       return false;
@@ -551,6 +681,338 @@ export function pathFits(pattern: string, path: string): boolean {
   ).test(path);
 }
 
+/** One ledger entry as the fuzz's `ledger` step records it (`query({})`). */
+type LedgerEntry = Record<string, Json>;
+
+const LEDGER_LABEL = JSON.stringify({ op: "ledger" });
+
+const NAVIGATE_KEYS = "from,hashAlgo,kind,prevHash,schemaVersion,seq,to,ts";
+
+/** `a` and `b` are the same entry but for `seq` and `prevHash`. */
+function sameButChain(a: Json | undefined, b: Json | undefined): boolean {
+  if (!isEntry(a) || !isEntry(b)) {
+    return false;
+  }
+  const rest = (e: LedgerEntry) =>
+    canonicalJson(
+      Object.fromEntries(
+        Object.entries(e).filter(([k]) => k !== "seq" && k !== "prevHash"),
+      ),
+    );
+
+  return rest(a) === rest(b);
+}
+
+function isEntry(v: Json | undefined): v is LedgerEntry {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+/**
+ * Whether 2.0's ledger entries (`b`, newest first, as `query({})` lists
+ * them) are 1.35's (`a`) with at least one `system.history.navigate`
+ * entry inserted (row (az)). Read oldest first, each 2.0 entry either is
+ * 1.35's next entry, equal but for its `seq` (1.35's plus the navigate
+ * entries inserted before it) and its `prevHash` (1.35's until the first
+ * insertion, a djb2 hex after it, since the chain now covers the inserted
+ * entry), or is an inserted navigate entry: that kind, an integer `from`,
+ * `to`, `seq` and `ts`, 1.35's `hashAlgo` and `schemaVersion`, and no
+ * other field. Every 1.35 entry is used, in order.
+ */
+function navigateInserted(a: Json[], b: Json[]): boolean {
+  const ref = [...a].reverse();
+  const cand = [...b].reverse();
+  let i = 0;
+  let inserted = 0;
+  for (const e of cand) {
+    if (!isEntry(e)) {
+      return false;
+    }
+    const next = ref[i];
+    if (sameButChain(next, e) && isEntry(next)) {
+      const seqOk =
+        typeof next.seq === "number" &&
+        typeof e.seq === "number" &&
+        e.seq === next.seq + inserted;
+      const hashOk =
+        inserted === 0
+          ? e.prevHash === next.prevHash
+          : typeof e.prevHash === "string" &&
+            /^[0-9a-f]{1,8}$/.test(e.prevHash);
+      if (!seqOk || !hashOk) {
+        return false;
+      }
+      i += 1;
+      continue;
+    }
+    const shape = Object.keys(e).sort().join();
+    const like = ref[0] as LedgerEntry | undefined;
+    if (
+      shape !== NAVIGATE_KEYS ||
+      e.kind !== "system.history.navigate" ||
+      ![e.from, e.to, e.seq, e.ts].every(
+        (v) => typeof v === "number" && Number.isInteger(v),
+      ) ||
+      typeof e.prevHash !== "string" ||
+      !/^[0-9a-f]{1,8}$/.test(e.prevHash) ||
+      like === undefined ||
+      e.hashAlgo !== like.hashAlgo ||
+      e.schemaVersion !== like.schemaVersion
+    ) {
+      return false;
+    }
+    inserted += 1;
+  }
+
+  return i === ref.length && inserted > 0;
+}
+
+/**
+ * The requirement id a cancel record names (an onResolverCancel hook's
+ * second argument, an onRequirementCanceled hook's first, a
+ * requirement.canceled event's own id); undefined for any other record.
+ */
+export function canceledIdOf(record: Json | undefined): string | undefined {
+  if (record === null || typeof record !== "object" || Array.isArray(record)) {
+    return undefined;
+  }
+  const r = record as Record<string, Json>;
+  const args = r.args as Json[] | undefined;
+  const id =
+    r.k === "hook" && r.hook === "onResolverCancel"
+      ? (args?.[1] as Record<string, Json> | null | undefined)?.id
+      : r.k === "hook" && r.hook === "onRequirementCanceled"
+        ? (args?.[0] as Record<string, Json> | null | undefined)?.id
+        : r.k === "observe" &&
+            (r.event as Record<string, Json> | null)?.type ===
+              "requirement.canceled"
+          ? (r.event as Record<string, Json>).id
+          : undefined;
+
+  return typeof id === "string" ? id : undefined;
+}
+
+/**
+ * Classes of a changed pattern's `pair` (`{ path, pair }`): each judges
+ * 1.35's whole record and the engine under test's whole record together
+ * (`Difference.record`, `candidateRecord`), so a field-by-field change is
+ * excused only when the two records stand in the named relation. Each is
+ * hand-named for one approved row; `generalize` never picks one.
+ */
+export const PAIR: Record<
+  string,
+  (reference: Json | undefined, candidate: Json | undefined) => boolean
+> = {
+  /**
+   * Row t's shared mispairing rule (L12 gate run 5, PR seed 17's eighth
+   * case, `pr17h`): the two records are cancel records of the same kind
+   * (both onResolverCancel hooks, both onRequirementCanceled hooks, or
+   * both requirement.canceled events) that name different requirements
+   * (`canceledIdOf`). Any other record on either side, or the same
+   * requirement on both, is outside it. Which requirements they may be,
+   * and what the engine's record must hold, is not this class's to say:
+   * it reads no field of the engine's record but its kind and id. The
+   * entry's `mispaired` (diff/scenario.ts `mispairedForm`) decides that
+   * from the two traces: the engine's record must equal, as compared,
+   * 1.35's own unpaired cancel record of that other requirement, so a
+   * wrong resolver, constraint or requirement body under the right id is
+   * not excused (the gate PR's review, 2026-11-27). Its `extraCancelOf`
+   * decides 1.35's side. The census requires both on every entry that
+   * names this class. Added on the
+   * owner's instruction: "Apply it to all row t cancels (Recommended)"
+   * (2026-11-26), under row t's approval.
+   */
+  cancelOfAnother: (referenceRecord, candidateRecord) => {
+    const kind = (r: Json | undefined) => {
+      const o = r as { hook?: Json; k?: Json } | null | undefined;
+
+      return o?.k === "hook" ? o.hook : o?.k;
+    };
+    const id = canceledIdOf(referenceRecord);
+    const other = canceledIdOf(candidateRecord);
+
+    return (
+      id !== undefined &&
+      other !== undefined &&
+      id !== other &&
+      kind(referenceRecord) === kind(candidateRecord)
+    );
+  },
+  /**
+   * Row (bx)'s knock-on in a trace run (L12 gate run 5, deep seed 1): 2.0's
+   * extra distributable-snapshot read computes a derivation inside a run,
+   * so its record of the run lists that compute where 1.35's does not. The
+   * two records (onTraceComplete's one run, or a state record's
+   * `inspect.trace` runs) hold the same runs in the same order, and each
+   * run that differs differs only so: 2.0's `derivationsRecomputed` is
+   * 1.35's, in order, with entries of derivations a snapshot can hold
+   * (`snapshotDerivation`) inserted, and 2.0's `causalChain` is 1.35's
+   * with one "<id> recomputed" link per inserted entry and nothing else.
+   * At least one entry is inserted. Any other field of a run differing, an
+   * entry removed or changed, another derivation, or a chain that differs
+   * in any other link is outside it. Added on the owner's instruction,
+   * under row (bx)'s approval and "Yes, widen (bx) to its knock-on effects
+   * (Recommended)" (2026-11-22).
+   */
+  traceRunRecomputeInserted: (referenceRecord, candidateRecord) => {
+    const runsOf = (r: Json | undefined): Json[] | undefined => {
+      if (r === null || typeof r !== "object" || Array.isArray(r)) {
+        return undefined;
+      }
+      const o = r as Record<string, Json>;
+      if (o.k === "hook") {
+        return o.hook === "onTraceComplete" &&
+          Array.isArray(o.args) &&
+          o.args.length === 1
+          ? [o.args[0] as Json]
+          : undefined;
+      }
+      const trace =
+        o.k === "state"
+          ? (o.inspect as Record<string, Json> | null | undefined)?.trace
+          : undefined;
+
+      return Array.isArray(trace) ? trace : undefined;
+    };
+    const reference = runsOf(referenceRecord);
+    const candidate = runsOf(candidateRecord);
+    if (
+      reference === undefined ||
+      candidate === undefined ||
+      reference.length !== candidate.length
+    ) {
+      return false;
+    }
+    const plain = (run: Json | undefined): run is Record<string, Json> =>
+      run !== null && typeof run === "object" && !Array.isArray(run);
+    const rest = (run: Record<string, Json>) =>
+      canonicalJson({
+        ...run,
+        causalChain: undefined,
+        derivationsRecomputed: undefined,
+      } as unknown as Json);
+    const LINK = " \u2192 ";
+    let inserted = 0;
+    for (const [n, r] of reference.entries()) {
+      const c = candidate[n];
+      if (canonicalJson(r) === canonicalJson(c)) {
+        continue;
+      }
+      if (
+        !plain(r) ||
+        !plain(c) ||
+        rest(r) !== rest(c) ||
+        !Array.isArray(r.derivationsRecomputed) ||
+        !Array.isArray(c.derivationsRecomputed) ||
+        typeof r.causalChain !== "string" ||
+        typeof c.causalChain !== "string"
+      ) {
+        return false;
+      }
+      const links = c.causalChain.split(LINK);
+      let i = 0;
+      for (const e of c.derivationsRecomputed) {
+        if (
+          i < r.derivationsRecomputed.length &&
+          canonicalJson(r.derivationsRecomputed[i]) === canonicalJson(e)
+        ) {
+          i += 1;
+          continue;
+        }
+        const id = plain(e) ? e.id : undefined;
+        const at =
+          typeof id === "string" ? links.indexOf(`${id} recomputed`) : -1;
+        if (LIKE.snapshotDerivation?.(id) !== true || at < 0) {
+          return false;
+        }
+        links.splice(at, 1);
+        inserted += 1;
+      }
+      if (
+        i !== r.derivationsRecomputed.length ||
+        links.join(LINK) !== r.causalChain
+      ) {
+        return false;
+      }
+    }
+
+    return inserted > 0;
+  },
+  /**
+   * Row (az) in the audit ledger (L12c): 2.0's `replay()` and `import()`
+   * call `onHistoryNavigate`, which the ledger records as a
+   * `system.history.navigate` entry; 1.35 does not. So a fuzz `ledger`
+   * step's two records differ only so: `verify()` reports a higher
+   * `entryCount` with every other field equal, and the entries are 1.35's
+   * with navigate entries inserted (`navigateInserted`). Added on the
+   * owner's instruction, under row (az)'s approval ("Approve all as
+   * recommended (Recommended)", 2026-11-10).
+   */
+  ledgerNavigateInserted: (referenceRecord, candidateRecord) => {
+    const dataOf = (r: Json | undefined) =>
+      isEntry(r) && r.k === "external" && Object.keys(r).length === 2
+        ? r.data
+        : undefined;
+    const reference = dataOf(referenceRecord);
+    const candidate = dataOf(candidateRecord);
+    if (
+      !Array.isArray(reference) ||
+      !Array.isArray(candidate) ||
+      reference[0] !== LEDGER_LABEL ||
+      candidate[0] !== LEDGER_LABEL ||
+      reference.length !== candidate.length
+    ) {
+      return false;
+    }
+    if (reference.length === 2) {
+      const [, r] = reference;
+      const [, c] = candidate;
+      if (!isEntry(r) || !isEntry(c)) {
+        return false;
+      }
+      const rest = (e: LedgerEntry) =>
+        canonicalJson(
+          Object.fromEntries(
+            Object.entries(e).filter(([k]) => k !== "entryCount"),
+          ),
+        );
+
+      return (
+        typeof r.entryCount === "number" &&
+        typeof c.entryCount === "number" &&
+        c.entryCount > r.entryCount &&
+        r.valid === true &&
+        rest(r) === rest(c)
+      );
+    }
+    if (reference.length === 3) {
+      const [, rTag, r] = reference;
+      const [, cTag, c] = candidate;
+
+      return (
+        rTag === "entries" &&
+        cTag === "entries" &&
+        Array.isArray(r) &&
+        Array.isArray(c) &&
+        navigateInserted(r, c)
+      );
+    }
+
+    return false;
+  },
+};
+
+/**
+ * Whether `path` is `prefix` or inside it (a `pair` pattern's path: the two
+ * records are judged whole, so any field under the prefix may differ).
+ */
+export function pathWithin(prefix: string, path: string): boolean {
+  return (
+    path === prefix ||
+    path.startsWith(`${prefix}.`) ||
+    path.startsWith(`${prefix}[`)
+  );
+}
+
 /** Whether bound `b` admits difference `d` (`Bound`). */
 export function admits(b: Bound, d: Difference): boolean {
   const payload = payloadOf(d);
@@ -567,14 +1029,19 @@ export function admits(b: Bound, d: Difference): boolean {
     return (
       typeof path === "string" &&
       (keys === "from,path,to" ||
-        (keys === "from,path,record,to" && fits(q.record as Json, d.record))) &&
-      pathFits(path, d.path ?? "") &&
-      fits(q.from as Json, d.reference) &&
-      (isLower(q.to)
-        ? typeof d.reference === "number" &&
-          typeof d.candidate === "number" &&
-          d.candidate < d.reference
-        : fits(q.to as Json, d.candidate))
+        (keys === "from,path,record,to" && fits(q.record as Json, d.record)) ||
+        (keys === "pair,path" &&
+          typeof q.pair === "string" &&
+          PAIR[q.pair]?.(d.record, d.candidateRecord) === true &&
+          pathWithin(path, d.path ?? ""))) &&
+      (keys === "pair,path" ||
+        (pathFits(path, d.path ?? "") &&
+          fits(q.from as Json, d.reference) &&
+          (isLower(q.to)
+            ? typeof d.reference === "number" &&
+              typeof d.candidate === "number" &&
+              d.candidate < d.reference
+            : fits(q.to as Json, d.candidate))))
     );
   });
 }
@@ -714,3 +1181,33 @@ export function excuseFor(d: Difference): Excuse {
     ...(d.candidate === undefined ? {} : { to: d.candidate }),
   };
 }
+
+/**
+ * The plugin counters whose source counts one hook record each (L12 gate
+ * run 5, `Divergence.counterFollows`), by section and field of the
+ * performance plugin's `getSnapshot()` as the fuzz records it (an `external`
+ * record `["performance", snapshot]`, diff/fuzz/model.ts). Both engines'
+ * plugins (packages/core/src/plugins/performance.ts and
+ * packages/core-next/src/plugins/performance.ts) add 1 to the field in the
+ * named hook, keyed by the hook's first argument (the resolver, effect or
+ * constraint id); `reconcile` is not keyed. The status plugin
+ * (utils/requirement-status.ts) is not listed: its numbers are the sizes
+ * of sets of requirement ids, not counts of records, and no fuzz case
+ * records them. A counter not listed here is never excused by the rule.
+ */
+export const PLUGIN_COUNTERS: Readonly<
+  Record<string, Readonly<Record<string, Readonly<Record<string, string>>>>>
+> = {
+  performance: {
+    resolvers: {
+      starts: "onResolverStart",
+      completions: "onResolverComplete",
+      errors: "onResolverError",
+      retries: "onResolverRetry",
+      cancellations: "onResolverCancel",
+    },
+    effects: { runs: "onEffectRun", errors: "onEffectError" },
+    constraints: { evaluations: "onConstraintEvaluate" },
+    reconcile: { runs: "onReconcileEnd" },
+  },
+};

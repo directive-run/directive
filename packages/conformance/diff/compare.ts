@@ -50,6 +50,7 @@
  * divergence covers and no further (scenario.ts `explain`).
  */
 
+import { isLogLine } from "./log-projection.js";
 import type { Json } from "./normalize.js";
 import type { TraceEntry } from "./record.js";
 
@@ -95,9 +96,60 @@ export interface Difference {
   op: "missing" | "extra" | "changed" | "moved";
   /**
    * For `moved` only: -1 when the engine's record came one step earlier
-   * (in step N - 1); absent when it came one step later, the default.
+   * (in step N - 1), 0 when it came earlier in the same step (L12 gate run
+   * 4); absent when it came one step later, the default.
    */
-  by?: -1;
+  by?: -1 | 0;
+  /**
+   * Set by `markStale` (diff/scenario.ts) on a fuzz difference of a
+   * derivation's record (its compute, invalidation or notify) when, on the
+   * reference at that point, the derivation's last compute threw or it has
+   * never computed. Only an entry with `stale` reads it.
+   */
+  stale?: true;
+  /**
+   * Set by `markAfterMet` (diff/scenario.ts) on a fuzz difference of a
+   * requirement's cancel record the engine lacks (onResolverCancel,
+   * onRequirementCanceled, requirement.canceled) when, just before it, the
+   * requirement's last lifecycle record on both engines reported it met.
+   * Only an entry with `afterMet` reads it.
+   */
+  afterMet?: true;
+  /**
+   * Set by `markAfterError` (diff/scenario.ts) on a fuzz difference of a
+   * requirement's cancel record the engine lacks (onResolverCancel,
+   * onRequirementCanceled, requirement.canceled) when, just before it, the
+   * requirement's last lifecycle record on both engines is its
+   * onResolverError, from the same resolver. Only an entry with
+   * `afterError` reads it.
+   */
+  afterError?: true;
+  /**
+   * Set by `markAfterCancel` (diff/scenario.ts) on a fuzz difference of a
+   * requirement's cancel record the engine lacks (onResolverCancel,
+   * onRequirementCanceled, requirement.canceled) when the requirement's
+   * lifecycle hooks end, on the reference just before it and on the engine
+   * at the same place in its own record order, with its run's outcome (its
+   * completion and its met, or its error) and one cancel of it (one or
+   * more on the reference), from the same resolver. Only an entry with
+   * `afterCancel` reads it.
+   *
+   * `afterMet`, `afterError` and `afterCancel` are also set on a `changed`
+   * difference in the mispaired form (`mispaired`, below), where each reads
+   * 1.35's whole record of the pair (`record`) by the same rule.
+   */
+  afterCancel?: true;
+  /**
+   * Set by `markMispaired` (diff/scenario.ts; row t's shared mispairing
+   * rule, L12 gate run 5) on a fuzz difference of a cancel record in the
+   * mispaired form: a `changed` pair of two cancel records where the
+   * engine's record cancels a different requirement than 1.35's, one that
+   * 1.35 also cancels, with a record of the same kind, in the pair's step
+   * and phase, as many times as the engine does; and 1.35's own cancel
+   * record of that other requirement there, left unpaired (op `missing`).
+   * Only an entry with `mispaired` reads it.
+   */
+  mispaired?: true;
   /** For `changed`: where inside the entry. */
   path?: string;
   /**
@@ -107,6 +159,13 @@ export interface Difference {
    * inside a record of a given shape.
    */
   record?: Json;
+  /**
+   * For `changed` only: the engine under test's whole record (as compared).
+   * Only a fuzz bound's changed pattern with a `pair` reads it
+   * (diff/fingerprint.ts `PAIR`), which judges the two whole records
+   * together, never one field alone.
+   */
+  candidateRecord?: Json;
   reference?: Json;
   candidate?: Json;
   /**
@@ -480,6 +539,12 @@ function kindOf(entry: TraceEntry): [Stream, string] | null {
     case "unhandled":
       return ["error", "unhandled"];
     case "external": {
+      // The logging plugin's lines are checked per engine, against the hook
+      // records they report (diff/log-projection.ts; owner, 2026-11-22:
+      // "Project, don't sign copies (Recommended)"), and not compared here.
+      if (isLogLine(entry)) {
+        return null;
+      }
       const tag = Array.isArray(entry.data) ? entry.data[0] : entry.data;
 
       return ["external", typeof tag === "string" ? tag : "external"];
@@ -980,6 +1045,30 @@ const traceRunText = (k: Keyed, project: (entry: TraceEntry) => Json) =>
     : "";
 
 /**
+ * A derivation compute's id (`onDerivationCompute`'s first argument, a
+ * `derivation.compute` observation's `id`), and "" for every other record:
+ * `lcs` breaks ties by it, as for `traceRunText`. By keys alone, 1.35's
+ * [b::d0, z::h0] in one step against 2.0's [b::d0] (2.0 computed z::h0 a
+ * step earlier, row (bx)'s knock-on) could pair 1.35's z::h0 with 2.0's
+ * b::d0, a `changed` on every field, and leave 1.35's b::d0 to a move
+ * against 2.0's z::h0 (L12 gate run 3, PR seed 19). The pairing is still a
+ * longest one, so no record that is missing or extra by keys pairs.
+ * Self-test: diff/self/l12-gate-run4.test.ts.
+ */
+const computeIdText = (k: Keyed) => {
+  const e = k.entry;
+  const id =
+    e.k === "hook" && e.hook === "onDerivationCompute"
+      ? e.args[0]
+      : e.k === "observe" &&
+          (e.event as { type?: unknown } | null)?.type === "derivation.compute"
+        ? (e.event as { id?: Json }).id
+        : undefined;
+
+  return typeof id === "string" ? `compute ${id}` : "";
+};
+
+/**
  * Longest common subsequence of keys: pairs of matched indexes.
  *
  * With `text` (the console stream: each record's printed arguments, which
@@ -1343,15 +1432,23 @@ function compareWith(
     const a = left.filter((k) => k.stream === stream);
     const b = right.filter((k) => k.stream === stream);
 
-    const runText = (k: Keyed) => traceRunText(k, project);
+    const runText = (k: Keyed) => traceRunText(k, project) || computeIdText(k);
+    const hasCompute = (list: Keyed[]) =>
+      list.some((k) => computeIdText(k) !== "");
     const text =
       stream === "console"
         ? ([a.map(printed), b.map(printed)] as [string[], string[]])
         : stream === "hook" &&
-            a.some((k) => k.kind === "onTraceComplete") &&
-            b.some((k) => k.kind === "onTraceComplete")
+            ((a.some((k) => k.kind === "onTraceComplete") &&
+              b.some((k) => k.kind === "onTraceComplete")) ||
+              (hasCompute(a) && hasCompute(b)))
           ? ([a.map(runText), b.map(runText)] as [string[], string[]])
-          : undefined;
+          : stream === "observe" && hasCompute(a) && hasCompute(b)
+            ? ([a.map(computeIdText), b.map(computeIdText)] as [
+                string[],
+                string[],
+              ])
+            : undefined;
 
     return { stream, a, b, pairs: lcs(a.map(keyOf), b.map(keyOf), text) };
   });
@@ -1412,6 +1509,7 @@ function compareWith(
           op: "changed",
           ...f,
           record: project(ka.entry),
+          candidateRecord: project(kb.entry),
           at: { reference: ka.index, candidate: kb.index },
           where,
         });
