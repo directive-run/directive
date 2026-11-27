@@ -38,6 +38,10 @@
 //   length may differ only by the snapshots row (ay)'s entries explain as
 //   missing (`snapshotFollows`, `historyFollows`); any other history
 //   difference still fails.
+// - the gate PR's review (2026-11-27): in the mispaired form 2.0's cancel of
+//   the other requirement must equal 1.35's own unpaired record of it, as
+//   compared (`mispairedForm`, `sameAsCompared`); the same id under a wrong
+//   resolver, constraint or requirement type still fails.
 // Every (bx) entry applies only with a fact-including watch: the same
 // records without one still fail.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -46,12 +50,13 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { checkDivergences, checkExcuses } from "../../lib/census.js";
 import { type Difference, compareContract } from "../compare.js";
-import { PAIR, PLUGIN_COUNTERS, TEXT } from "../fingerprint.js";
+import { PAIR, PLUGIN_COUNTERS, TEXT, admits } from "../fingerprint.js";
 import type { Json } from "../normalize.js";
 import type { TraceEntry } from "../record.js";
 import {
   FUZZ_SCENARIO,
   counterOf,
+  covers,
   explain,
   fileMoves,
   historyFollows,
@@ -60,8 +65,10 @@ import {
   markAfterMet,
   markMispaired,
   markStale,
+  mispairedForm,
   pairedHalf,
   readDivergences,
+  sameAsCompared,
   stepOps,
   unpairedHalf,
 } from "../scenario.js";
@@ -1581,6 +1588,74 @@ describe("1.35's further cancels of a finished or failed batch run after a goTo 
       );
     });
 
+    describe("2.0's cancel of the other requirement must equal 1.35's own (the gate PR's review)", () => {
+      /** 2.0's B0 cancel, reported with `resolver` and `body` (1.35's are b::r0 and `single`). */
+      const cancelBAs = (resolver: string, body: Json) =>
+        caseOf([
+          ...finished(),
+          ...cancel2(),
+          hook("onResolverCancel", [resolver, body]),
+          hook("onRequirementCanceled", [body]),
+          observe({ id: B0, type: "requirement.canceled" }),
+        ]);
+      const wrongResolver = cancelBAs("b::r1", single);
+      const wrongConstraint = cancelBAs("b::r0", {
+        ...single,
+        fromConstraint: "b::c1",
+      });
+      const wrongType = cancelBAs("b::r0", {
+        ...single,
+        requirement: { type: "B1" },
+      });
+      /** The kinds of the pairs `markAfterCancel` marks. */
+      const markedKinds = (candidate: TraceEntry[]) => [
+        ...new Set(
+          marked(g1, candidate)
+            .filter((d) => d.afterCancel === true)
+            .map((d) => d.kind),
+        ),
+      ];
+
+      it("the wrong resolver under the right id fails", () => {
+        // Only the onResolverCancel record names the resolver.
+        expect(markedKinds(wrongResolver).sort()).toEqual([
+          "onRequirementCanceled",
+          "requirement.canceled",
+        ]);
+        expect(run(g1, wrongResolver, NO_WR).left).toEqual(PAIRED.slice(3, 7));
+        expect(run(g1, wrongResolver, TC_ON).left).toEqual(PAIRED.slice(3, 7));
+        // Without 1.35's extra cancel the same records pair, and fail.
+        expect(run(g2, wrongResolver, NO_WR).left).toEqual([
+          "changed hook onResolverCancel 3 args[0]",
+        ]);
+      });
+
+      it("the wrong fromConstraint under the right id fails", () => {
+        // Both hooks carry the requirement; the event carries only the id.
+        expect(markedKinds(wrongConstraint)).toEqual(["requirement.canceled"]);
+        expect(run(g1, wrongConstraint, NO_WR).left).toEqual(
+          PAIRED.slice(0, 7),
+        );
+        expect(run(g1, wrongConstraint, TC_ON).left).toEqual(
+          PAIRED.slice(0, 7),
+        );
+        expect(run(g2, wrongConstraint, NO_WR).left).toEqual([
+          "changed hook onRequirementCanceled 3 args[0].fromConstraint",
+          "changed hook onResolverCancel 3 args[1].fromConstraint",
+        ]);
+      });
+
+      it("the wrong requirement.type under the right id fails", () => {
+        expect(markedKinds(wrongType)).toEqual(["requirement.canceled"]);
+        expect(run(g1, wrongType, NO_WR).left).toEqual(PAIRED.slice(0, 7));
+        expect(run(g1, wrongType, TC_ON).left).toEqual(PAIRED.slice(0, 7));
+        expect(run(g2, wrongType, NO_WR).left).toEqual([
+          "changed hook onRequirementCanceled 3 args[0].requirement.type",
+          "changed hook onResolverCancel 3 args[1].requirement.type",
+        ]);
+      });
+    });
+
     it("2.0 canceling a requirement 1.35 never cancels (a real wrong-request cancel) fails", () => {
       const never = caseOf([...finished(), ...cancel(), ...cancel()]);
       expect(marked(never, g2).some((d) => d.afterCancel === true)).toBe(false);
@@ -2324,6 +2399,195 @@ describe("row t's shared mispairing rule: an approved extra cancel paired with 2
     expect(run(k1, k2, NO_WR).left).toEqual(
       expect.arrayContaining([...CANCELS, PAIRED[7]]),
     );
+  });
+
+  describe("2.0's cancel of the other requirement must equal 1.35's own (the gate PR's review)", () => {
+    /** 2.0's A0 cancel, reported with `resolver` and `body` (1.35's are a::r0 and `single(0)`). */
+    const cancelA0As = (resolver: string, body: Json) =>
+      caseOf([
+        ...finished(),
+        hook("onResolverCancel", [resolver, body]),
+        hook("onRequirementCanceled", [body]),
+        observe({ id: A0, type: "requirement.canceled" }),
+      ]);
+    const wrongResolver = cancelA0As("a::r1", single(0));
+    const wrongConstraint = cancelA0As("a::r0", {
+      ...single(0),
+      fromConstraint: "a::c1",
+    });
+    const wrongType = cancelA0As("a::r0", {
+      ...single(0),
+      requirement: { type: "A1" },
+    });
+    // Row t's own L3 entries for a changed cancel need writeRetracts.
+    const NO_WR = TH_ON.filter((t) => t !== "writeRetracts");
+    const L3_CHANGED = [
+      "l3-cand-t-fuzz-hook-onRequirementCanceled-changed",
+      "l3-cand-t-fuzz-hook-onResolverCancel-changed",
+    ];
+    /** The kinds `markMispaired` marks, by op. */
+    const mispairedKinds = (candidate: TraceEntry[], op: string) => [
+      ...new Set(
+        marked(h1, candidate)
+          .filter((d) => d.op === op && d.mispaired === true)
+          .map((d) => d.kind),
+      ),
+    ];
+
+    it("the wrong resolver under the right id fails", () => {
+      // Neither the pair nor 1.35's own unpaired A0 record is in the form.
+      for (const op of ["changed", "missing"]) {
+        expect(mispairedKinds(wrongResolver, op).sort()).toEqual([
+          "onRequirementCanceled",
+          "requirement.canceled",
+        ]);
+      }
+      expect(run(h1, wrongResolver, TH_ON).left).toEqual(PAIRED.slice(3, 7));
+      // Without 1.35's extra cancel the same records pair, and fail.
+      expect(run(h2, wrongResolver, NO_WR).left).toEqual([
+        "changed hook onResolverCancel 2 args[0]",
+      ]);
+    });
+
+    it("the form borrows no other entry: equal means no difference, not an approved one", () => {
+      // Paired with each other (no extra cancel, or 1.35's own order, where
+      // the alignment pairs the two A0 cancels), the two A0 records differ
+      // only by what row t's L3 entries approve after a retracting write.
+      // The mispaired form does not read those entries: with the same
+      // triggers the wrong record under it fails (the tests around this one).
+      for (const [reference, candidate] of [
+        [h2, wrongResolver],
+        [hr1, wrongResolver],
+        [h2, wrongConstraint],
+        [h2, wrongType],
+      ] as const) {
+        const direct = run(reference, candidate, TH_ON);
+        expect(direct.left).toEqual([]);
+        expect(direct.used.some((id) => L3_CHANGED.includes(id))).toBe(true);
+        expect(direct.used.some((id) => TM_CHANGED.includes(id))).toBe(false);
+      }
+    });
+
+    it("the wrong fromConstraint under the right id fails", () => {
+      for (const op of ["changed", "missing"]) {
+        expect(mispairedKinds(wrongConstraint, op)).toEqual([
+          "requirement.canceled",
+        ]);
+      }
+      expect(run(h1, wrongConstraint, TH_ON).left).toEqual(PAIRED.slice(0, 7));
+      expect(run(h2, wrongConstraint, NO_WR).left).toEqual([
+        "changed hook onRequirementCanceled 2 args[0].fromConstraint",
+        "changed hook onResolverCancel 2 args[1].fromConstraint",
+      ]);
+    });
+
+    it("the wrong requirement.type under the right id fails", () => {
+      for (const op of ["changed", "missing"]) {
+        expect(mispairedKinds(wrongType, op)).toEqual(["requirement.canceled"]);
+      }
+      expect(run(h1, wrongType, TH_ON).left).toEqual(PAIRED.slice(0, 7));
+      expect(run(h2, wrongType, NO_WR).left).toEqual([
+        "changed hook onRequirementCanceled 2 args[0].requirement.type",
+        "changed hook onResolverCancel 2 args[1].requirement.type",
+      ]);
+    });
+
+    it("equal means no difference as the comparison compares a pair", () => {
+      const own = hook("onResolverCancel", ["a::r0", single(0)]) as Json;
+      expect(sameAsCompared(own, structuredClone(own))).toBe(true);
+      expect(
+        sameAsCompared(
+          own,
+          hook("onResolverCancel", ["a::r1", single(0)]) as Json,
+        ),
+      ).toBe(false);
+      expect(sameAsCompared(own, undefined)).toBe(false);
+      expect(sameAsCompared(undefined, undefined)).toBe(false);
+    });
+
+    it("each unpaired record of 1.35's stands for one pair only", () => {
+      // 1.35 cancels A0 twice, once by a::r0 and once by a::r1; 2.0 twice by
+      // a::r0. Two pairs took 2.0's cancels: only one has 1.35's own record.
+      const extra = hook("onResolverCancel", ["a::rb", { id: AB }]);
+      const good = hook("onResolverCancel", ["a::r0", single(0)]);
+      const other = hook("onResolverCancel", ["a::r1", single(0)]);
+      const trace = (records: TraceEntry[]) =>
+        [{ k: "step", i: 1 }, { k: "async" }, ...records] as TraceEntry[];
+      const pair = (n: number) =>
+        diff(n, {
+          stream: "hook",
+          kind: "onResolverCancel",
+          op: "changed",
+          path: "args[0]",
+          record: extra as Json,
+          candidateRecord: good as Json,
+        });
+      const unpaired = (n: number, reference: TraceEntry) =>
+        diff(n, {
+          stream: "hook",
+          kind: "onResolverCancel",
+          op: "missing",
+          reference: reference as Json,
+        });
+      const diffs = [
+        pair(10),
+        pair(10),
+        pair(11),
+        unpaired(12, good),
+        unpaired(13, other),
+      ];
+      const form = mispairedForm(
+        diffs,
+        trace([extra, extra, good, other]),
+        trace([good, good]),
+      );
+      // The first pair, in both its differences, and the record it took.
+      expect([...form.keys()]).toEqual([diffs[0], diffs[1]]);
+      expect([...new Set(form.values())]).toEqual([diffs[3]]);
+      // With 1.35's second cancel by a::r0 too, both pairs are in the form.
+      const both = [...diffs.slice(0, 4), unpaired(13, good)];
+      const formBoth = mispairedForm(
+        both,
+        trace([extra, extra, good, good]),
+        trace([good, good]),
+      );
+      expect([...formBoth.keys()]).toEqual(both.slice(0, 3));
+      expect([...new Set(formBoth.values())]).toEqual(both.slice(3));
+    });
+
+    it("the unpaired twin covers only the record its pair's 2.0 record equals", () => {
+      // The other requirement is a batch requirement (no earlier entry takes it).
+      const k1 = caseOf([...finished(), ...cancelId(), ...cancelBatch(AB1)]);
+      const k2 = caseOf([...finished(), ...cancelBatch(AB1)]);
+      const diffs = marked(k1, k2);
+      const steps = stepOps(k1);
+      const twin = byId(TM_UNPAIRED[0] as string);
+      const own = diffs.find(
+        (d) => d.op === "missing" && d.kind === "onResolverCancel",
+      ) as Difference;
+      expect(own.mispaired).toBe(true);
+      expect(covers(twin, FUZZ_SCENARIO, own, TH_ON, steps, diffs, ALL)).toBe(
+        true,
+      );
+      // The same record by another batch resolver: inside the twin's bound
+      // and marked, but not the record the pair's 2.0 half equals.
+      const forged = {
+        ...own,
+        reference: hook("onResolverCancel", ["b::rb", batch(AB1)]) as Json,
+      };
+      expect(admits(twin.bound as never, forged)).toBe(true);
+      expect(
+        covers(
+          twin,
+          FUZZ_SCENARIO,
+          forged,
+          TH_ON,
+          steps,
+          diffs.map((d) => (d === own ? forged : d)),
+          ALL,
+        ),
+      ).toBe(false);
+    });
   });
 
   it("a wrong-request cancel on 2.0 still fails", () => {

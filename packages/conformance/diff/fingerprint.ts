@@ -808,9 +808,16 @@ export const PAIR: Record<
    * (both onResolverCancel hooks, both onRequirementCanceled hooks, or
    * both requirement.canceled events) that name different requirements
    * (`canceledIdOf`). Any other record on either side, or the same
-   * requirement on both, is outside it. Which requirements they may be is
-   * not this class's to say: the entry's `mispaired` and `extraCancelOf`
-   * (diff/scenario.ts) decide that from the two traces. Added on the
+   * requirement on both, is outside it. Which requirements they may be,
+   * and what the engine's record must hold, is not this class's to say:
+   * it reads no field of the engine's record but its kind and id. The
+   * entry's `mispaired` (diff/scenario.ts `mispairedForm`) decides that
+   * from the two traces: the engine's record must equal, as compared,
+   * 1.35's own unpaired cancel record of that other requirement, so a
+   * wrong resolver, constraint or requirement body under the right id is
+   * not excused (the gate PR's review, 2026-11-27). Its `extraCancelOf`
+   * decides 1.35's side. The census requires both on every entry that
+   * names this class. Added on the
    * owner's instruction: "Apply it to all row t cancels (Recommended)"
    * (2026-11-26), under row t's approval.
    */

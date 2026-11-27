@@ -504,7 +504,9 @@ on 2.0, or a mispairing without an approved extra cancel, still fail.
   `mispairedBy` asks whether the pair that left a cancel unpaired is
   itself covered. `PAIR.cancelOfAnother` and `canceledIdOf` are in
   `diff/fingerprint.ts`. `diff/compare.ts` gains the `mispaired` field and
-  a note on the three markers; its pairing is untouched.
+  a note on the three markers; its pairing is untouched. (The gate PR's
+  review narrowed this test and renamed it `mispairedForm`: "The gate PR's
+  review", below.)
 - The census (`lib/census.ts`) validates the three fields: `mispaired` on
   a fuzz entry of op `changed` or `missing`; `extraCancelOf` naming only
   row t fuzz entries of op `missing` on the same engine, stream and kind,
@@ -671,6 +673,98 @@ unless that case is a real 2.0 bug, which still blocks.
   record, a `resume`, `destroy` or `twin` in between; the census rule. No
   earlier result changed.
 - Pinned: `pr17k` (group `row-ay-history-record`).
+
+## The gate PR's review (#440): the mispaired form reads 2.0's record
+
+The review of the gate PR (2026-11-27) found one blocker, in the mispaired
+form of the two sections above. No new approval was needed to close it:
+the fix is a narrowing, and the owner's rule already says it. 2.0's cancel
+in the pair is "of another request that 1.35 also cancels in the same
+step".
+
+**The blocker.** The form hid a wrong cancel record on 2.0. The test of
+2.0's half of the pair (`mispairedCancel`), the unpaired twin's condition
+(`mispairedBy`) and `PAIR.cancelOfAnother` read only the record's kind, its
+requirement id and how often each engine cancels that id in the step and
+phase. Every other field of 2.0's record went unread, and the pair's
+entries then excused each changed field. The reviewer's probe, on
+`pr17g`'s shape: 2.0 cancels `B0` naming resolver `b::r1` where 1.35 names
+`b::r0`, and the case showed 0 unexplained. A wrong `fromConstraint` and a
+wrong `requirement.type` under the same id were hidden the same way. With
+no extra cancel on 1.35 the same records pair with each other and fail, as
+they should.
+
+**The fix** (`diff/scenario.ts`; `diff/compare.ts` is unchanged). A pair is
+in the mispaired form only when 2.0's record equals 1.35's own record of
+that other requirement, the one the comparison left unpaired in the same
+stream, kind, step and phase. Equal means the comparison's own test of a
+paired record on the records as it compares them (`sameAsCompared`:
+`diffJson` on the projected records finds nothing). So the form is
+explained only where pairing 2.0's record with 1.35's own would have shown
+no difference.
+
+- `mispairedForm` replaces `mispairedCancel`. It keeps the old test (kind,
+  id, count; now `cancelOfCountedOther`) and adds the equality. Each
+  unpaired record stands for one pair only, so two pairs never share one.
+- All three markers read it (`markAfterMet`, `markAfterError`,
+  `markAfterCancel`), so the second-cancel `-changed` twins and every
+  entry of the shared rule are narrowed together. `markMispaired` marks
+  only such a pair and the one unpaired record it equals.
+- `covers`: the unpaired twin (`mispairedBy`) now needs a pair whose 2.0
+  record equals this very record, not only one that names its id.
+- `PAIR.cancelOfAnother` is unchanged and its note now says what it does
+  not read. The census already requires `mispaired` and `extraCancelOf`
+  on every entry that names it.
+- No entry changed. Each entry is narrower than before, inside its row.
+
+**Self-tests** (10 new in `diff/self/l12-gate-run5.test.ts`, 123 in the
+file; none of the 113 earlier ones changed result).
+
+| Shape | On `pr17g`'s shape (the second-cancel twins) | On `pr17h`'s shape (the shared rule) |
+| --- | --- | --- |
+| 2.0 names the wrong resolver under the right id | fails: the onResolverCancel pair's 4 fields | fails: the same 4 fields |
+| 2.0 names the wrong `fromConstraint` | fails: both hook pairs, 7 fields | fails: 7 fields |
+| 2.0 names the wrong `requirement.type` | fails: both hook pairs, 7 fields | fails: 7 fields |
+| `pr17g` and `pr17h` themselves | explained (unchanged controls) | explained (unchanged controls) |
+
+Also tested: equality is the comparison's own (`sameAsCompared`); one
+unpaired record never stands for two pairs (`mispairedForm`); the unpaired
+twin refuses a record that is inside its bound and marked, where the
+pair's 2.0 record differs from it.
+
+**One thing the probes showed, not changed here.** Where a case has the
+`writeRetracts` trigger, row t's own L3 entries
+(`l3-cand-t-fuzz-hook-onResolverCancel-changed`,
+`l3-cand-t-fuzz-hook-onRequirementCanceled-changed`) approve a cancel pair
+of the same requirement whose resolver, constraint or type differ. So the
+"same records, no extra cancel" control fails only without that trigger.
+The mispaired form does not borrow those entries: equal means no
+difference, not an approved one. A self-test pins both halves. Whether
+those L3 entries are wider than row t needs is a follow-up for the L3
+entries, not for this gate.
+
+**Replays** on the narrowed harness: `pr17` and `pr17b` to `pr17k`, 0
+unexplained each (`$G/r5/replay/rf1-*`).
+
+**Results on the narrowed harness** (2026-11-27; logs `$G/r5/rf-*.log`,
+`rfb-*.log`, `pr15-*`, `slow15-*`).
+
+| Check | Exit | Result |
+| --- | --- | --- |
+| diff self-tests | 0 | 732 tests; `l12-gate-run5.test.ts` 123 (10 new) |
+| `check:expects` | 0 | |
+| `oracle:update` | 0 | after the last harness edit |
+| `conformance:checks` | 0 | 253 passed |
+| `pnpm census` | 0 | 10 projects, 15,779 tests |
+| Root biome | 0 | |
+| `ratchet --update` | 0 | +0, none lost; 3,046 |
+| Conformance `tsc --noEmit` | 0 | |
+| The 20 blocking PR seeds at L12 (one at a time, nohup, 8 GB heap) | 0 | d, 1, 2, 3, 4, 5, 6, 8, 10, 12, 13, 14, 15, 16, 18, 19, 20 exit 0 (300 s limit); 7, 9, 11 exit 0 (1,800 s limit; 342, 463 and 742 s). The narrowing exposed no record difference |
+| PR seed 17, for the record (the nightly report list) | 1 | 81 s; the same shrink path and the same counterexample as before the fix: still `pr17l`'s form |
+
+`oracle:update`, `check:expects`, `conformance:checks`, the diff
+self-tests and root biome were run again after this section was written:
+each exits 0.
 
 ## Seed 17: the nightly report list
 

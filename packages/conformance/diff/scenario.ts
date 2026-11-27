@@ -586,7 +586,8 @@ export interface Divergence {
    * mispaired form, PR seed 17's seventh case): the pair's 1.35 record is
    * such a further cancel, and the engine's record is a cancel of another
    * requirement that 1.35 also cancels in the same step and phase, as many
-   * times as the engine does.
+   * times as the engine does, and equals 1.35's own unpaired record of it
+   * as compared (`mispairedForm`).
    */
   afterCancel?: true;
   /**
@@ -596,8 +597,11 @@ export interface Divergence {
    * `markMispaired`). On op `changed`: a pair of two cancel records where
    * the engine's record cancels a different requirement, one that 1.35
    * also cancels in the same step and phase, as many times as the engine
-   * does. On op `missing`: 1.35's own cancel of that other requirement,
-   * which such a pair left unpaired.
+   * does, and equals 1.35's own unpaired record of that requirement as
+   * compared (`mispairedForm`): the same resolver, constraint and
+   * requirement body, not only the same id. On op `missing`: 1.35's own
+   * cancel of that other requirement, which such a pair left unpaired and
+   * whose engine record equals it.
    */
   mispaired?: true;
   /**
@@ -617,7 +621,8 @@ export interface Divergence {
    * cancel of the other requirement only where the case holds the pair
    * that took the engine's cancel of it (a `changed` difference marked
    * `mispaired`, of the same kind, step and phase, whose engine record
-   * cancels this record's requirement) and one of the named entries covers
+   * equals this record as compared, `sameAsCompared`) and one of the named
+   * entries covers
    * that pair. So the cancel left unpaired is excused only where the pair
    * is: where no row t entry approves 1.35's extra cancel, both fail.
    */
@@ -1596,6 +1601,7 @@ export function covers(
             pair.step === d.step &&
             pair.phase === d.phase &&
             canceledIdOf(pair.candidateRecord) === canceledIdOf(d.reference) &&
+            sameAsCompared(d.reference, pair.candidateRecord) &&
             (entries ?? []).some(
               (e) =>
                 div.mispairedBy?.includes(e.id) === true &&
@@ -2522,8 +2528,9 @@ export function markAfterMet(
 
     return met;
   };
+  const form = mispairedFormOnce(differences, reference, candidate);
   for (const d of differences) {
-    const id = canceledIdOf(extraCancelRecord(d, reference, candidate));
+    const id = canceledIdOf(extraCancelRecord(d, form));
     const at = d.at.reference;
     if (id === undefined || at === undefined) {
       continue;
@@ -2670,8 +2677,9 @@ export function markAfterError(
 
     return resolver;
   };
+  const form = mispairedFormOnce(differences, reference, candidate);
   for (const d of differences) {
-    const own = extraCancelRecord(d, reference, candidate);
+    const own = extraCancelRecord(d, form);
     const id = canceledIdOf(own);
     const at = d.at.reference;
     if (id === undefined || at === undefined) {
@@ -2806,29 +2814,28 @@ function cancelCounts(trace: TraceEntry[]): Map<string, number> {
   return out;
 }
 
-/** Each trace's `cancelCounts`, counted once (`mispairedCancel`). */
+/** Each trace's `cancelCounts`, counted once (`cancelOfCountedOther`). */
 const CANCEL_COUNTS = new WeakMap<TraceEntry[], Map<string, number>>();
 
 /**
- * Row t's shared mispairing rule, the engine's side (L12 gate run 5; the
- * owner's 2026-11-24 answer for the second-cancel group, applied to every
- * row t extra cancel by his 2026-11-26 answer). The alignment pairs a step
- * and phase's cancel records by kind, never by requirement id, so where a
- * pass cancels another requirement on both engines, a cancel only 1.35
- * makes can pair with the engine's cancel of that other requirement and
- * show as op `changed`.
+ * Row t's shared mispairing rule, the engine's side by kind, id and count
+ * (L12 gate run 5; the owner's 2026-11-24 answer for the second-cancel
+ * group, applied to every row t extra cancel by his 2026-11-26 answer). The
+ * alignment pairs a step and phase's cancel records by kind, never by
+ * requirement id, so where a pass cancels another requirement on both
+ * engines, a cancel only 1.35 makes can pair with the engine's cancel of
+ * that other requirement and show as op `changed`.
  *
- * Whether `d` is such a pair: both whole records are cancel records
- * (`Difference.record`, `candidateRecord`), the engine's names a different
- * requirement than 1.35's, and 1.35 also cancels that other requirement,
- * with a record of the same kind, in the pair's step and phase, as many
- * times as the engine does (`cancelCounts`). A cancel the engine makes of
- * a requirement 1.35 never cancels, or cancels more or less often, is not
- * one. Whether 1.35's record is an approved extra cancel is not decided
- * here: each row t entry's own conditions decide that (`markAfterMet`,
- * `markAfterError`, `markAfterCancel`, `Divergence.extraCancelOf`).
+ * Whether `d` is such a pair by its ids and counts: both whole records are
+ * cancel records (`Difference.record`, `candidateRecord`), the engine's
+ * names a different requirement than 1.35's, and 1.35 also cancels that
+ * other requirement, with a record of the same kind, in the pair's step
+ * and phase, as many times as the engine does (`cancelCounts`). A cancel
+ * the engine makes of a requirement 1.35 never cancels, or cancels more or
+ * less often, is not one. This is necessary, not sufficient: the engine's
+ * record itself is judged by `mispairedForm`.
  */
-export function mispairedCancel(
+function cancelOfCountedOther(
   d: Difference,
   reference: TraceEntry[],
   candidate: TraceEntry[],
@@ -2854,50 +2861,142 @@ export function mispairedCancel(
 }
 
 /**
+ * Whether two records, each as the comparison compares it (`project`ed:
+ * `Difference.reference`, `record`, `candidateRecord`), would show no
+ * difference if the alignment had paired them (`diffJson`, the paired
+ * records' own test).
+ */
+export function sameAsCompared(
+  a: Json | undefined,
+  b: Json | undefined,
+): boolean {
+  if (a === undefined || b === undefined) {
+    return false;
+  }
+  const fields: Array<{ path: string }> = [];
+  diffJson(a, b, "", fields);
+
+  return fields.length === 0;
+}
+
+/**
+ * Row t's shared mispairing rule, the whole form (the review of the L12
+ * gate PR, 2026-11-27): each `changed` difference of `differences` (one
+ * engine's) that is in the mispaired form, with 1.35's unpaired record it
+ * stands for.
+ *
+ * A pair is in the form only when (1) it passes `cancelOfCountedOther`,
+ * and (2) the engine's record equals 1.35's own record of that other
+ * requirement that the comparison left unpaired (op `missing`) in the same
+ * stream, kind, step and phase, under the comparison's own normalisation
+ * (`sameAsCompared`): had the alignment paired the engine's record with
+ * that record instead, it would have shown no difference. The owner's rule
+ * is that the engine's cancel is "of another request that 1.35 also cancels
+ * in the same step"; a cancel of the same id that names another resolver,
+ * constraint or requirement body is not that cancel, and stays a
+ * difference. Before this, ids and counts alone decided, and the pair's
+ * entries excused every field of the engine's record unread.
+ *
+ * Each unpaired record stands for one pair only (a pair is one record of
+ * each trace, `Difference.at`; it can show as several `changed`
+ * differences, one a field), so two pairs never share one unpaired record.
+ * Whether 1.35's record of the pair is an approved extra cancel is not
+ * decided here: each row t entry's own conditions decide that
+ * (`markAfterMet`, `markAfterError`, `markAfterCancel`,
+ * `Divergence.extraCancelOf`).
+ */
+export function mispairedForm(
+  differences: Difference[],
+  reference: TraceEntry[],
+  candidate: TraceEntry[],
+): Map<Difference, Difference> {
+  const form = new Map<Difference, Difference>();
+  const pairs = new Map<string, Difference | null>();
+  const taken = new Set<Difference>();
+  for (const d of differences) {
+    if (!cancelOfCountedOther(d, reference, candidate)) {
+      continue;
+    }
+    const pair = `${d.engine}|${d.stream}|${d.at.reference}|${d.at.candidate}`;
+    let own = pairs.get(pair);
+    if (own === undefined) {
+      const other = canceledIdOf(d.candidateRecord);
+      own =
+        differences.find(
+          (m) =>
+            m.op === "missing" &&
+            !taken.has(m) &&
+            m.engine === d.engine &&
+            m.stream === d.stream &&
+            m.kind === d.kind &&
+            m.step === d.step &&
+            m.phase === d.phase &&
+            canceledIdOf(m.reference) === other &&
+            sameAsCompared(m.reference, d.candidateRecord),
+        ) ?? null;
+      pairs.set(pair, own);
+      if (own !== null) {
+        taken.add(own);
+      }
+    }
+    if (own !== null) {
+      form.set(d, own);
+    }
+  }
+
+  return form;
+}
+
+/** `mispairedForm` of one marker's call, found once and only if asked. */
+function mispairedFormOnce(
+  differences: Difference[],
+  reference: TraceEntry[],
+  candidate: TraceEntry[],
+): () => Map<Difference, Difference> {
+  let form: Map<Difference, Difference> | undefined;
+
+  return () => {
+    form ??= mispairedForm(differences, reference, candidate);
+
+    return form;
+  };
+}
+
+/**
  * 1.35's cancel record a row t marker reads on `d`: the difference's own
  * (op `missing`), or 1.35's half of a pair in the mispaired form
- * (`mispairedCancel`); undefined for any other difference.
+ * (`mispairedForm`); undefined for any other difference.
  */
 function extraCancelRecord(
   d: Difference,
-  reference: TraceEntry[],
-  candidate: TraceEntry[],
+  form: () => Map<Difference, Difference>,
 ): Json | undefined {
   return d.op === "missing"
     ? d.reference
-    : mispairedCancel(d, reference, candidate)
+    : d.op === "changed" && form().has(d)
       ? d.record
       : undefined;
 }
 
 /**
  * Mark `Difference.mispaired` (row t's shared mispairing rule): every
- * `changed` pair in the mispaired form (`mispairedCancel`), and each cancel
+ * `changed` pair in the mispaired form (`mispairedForm`), and the cancel
  * record of the other requirement that 1.35 made in the same step and
- * phase and the comparison left unpaired (op `missing`, the same kind): the
- * pair took the engine's cancel that record would have paired with. A
- * missing cancel with no such pair for its requirement is never marked.
- * Returns `differences` (one engine's), marked in place.
+ * phase and the comparison left unpaired (op `missing`, the same kind)
+ * which the engine's record of the pair equals: the pair took the engine's
+ * cancel that record would have paired with, with no difference. A missing
+ * cancel with no such pair for its requirement, or one the pair's engine
+ * record differs from, is never marked. Returns `differences` (one
+ * engine's), marked in place.
  */
 export function markMispaired(
   differences: Difference[],
   reference: TraceEntry[],
   candidate: TraceEntry[],
 ): Difference[] {
-  const took = new Set<string>();
-  const key = (d: Difference, id: string | undefined) =>
-    `${segmentRank(d.step, d.phase)}|${d.kind}|${id}`;
-  for (const d of differences) {
-    if (mispairedCancel(d, reference, candidate)) {
-      d.mispaired = true;
-      took.add(key(d, canceledIdOf(d.candidateRecord)));
-    }
-  }
-  for (const d of differences) {
-    const id = d.op === "missing" ? canceledIdOf(d.reference) : undefined;
-    if (id !== undefined && took.has(key(d, id))) {
-      d.mispaired = true;
-    }
+  for (const [d, own] of mispairedForm(differences, reference, candidate)) {
+    d.mispaired = true;
+    own.mispaired = true;
   }
 
   return differences;
@@ -2942,8 +3041,10 @@ export function markMispaired(
  * cancel the engine makes of a requirement 1.35 never cancels, or more
  * often than 1.35, stays unmarked. 1.35's own cancel of the other
  * requirement, left unpaired, is never marked. That test of the engine's
- * record is the shared rule's (`mispairedCancel`), which `markAfterMet` and
- * `markAfterError` apply as well (the owner's 2026-11-26 answer).
+ * record is the shared rule's (`mispairedForm`), which `markAfterMet` and
+ * `markAfterError` apply as well (the owner's 2026-11-26 answer); by that
+ * rule the engine's record must also equal 1.35's own unpaired record of
+ * the other requirement (the gate PR's review, 2026-11-27).
  * Returns `differences`, marked in place.
  */
 export function markAfterCancel(
@@ -2992,11 +3093,13 @@ export function markAfterCancel(
       ? { key: `${outcome}:${resolver}`, end: n }
       : null;
   };
+  const form = mispairedFormOnce(differences, reference, candidate);
   for (const d of differences) {
     // 1.35's cancel record: the difference's own, or 1.35's half of a pair
     // in the mispaired form (the engine's half is a cancel of another
-    // requirement, which 1.35 cancels as often in this step and phase).
-    const own = extraCancelRecord(d, reference, candidate);
+    // requirement, which 1.35 cancels as often in this step and phase, and
+    // equals 1.35's own unpaired record of it).
+    const own = extraCancelRecord(d, form);
     const id = canceledIdOf(own);
     const at = d.at.reference;
     if (id === undefined || at === undefined) {
