@@ -1,14 +1,15 @@
 /**
  * P3-F3 in development: what 2.0 has not built says so. No option is
  * unbuilt since L9b built the trace; a member 1.35 always
- * provides throws `featureMissing` (code E_FEATURE_MISSING); a `/plugins` or
- * `/testing` export not built yet is a stub that throws when called; a plugin
+ * provides throws `featureMissing` (code E_FEATURE_MISSING); every `/plugins`
+ * and `/testing` export is built (L12d, L13a), and the stubs of the other L13
+ * entries still throw `featureMissing` when called; a plugin
  * entry that is not a plugin object is a clear error. Codes are asserted,
  * not wording.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createModule } from "../api/core.js";
-import { FEATURE_MISSING } from "../api/missing.js";
+import { FEATURE_MISSING, featureMissing } from "../api/missing.js";
 import { t } from "../api/schema-builders.js";
 import { createSystem } from "../api/system.js";
 import * as plugins from "../plugins/index.js";
@@ -172,7 +173,7 @@ describe("stub exports", () => {
     ).toBe("object");
   });
 
-  it("every /testing export 1.35 has is defined, and the unbuilt ones throw when called", async () => {
+  it("every /testing export 1.35 has is built (L13a): none is a stub", async () => {
     for (const name of [
       "assertDynamic",
       "assertNotDynamic",
@@ -185,17 +186,25 @@ describe("stub exports", () => {
       "mockResolver",
       "settleWithFakeTimers",
     ]) {
-      const stub = (testing as Record<string, unknown>)[name];
-      expect(typeof stub, name).toBe("function");
-      const error = thrown(() => (stub as (...a: unknown[]) => unknown)({}));
-      expect(error).toMatchObject({
-        code: FEATURE_MISSING,
-        feature: name,
-        layer: 13,
-      });
+      expect(typeof (testing as Record<string, unknown>)[name], name).toBe(
+        "function",
+      );
     }
-    // Built: flushMicrotasks still works.
+    // Called with nothing a stub would have ignored, each runs 1.35's code.
+    expect(testing.createFakeTimers().now()).toBe(0);
+    expect(testing.mockResolver("R").calls).toEqual([]);
     await expect(testing.flushMicrotasks()).resolves.toBeUndefined();
+    await expect(testing.flushAsync()).resolves.toBeUndefined();
+  });
+
+  it("featureMissing, which the other L13 entries' stubs still call, throws the code, the name and the layer", () => {
+    const error = thrown(() => featureMissing("createWorkerClient", 13));
+    expect(error).toMatchObject({
+      code: FEATURE_MISSING,
+      feature: "createWorkerClient",
+      layer: 13,
+    });
+    expect(error.message).toContain("2.0.0-alpha");
   });
 });
 

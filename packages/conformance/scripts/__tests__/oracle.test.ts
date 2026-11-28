@@ -44,7 +44,11 @@ import {
   unbuiltSpecifiers,
   v2Skips,
 } from "../../lib/census.js";
-import { coreEntries, v2Entries } from "../../lib/core-entries.js";
+import {
+  type CoreEntry,
+  coreEntries,
+  v2Entries,
+} from "../../lib/core-entries.js";
 import { FUZZ_DEFAULT_RUNS, maxRunaways, v2Cases } from "../../lib/fuzz.js";
 import { checkBaseline, checkPullRequest } from "../../lib/guard.js";
 import { checkLock } from "../../lib/harness.js";
@@ -358,32 +362,52 @@ describe("the census", () => {
   });
 
   // A port's tests that reach a binding of an entry core-next has not built.
-  const reachingUnbuilt = (rel: string) =>
+  const reachingUnbuilt = (rel: string, entries: CoreEntry[]) =>
     unbuiltReached(
       new Project({ useInMemoryFileSystem: true }).createSourceFile(
         `/${rel}`,
         readFileSync(join(conformance, rel), "utf8"),
       ),
-      v2Entries(repoRoot),
+      entries,
     );
 
   it("fails when a v2 test ran that reaches an unbuilt entry", () => {
-    const reports = cleanReports();
-    let flipped: { status: string } | undefined;
-    for (const f of reports["conformance:v2"]?.testResults ?? []) {
-      const reached = reachingUnbuilt(relative(conformance, f.name));
-      flipped = f.assertionResults.find(
-        (a) =>
-          a.status === "skipped" &&
-          reached.has([...a.ancestorTitles, a.title].join(" > ")),
+    // Synthetic, so the rule is exercised even when core-next has built every
+    // entry: map one real entry to an unbuilt stub and take a v2 test that
+    // reaches it.
+    const real = v2Entries(repoRoot);
+    let found:
+      | {
+          entries: CoreEntry[];
+          reports: Record<string, JsonReport>;
+          test: { status: string };
+        }
+      | undefined;
+    for (const entry of real) {
+      const entries = real.map((e) =>
+        e === entry ? { ...e, file: "/n/unbuilt.ts" } : e,
       );
-      if (flipped) {
+      const reports = cleanReports();
+      for (const f of reports["conformance:v2"]?.testResults ?? []) {
+        const reached = reachingUnbuilt(relative(conformance, f.name), entries);
+        const test = f.assertionResults.find((a) =>
+          reached.has([...a.ancestorTitles, a.title].join(" > ")),
+        );
+        if (test) {
+          found = { entries, reports, test };
+          break;
+        }
+      }
+      if (found) {
         break;
       }
     }
-    expect(flipped, "a gated test that reaches an unbuilt entry").toBeDefined();
-    (flipped as { status: string }).status = "passed";
-    expect(census(repoRoot, reports).join("\n")).toMatch(
+    expect(found, "a test that reaches an unbuilt entry").toBeDefined();
+    const { entries, reports, test } = found as NonNullable<typeof found>;
+    test.status = "passed";
+    expect(
+      census(repoRoot, reports, { v2: entries, v2Dist: entries }).join("\n"),
+    ).toMatch(
       /ran \(passed\) but the file imports .* which core-next has not built/,
     );
   });
