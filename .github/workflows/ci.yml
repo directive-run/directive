@@ -207,6 +207,91 @@ jobs:
             pnpm --filter "@directive-run/${pkg}" typecheck:v2
           done
 
+  # L13d: the packages that sit on core (query, sources, mutator, optimistic)
+  # run their whole suites on core-next, then their types against it. el is
+  # not run here: it already runs in adapters-v2. Not a required check yet.
+  downstream-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @directive-run/core build
+      - run: pnpm --filter @directive-run/core-next build
+      - run: pnpm --filter @directive-run/query build
+
+      - name: Downstream suites on core-next
+        env:
+          DIRECTIVE_ENGINE: v2
+        run: |
+          if [ "${DIRECTIVE_ENGINE}" != "v2" ]; then
+            echo "::error::downstream-v2 must run with DIRECTIVE_ENGINE=v2, got '${DIRECTIVE_ENGINE}'"
+            exit 1
+          fi
+          # Explicit paths: vitest exits 1 when a path matches no test file,
+          # so a typo cannot pass silently. query has no test script.
+          for pkg in query sources mutator optimistic; do
+            pnpm exec vitest run "packages/${pkg}/"
+          done
+
+      - name: Downstream types against core-next
+        run: |
+          for pkg in query sources mutator optimistic; do
+            pnpm --filter "@directive-run/${pkg}" typecheck:v2
+          done
+
+  # L13d: timeline, cli and scaffold on core-next. cli's types read the built
+  # scaffold, timeline and knowledge. Not a required check yet.
+  tooling-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @directive-run/core build
+      - run: pnpm --filter @directive-run/core-next build
+      - run: pnpm --filter @directive-run/scaffold build
+      - run: pnpm --filter @directive-run/timeline build
+      # Only the bundle and declarations cli's types read; the full build's
+      # generators need api-reference.json (a token), which nothing here uses.
+      - run: pnpm --filter @directive-run/knowledge exec tsup
+
+      - name: Tooling suites on core-next
+        env:
+          DIRECTIVE_ENGINE: v2
+        run: |
+          if [ "${DIRECTIVE_ENGINE}" != "v2" ]; then
+            echo "::error::tooling-v2 must run with DIRECTIVE_ENGINE=v2, got '${DIRECTIVE_ENGINE}'"
+            exit 1
+          fi
+          for pkg in timeline cli scaffold; do
+            pnpm --filter "@directive-run/${pkg}" test
+          done
+
+      - name: Tooling types against core-next
+        run: |
+          for pkg in timeline cli; do
+            pnpm --filter "@directive-run/${pkg}" typecheck:v2
+          done
+
   # Packaging breakage (wrong exports/types fields, a CJS consumer resolving
   # ESM types, a tarball that will not install) never shows up in unit tests,
   # which import from source. This builds, lints the metadata with publint and
