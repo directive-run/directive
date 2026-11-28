@@ -217,10 +217,13 @@ export function createEffectsManager<S extends Schema>(
   const order: EffectState[] = [];
   function make(id: string): EffectState {
     const def = definitions[id];
-    const deps = def?.deps as string[] | undefined;
+    // No `?.`: a definition that is undefined or null is the platform's
+    // TypeError here, where the system is created, as 1.35 (its engine reads
+    // `meta` of each, engine.ts:393; the message is each engine's own).
+    const deps = def.deps as string[] | undefined;
     // As 1.35's initState: a data-form `on` that is no predicate is a user
     // error, thrown rather than ignored.
-    if (!deps && def?.on !== undefined && !isPredicate(def.on)) {
+    if (!deps && def.on !== undefined && !isPredicate(def.on)) {
       throw new Error(
         `[Directive] effect on must be a FactPredicate spec; got ${typeof def.on}`,
       );
@@ -228,7 +231,7 @@ export function createEffectsManager<S extends Schema>(
     // L11 (D1): a data-form `on` is the gate, and the facts it names are
     // the dependencies (not resolved against derivations, as 1.35).
     const gate =
-      !deps && def?.on !== undefined ? options.pred?.on_(id, def) : undefined;
+      !deps && def.on !== undefined ? options.pred?.on_(id, def) : undefined;
     const state: EffectState = {
       id,
       enabled: true,
