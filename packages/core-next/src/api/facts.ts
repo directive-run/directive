@@ -203,19 +203,20 @@ export const LOCKED = {
 
 /**
  * A read-only keyed view (the system's `derive` and `events`): `has` says
- * which keys exist, `get` reads one. `traps` adds or overrides traps.
+ * which keys exist, `get` reads one (any key: it answers for the ones that
+ * are not there too). `traps` adds or overrides traps.
  */
 export function view(
   has: (key: string) => boolean,
   keys: () => string[],
-  get: (key: string) => unknown,
+  get: (key: string | symbol) => unknown,
   traps?: ProxyHandler<Record<string, unknown>>,
 ): Record<string, unknown> {
   const own = (_: object, key: string | symbol) =>
     typeof key === "string" && has(key);
 
   return new Proxy({} as Record<string, unknown>, {
-    get: (_, key) => (own(_, key) ? get(key as string) : undefined),
+    get: (_, key) => get(key),
     has: own,
     ownKeys: keys,
     getOwnPropertyDescriptor: (_, key) =>
