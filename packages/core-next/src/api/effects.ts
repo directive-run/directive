@@ -4,7 +4,7 @@
  * return a cleanup.
  *
  * Dependencies are either declared (`deps`) or tracked on each run through
- * the system's tracker. Nothing here is module-level mutable state.
+ * the tracker (one for every system: facts.ts `sharedTracker`).
  */
 
 import isDevelopment from "#is-development";
@@ -512,17 +512,18 @@ export function createEffectsManager<S extends Schema>(
         // withTracking's frame, without its result object, into the spare
         // set (T1), marked as an effect's for the membership rule (c).
         //
-        // `effect_` is not restored: no effect body runs inside another's.
-        // The system's pass is the only caller of `run` and does not start
-        // while one is going (core.ts `reconciling`): a write, an `enable`,
-        // a plugin hook or a derivation computed in the body cannot re-enter
-        // it, and another system has its own tracker. Once this frame ends,
-        // `deps` is the outer frame and never this set, so the stale mark
-        // matches nothing. l4b-quirk-c-index.test.ts pins both effects'
-        // tracking in such a body.
+        // No effect body of this system runs inside another of its own: the
+        // system's pass is the only caller of `run` and does not start while
+        // one is going (core.ts `reconciling`). Another system's can, on the
+        // same tracker (a pass starts on a microtask, but a body may flush a
+        // scheduler it owns), so `effect_` is restored with `deps`, or the
+        // outer body's next membership test would not be an effect's
+        // (l13b-shared-tracker.test.ts). l4b-quirk-c-index.test.ts pins both
+        // effects' tracking in a body.
         const deps = state.spare_ ?? new Set<string>();
         state.spare_ = undefined;
         const outer = tracker.deps;
+        const outerEffect = tracker.effect_;
         tracker.deps = tracker.effect_ = deps;
         try {
           store.batch(body);
@@ -533,6 +534,7 @@ export function createEffectsManager<S extends Schema>(
           throw error;
         } finally {
           tracker.deps = outer;
+          tracker.effect_ = outerEffect;
         }
         commit(state, deps);
         if (isDevelopment && state.out_ instanceof Promise) {

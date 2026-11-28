@@ -6,4 +6,5 @@ await main(
   "v2",
   () => import("../../dist/index.js"),
   () => import("../../dist/plugins.js"),
+  () => import("../../dist/adapter-utils.js"),
 );

@@ -401,7 +401,7 @@ function devChecksOn({ createModule, createSystem, t }) {
  * often. BENCH_ENV_SWAP=0 (driver: --no-env-swap) leaves the real `process.env`
  * in place instead, which is the UNBUNDLED-Node case (report-only).
  */
-export async function main(engine, load, loadPlugins) {
+export async function main(engine, load, loadPlugins, loadAdapterUtils) {
   const nodeEnv = process.env.BENCH_NODE_ENV || "production";
   const envSwap = process.env.BENCH_ENV_SWAP !== "0";
   if (envSwap) {
@@ -419,6 +419,8 @@ export async function main(engine, load, loadPlugins) {
     // plugins-100 (L12b, B2): the engine's own logging and performance plugins.
     loggingPlugin: (await loadPlugins()).loggingPlugin,
     performancePlugin: (await loadPlugins()).performancePlugin,
+    // selector-1000 (L13b, B5): the engine's own `/adapter-utils` entry.
+    runTrackedSelector: (await loadAdapterUtils()).runTrackedSelector,
   };
   const devChecks = devChecksOn(api);
   const report =

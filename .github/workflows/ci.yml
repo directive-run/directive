@@ -161,6 +161,52 @@ jobs:
       - run: pnpm --filter @directive-run/conformance ratchet
       - run: pnpm --filter @directive-run/conformance oracle:guard
 
+  # The adapters group on the 2.0 engine (the L13 RFC's D2 and D3): the six
+  # adapter suites, unedited, with DIRECTIVE_ENGINE=v2 (the root vitest config
+  # points @directive-run/core's seven entries at packages/core-next), and
+  # each package's types checked against core-next's built declarations
+  # (D5). Not a required check yet: it becomes one at the L13 gate.
+  adapters-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # typecheck:v2 reads core-next's dist; the adapters' own declarations
+      # and react and vue's query hooks read core's and query's.
+      - run: pnpm --filter @directive-run/core build
+      - run: pnpm --filter @directive-run/core-next build
+      - run: pnpm --filter @directive-run/query build
+
+      - name: Adapter suites on core-next
+        env:
+          DIRECTIVE_ENGINE: v2
+        run: |
+          # Unset, the switch runs the suites on 1.35 and they pass: fail
+          # here instead, in the shell the suites inherit their engine from.
+          if [ "${DIRECTIVE_ENGINE}" != "v2" ]; then
+            echo "::error::adapters-v2 must run with DIRECTIVE_ENGINE=v2, got '${DIRECTIVE_ENGINE}'"
+            exit 1
+          fi
+          for pkg in react vue svelte solid lit el; do
+            pnpm --filter "@directive-run/${pkg}" test
+          done
+
+      - name: Adapter types against core-next
+        run: |
+          for pkg in react vue svelte solid lit el; do
+            pnpm --filter "@directive-run/${pkg}" typecheck:v2
+          done
+
   # Packaging breakage (wrong exports/types fields, a CJS consumer resolving
   # ESM types, a tarball that will not install) never shows up in unit tests,
   # which import from source. This builds, lints the metadata with publint and

@@ -13,4 +13,8 @@ await main(
     process.env.BENCH_V1_BUILD === "production"
       ? import("../../../core/dist/production/plugins/index.js")
       : import("../../../core/dist/plugins/index.js"),
+  () =>
+    process.env.BENCH_V1_BUILD === "production"
+      ? import("../../../core/dist/production/adapter-utils.js")
+      : import("../../../core/dist/adapter-utils.js"),
 );

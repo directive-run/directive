@@ -11,8 +11,9 @@
  *   them follows the graph's own subscriber links.
  * - Effects run in a reconcile pass scheduled on a microtask after a change.
  *
- * Every piece of state belongs to one system: its graph, tracker, plugin
- * list and warning caches. Two systems in one process never share any.
+ * Every piece of state belongs to one system (its graph, plugin list and
+ * warning caches), except the tracker: facts.ts `sharedTracker` is one for
+ * the process, as 1.35's is, and each frame on it restores the one before.
  *
  * Written for size (L0e): system state lives in closure variables (which a
  * minifier shortens) rather than object fields, build-private fields end in
@@ -43,6 +44,7 @@ import {
   describeDep,
   isPrototypeSafe,
   listen,
+  sharedTracker,
   view,
   withTracking,
 } from "./facts.js";
@@ -660,9 +662,8 @@ export function createSystemCore<const M extends ModuleSchema>(
     /** The batch part (batch.ts): run every batch queue now. */
     batch?: () => void;
   };
-  // `effect_` from the start: the effects part sets it on its first run, and
-  // a field added then would give every hot tracker read a second shape.
-  const tracker: Tracker = { deps: null, effect_: undefined };
+  // Shared by every system (facts.ts `sharedTracker`), as 1.35's is.
+  const tracker = sharedTracker;
   /**
    * After destroy the kernel's stream is gone, but as in 1.35 plugins and
    * observers still hear writes: records go straight to the plugins.

@@ -1087,6 +1087,68 @@ export const workloads = {
       };
     },
   },
+  // B5 (L13 RFC): 1,000 `runTrackedSelector` calls over one system with five
+  // facts and two derivations, the call every adapter's useSelector makes on a
+  // re-select. Each call reads three facts and both derivations through the
+  // state proxy. `retainedHeap` is the bytes half: a call may keep nothing.
+  "selector-1000": {
+    op: "1 runTrackedSelector call (3 fact reads, 2 derivation reads)",
+    ops: 1000,
+    retainedHeap: true,
+    build({ createModule, createSystem, t, runTrackedSelector }) {
+      const module = createModule("sel", {
+        schema: {
+          facts: numbers(t, ["a", "b", "c", "d", "e"]),
+          derivations: { sum: t.number(), double: t.number() },
+        },
+        init: (f) => {
+          f.a = 1;
+          f.b = 2;
+          f.c = 3;
+          f.d = 4;
+          f.e = 5;
+        },
+        derive: {
+          sum: (f) => f.a + f.b + f.c + f.d + f.e,
+          double: (f) => f.a * 2,
+        },
+      });
+      const sys = createSystem({ module });
+      sys.start();
+      const deriveKeys = new Set(["sum", "double"]);
+      const selector = (s) => s.a + s.b + s.c + s.sum + s.double;
+      let total = 0;
+      let last;
+
+      return {
+        step() {
+          for (let k = 0; k < 1000; k++) {
+            last = runTrackedSelector(sys, deriveKeys, selector);
+            total += last.value;
+          }
+        },
+        check(steps) {
+          // 1 + 2 + 3 + 15 + 2 per call.
+          expect("selector-1000", "total", total, 23 * 1000 * steps);
+          expect(
+            "selector-1000",
+            "factKeys",
+            JSON.stringify(last.factKeys),
+            JSON.stringify(["a", "b", "c", "\u001Fsum", "\u001Fdouble"]),
+          );
+          expect(
+            "selector-1000",
+            "deriveKeys",
+            last.deriveKeys.join(","),
+            "sum,double",
+          );
+
+          return {};
+        },
+        done: () => sys.destroy(),
+      };
+    },
+  },
   // 1,000 systems made, started and destroyed, one after another.
   "create-destroy-1000": {
     op: "1 system: createSystem + start + destroy",
