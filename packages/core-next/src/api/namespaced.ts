@@ -714,7 +714,7 @@ export function createNamespacedSystem(
       ["event", flat.events, events],
     ] as const) {
       const taken = keyOwners[+!section]!;
-      for (const id in obj) {
+      for (const id of Object.keys(obj)) {
         const owner = taken.get(id);
         if (owner && owner !== ns) {
           throw new Error(

@@ -43,47 +43,67 @@ const gate = (
     changes?: ApiChange[];
     unshipped?: Unshipped;
     drift?: Drift;
+    frozen?: Surface;
+    layers?: typeof layers;
   } = {},
 ) =>
   checkNextSurface(
-    frozen,
+    options.frozen ?? frozen,
     s,
     options.changes ?? changes,
     options.current === undefined ? current : options.current,
-    layers,
+    options.layers ?? layers,
     options.unshipped ?? unshipped,
     options.drift ?? drift,
   );
 const baseline = gate(next);
-const layerOf = (key: string) => layers.get(key)?.layer as Layer;
+const layerOf = (key: string, from: typeof layers = layers) =>
+  from.get(key)?.layer as Layer;
 /** The failure for a name core-next ships at an unbuilt layer, dropped. */
-const dropped = (key: string) =>
-  `core-next ${key} (missing): 1.35 exports it and contracts/next-unshipped.json does not list it (layer ${layerOf(key)}, unbuilt at current ${current}): a name core-next ships may not be dropped`;
+const dropped = (key: string, from: typeof layers = layers) =>
+  `core-next ${key} (missing): 1.35 exports it and contracts/next-unshipped.json does not list it (layer ${layerOf(key, from)}, unbuilt at current ${current}): a name core-next ships may not be dropped`;
 /**
  * The stock "unshipped" name: the first name (sorted) next-unshipped.json
  * lists above `current`, with its entry and layer read from the list, so the
- * self-tests that need one move on as engine slices ship names. Undefined
- * once nothing is listed above `current`; those cases then skip.
+ * self-tests that need one move on as engine slices ship names. When nothing
+ * is listed above `current` (every name shipped) the stock is made up: a name
+ * 1.35 never had, injected into the frozen surface, the layer table and the
+ * list the cases check, at the newest layer. The rule is exercised either way
+ * and no case skips.
  */
-const stockKey = Object.keys(unshipped)
+const realStockKey = Object.keys(unshipped)
   .filter(
     (k) => layerIndex(unshipped[k] as Layer) > layerIndex(current as Layer),
   )
   .sort()[0];
-const noStock = stockKey === undefined;
-const noStockReason =
-  "skipped: next-unshipped.json lists no name above current, so there is no stock unshipped name";
-if (noStock) console.info(`[contracts] ${noStockReason}`);
 const stock = (() => {
-  const key = stockKey ?? "";
+  const synthetic = realStockKey === undefined;
+  const key = realStockKey ?? "./internals madeUpStockName";
   const [entry = "", name = ""] = key.split(" ");
-  const layer = (unshipped[key] ?? "L0") as Layer;
+  const layer = (unshipped[key] ?? LAYERS[LAYERS.length - 1]) as Layer;
+  const world = {
+    frozen: frozen as Surface,
+    layers,
+    unshipped: unshipped as Unshipped,
+  };
+  if (synthetic) {
+    const f = copy(frozen);
+    f[entry] = { ...f[entry], [name]: "function madeUpStockName(): void" };
+    const l = new Map(layers);
+    l.set(key, { layer, module: "made-up" } as never);
+    world.frozen = f;
+    world.layers = l;
+    world.unshipped = { ...unshipped, [key]: layer };
+  }
   /** A layer above `current` that is not the stock's, for the misplaced case. */
   const wrong = LAYERS.find(
     (l) => l !== layer && layerIndex(l) > layerIndex(current as Layer),
   );
-  return { key, entry, name, layer, wrong };
+  const baseline = gate(next, world);
+
+  return { key, entry, name, layer, wrong, world, baseline };
 })();
+const stockKey = stock.key;
 const signedRemoval: ApiChange = {
   entry: ".",
   name: "createSystem",
@@ -127,32 +147,30 @@ describe("core-next public API surface", () => {
     expect(failures.length).toBe(baseline.failures.length + 2);
   });
 
-  it(`a missing unbuilt-layer export is accepted, and fails once its layer is built (stock ${stockKey ?? noStockReason})`, (ctx) => {
-    if (noStock) {
-      ctx.skip(noStockReason);
-    }
-    const { key, entry, name, layer } = stock;
+  it(`a missing unbuilt-layer export is accepted, and fails once its layer is built (stock ${stockKey})`, () => {
+    const { key, entry, name, layer, world } = stock;
     expect(layerIndex(layer)).toBeGreaterThan(layerIndex(current as Layer));
     expect(next[entry]?.[name]).toBeUndefined();
-    expect(frozen[entry]?.[name]).toBeDefined();
-    expect(layers.get(key)?.layer).toBe(layer);
-    expect(baseline.unbuilt).toContainEqual({ entry, name, layer });
-    expect(baseline.failures.some((f) => f.includes(` ${key} `))).toBe(false);
-    expect(gate(next, { current: layer }).failures).toContain(
+    expect(world.frozen[entry]?.[name]).toBeDefined();
+    expect(world.layers.get(key)?.layer).toBe(layer);
+    expect(stock.baseline.unbuilt).toContainEqual({ entry, name, layer });
+    expect(stock.baseline.failures.some((f) => f.includes(` ${key} `))).toBe(
+      false,
+    );
+    expect(gate(next, { ...world, current: layer }).failures).toContain(
       `core-next ${key} (missing): contracts/next-unshipped.json lists it at ${layer}, but layer ${layer} is built (current ${layer})`,
     );
   });
 
   // The guard lets an engine PR remove names from next-unshipped.json
   // (Jason, 2026-11-17); this gate is what catches a false removal.
-  it(`a name removed from next-unshipped.json that core-next does not ship fails (stock ${stockKey ?? noStockReason})`, (ctx) => {
-    if (noStock) {
-      ctx.skip(noStockReason);
-    }
-    const { key, entry, name } = stock;
+  it(`a name removed from next-unshipped.json that core-next does not ship fails (stock ${stockKey})`, () => {
+    const { key, entry, name, world } = stock;
     expect(next[entry]?.[name]).toBeUndefined();
-    const { [key]: _, ...removed } = unshipped;
-    expect(gate(next, { unshipped: removed }).failures).toEqual([dropped(key)]);
+    const { [key]: _, ...removed } = world.unshipped;
+    expect(gate(next, { ...world, unshipped: removed }).failures).toEqual([
+      dropped(key, world.layers),
+    ]);
   });
 
   it("a missing export the layer tables do not place fails", () => {
@@ -353,11 +371,8 @@ describe("core-next public API surface", () => {
     ]);
   });
 
-  it(`a next-unshipped.json entry listed at the wrong unbuilt layer fails (stock ${stockKey ?? noStockReason})`, (ctx) => {
-    if (noStock) {
-      ctx.skip(noStockReason);
-    }
-    const { key, layer } = stock;
+  it(`a next-unshipped.json entry listed at the wrong unbuilt layer fails (stock ${stockKey})`, () => {
+    const { key, layer, world } = stock;
     // From L12 the stock's layer (L13) is the only one above `current`, so
     // the case is judged one layer down, where the layer below the stock's
     // is still unbuilt and so a wrong unbuilt layer to list it at.
@@ -371,8 +386,9 @@ describe("core-next public API surface", () => {
     expect(wrong).toBeDefined();
     expect(
       gate(next, {
+        ...world,
         current: at,
-        unshipped: { ...unshipped, [key]: wrong as Layer },
+        unshipped: { ...world.unshipped, [key]: wrong as Layer },
       }).failures,
     ).toEqual([
       `contracts/next-unshipped.json: ${key} is listed at ${wrong}, but lib/layers.ts places it at ${layer}`,

@@ -155,7 +155,7 @@ export const withDynamic: SystemPart = (ctx) => {
   const system = ctx.system as Record<string, any>;
   let kinds: Kinds | undefined;
   const build = () => (kinds ??= registry(ctx));
-  for (const type in MAPS) {
+  for (const type of Object.keys(MAPS)) {
     if (type !== "derivation") {
       const target = (system[MAPS[type]!] ??= {});
       target[OWNER] = [type, build];
@@ -283,8 +283,8 @@ const registry = (ctx: SystemContext): Kinds => {
           `[Directive] Derivation ID "${id}" conflicts with a reserved derive method name.`,
         );
       }
-      // D2, with 1.35's `in`.
-      if (op === "register" ? id in map : !(id in map)) {
+      // D2: 1.35's `in` is on a map without a prototype, so own keys only.
+      if (Object.hasOwn(map, id) === (op === "register")) {
         throw new Error(
           `[Directive] ${type[0]!.toUpperCase() + type.slice(1)} "${id}" ${op === "register" ? "already exists. Use assign() to override." : "does not exist. Use register() to create it."}`,
         );
@@ -406,7 +406,8 @@ const registry = (ctx: SystemContext): Kinds => {
   const call = (type: string) => (id: string, props?: unknown) => {
     check("call", type, id);
     emit("definition.call", { type, id, props });
-    const def = m[MAPS[type]!][id];
+    const map = m[MAPS[type]!];
+    const def = Object.hasOwn(map, id) && map[id];
     if (!def) {
       const error = new Error(
         `[Directive] Cannot call ${type} "${id}" — it does not exist.`,
@@ -433,7 +434,7 @@ const registry = (ctx: SystemContext): Kinds => {
     });
     await done;
   };
-  for (const type in MAPS) {
+  for (const type of Object.keys(MAPS)) {
     const ids = (dynamic[type] = new Set());
     kinds[type] = {
       register: guarded("register", type),
@@ -556,16 +557,16 @@ const modules = (ctx: SystemContext): Fn[] => {
     const facts = mod.schema?.facts ?? {};
     // M1, 1.35's validateKeys (engine.ts:4449–4466), with its shorter text.
     validateKeys(id, mod, facts, 1, "");
-    for (const key in facts) {
-      if (key in schema) {
+    for (const key of Object.keys(facts)) {
+      if (Object.hasOwn(schema, key)) {
         throw new Error(
           `[Directive] Schema collision: Fact "${key}" already exists. Cannot register module "${id}".`,
         );
       }
     }
     if (isDevelopment) {
-      for (const key in mod.derive) {
-        key in schema &&
+      for (const key of Object.keys(mod.derive ?? {})) {
+        Object.hasOwn(schema, key) &&
           console.warn(
             `[Directive] "${key}" exists as both a fact and a derivation after registering module "${id}".`,
           );
