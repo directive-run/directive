@@ -135,7 +135,8 @@ const build = (context: SystemContext) => {
   const keyFn = (key: any): RequirementKeyFn =>
     Array.isArray(key) ? (req) => evaluateKeySelector(key, req as never) : key;
   for (const def of Object.values(resolverDefs)) {
-    if (def?.key && typeof def.requirement === "string") {
+    // No `?.`: an undefined or null definition is a TypeError here, as 1.35.
+    if (def.key && typeof def.requirement === "string") {
       keys[def.requirement] = keyFn(def.key);
     }
   }
