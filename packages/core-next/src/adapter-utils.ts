@@ -3,17 +3,22 @@
  * the framework adapters share, ported line for line from
  * packages/core/src/adapter-utils.ts and core/types/adapter-utils.ts.
  *
- * One difference in mechanism, none in behaviour: 1.35 tracks a selector's
- * reads with a module-level tracker; core-next keeps one tracker per system,
- * so {@link runTrackedSelector} borrows the system's own through `scopes`
+ * One difference in mechanism: 1.35 tracks a selector's reads with a
+ * module-level tracker; core-next keeps one tracker per system, so
+ * {@link runTrackedSelector} borrows the system's own through `scopes`
  * (api/plugins.ts), the first-party pairing persistence already reads. No
- * core seam, and nothing here reaches a `createSystem` build.
+ * core seam, and nothing here reaches a `createSystem` build. Two
+ * behaviours follow from it and differ from 1.35 (the fix round's notes): a
+ * copy or wrapper of a system (`{ ...system }`, a Proxy) has no entry in
+ * `scopes`, so its selector records no keys; and a selector that reads a
+ * second system does not record that system's reads.
  * @internal
  */
 
 import isDevelopment from "#is-development";
-import { type Tracker, withTracking } from "./api/facts.js";
+import { MEMBER_DEP_PREFIX, type Tracker } from "./api/facts.js";
 import { scopes } from "./api/plugins.js";
+import type { Graph } from "./graph.js";
 import type { Facts } from "./types/facts.js";
 import type { Plugin } from "./types/plugins.js";
 import type { Requirement } from "./types/requirements.js";
@@ -297,6 +302,44 @@ export interface TrackedSelectorResult<R> {
 }
 
 /**
+ * Run `selector` with `deps` as the tracker's frame, apart from whatever is
+ * running around it, as 1.35's nested frame is.
+ *
+ * - The frame is the tracker's effect frame as well, so a membership test
+ *   (`"double" in system.derive`) and a read of an unknown derivation take
+ *   the core's effect rule: a membership key (the caller drops it) and no
+ *   watcher, where its other rule records the derivation as read. 1.35
+ *   records neither (derivations.ts `has`, and `get` on an unknown name).
+ * - Inside a derivation's compute the graph would link that derivation to
+ *   every fact the selector reads, so the selector runs outside the graph's
+ *   active node (as `graph.untracked` does, without a closure per call).
+ */
+function framed<R>(
+  tracker: Tracker,
+  graph: Graph | undefined,
+  deps: Set<string>,
+  selector: (state: Record<string, unknown>) => R,
+  state: Record<string, unknown>,
+): R {
+  const prevDeps = tracker.deps;
+  const prevEffect = tracker.effect_;
+  const prevActive = graph?.active;
+  tracker.deps = tracker.effect_ = deps;
+  if (graph) {
+    graph.active = null;
+  }
+  try {
+    return selector(state);
+  } finally {
+    tracker.deps = prevDeps;
+    tracker.effect_ = prevEffect;
+    if (graph) {
+      graph.active = prevActive!;
+    }
+  }
+}
+
+/**
  * Run a selector against a system with automatic dependency tracking.
  * Creates a Proxy that intercepts property access to distinguish between
  * fact reads (tracked via withTracking) and derivation reads (tracked manually).
@@ -342,16 +385,29 @@ export function runTrackedSelector<R>(
   // object no system made (a hand-built SystemLike) has none, and nothing it
   // reads could be recorded on either engine: a tracker of its own gives the
   // same empty list.
-  const tracker: Tracker = scopes.get(system)?.tracker ?? {
+  const context = scopes.get(system);
+  const tracker: Tracker = context?.tracker ?? {
     deps: null,
     effect_: undefined,
   };
-  const { value, deps } = withTracking(tracker, () =>
-    selector(stateProxy as Record<string, unknown>),
+  const deps = new Set<string>();
+  const value = framed(
+    tracker,
+    context?.kernel.graph,
+    deps,
+    selector,
+    stateProxy as Record<string, unknown>,
   );
+  const factKeys: string[] = [];
+  for (const key of deps) {
+    if (key[0] !== MEMBER_DEP_PREFIX) {
+      factKeys.push(key);
+    }
+  }
+
   return {
     value,
-    factKeys: Array.from(deps) as string[],
+    factKeys,
     deriveKeys: accessedDeriveKeys,
   };
 }
