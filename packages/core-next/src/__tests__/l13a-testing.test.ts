@@ -82,17 +82,49 @@ describe.each(["single", "namespaced"])("row (bz), %s test system", (form) => {
     ts.destroy();
   });
 
-  it("the three stay own enumerable members, as the spread left them, and cannot be assigned", () => {
+  it("the three stay own enumerable members, as the spread left them", () => {
     const ts = build();
 
     for (const flag of ["isRunning", "isInitialized", "isSettled"]) {
       const own = Object.getOwnPropertyDescriptor(ts, flag);
       expect(typeof own?.get, flag).toBe("function");
-      expect(own?.set, flag).toBeUndefined();
       expect(own?.enumerable, flag).toBe(true);
     }
     // A copy of a test system is a snapshot again, as any spread is.
     expect(flags({ ...ts })).toEqual([false, false, true]);
+    ts.destroy();
+  });
+
+  it("assigning one sets it, as 1.35's plain property does; the others stay live", () => {
+    const ts = build();
+    const keys = Object.keys(ts);
+    const marker = { assigned: true };
+
+    // 1.35: writable data properties, so assignment never throws (this file
+    // is strict code) and the property then holds the assigned value.
+    expect(() => {
+      ts.isRunning = marker;
+    }).not.toThrow();
+    expect(ts.isRunning).toBe(marker);
+    expect(Object.getOwnPropertyDescriptor(ts, "isRunning")).toEqual({
+      value: marker,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+    expect(Object.keys(ts)).toEqual(keys);
+
+    ts.start();
+    // The assigned flag no longer follows the system; the other two do.
+    expect(ts.isRunning).toBe(marker);
+    expect(ts.isInitialized).toBe(true);
+    ts.isRunning = false;
+    expect(ts.isRunning).toBe(false);
+
+    for (const flag of ["isInitialized", "isSettled"]) {
+      ts[flag] = "set";
+      expect(ts[flag], flag).toBe("set");
+    }
     ts.destroy();
   });
 

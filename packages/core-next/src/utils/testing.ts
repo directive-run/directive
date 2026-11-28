@@ -504,7 +504,8 @@ const warnedAboutFactsHistory = new WeakSet<object>();
  * getter once, so the three keep their creation values (false, false, true)
  * whatever the system does later (U1). The spread stays, so every other
  * member is 1.35's; the three are then redefined as getters, enumerable as
- * the spread left them.
+ * the spread left them. A flag stays live until it is assigned; from then on
+ * it is 1.35's plain property holding the assigned value.
  */
 function liveFlags<T extends object>(
   testSystem: T,
@@ -513,6 +514,16 @@ function liveFlags<T extends object>(
   for (const flag of ["isRunning", "isInitialized", "isSettled"] as const) {
     Object.defineProperty(testSystem, flag, {
       get: () => system[flag],
+      // 1.35's three are writable data properties: assigning one sets it and
+      // never throws. So an assignment turns the flag back into one.
+      set: (value: unknown) => {
+        Object.defineProperty(testSystem, flag, {
+          value,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      },
       enumerable: true,
       configurable: true,
     });
