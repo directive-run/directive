@@ -1805,8 +1805,14 @@ export function createSystemCore<const M extends ModuleSchema>(
     events: view(
       (name) => !BLOCKED_PROPS.has(name) && name in eventDefs,
       () => Object.keys(eventDefs),
-      (name) => (payload?: Record<string, unknown>) =>
-        system.dispatch({ type: name, ...payload }),
+      // As 1.35 (system.ts:1190): any name that is not blocked reads as a
+      // dispatcher, and an unknown one's dispatch is the unknown-event
+      // warning and nothing else.
+      (name) =>
+        typeof name !== "string" || BLOCKED_PROPS.has(name)
+          ? undefined
+          : (payload?: Record<string, unknown>) =>
+              system.dispatch({ type: name, ...payload }),
       { ...LOCKED, set: no, deleteProperty: no },
     ),
     get isRunning() {
