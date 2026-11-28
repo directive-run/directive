@@ -69,7 +69,7 @@ export const isPrototypeSafe = (
   return true;
 };
 
-/** Per-system tracking: what the running derivation or effect read. */
+/** Tracking: what the running derivation, effect or selector read. */
 export interface Tracker {
   /** Fact keys and `\u001F`-prefixed derivation ids read in this frame. */
   deps: Set<string> | null;
@@ -143,6 +143,18 @@ const framed = <T>(tracker: Tracker, deps: Set<string> | null, fn: () => T) => {
     tracker.deps = prev;
   }
 };
+
+/**
+ * The one tracker every system reads and writes, as 1.35's module-level
+ * tracking stack is (owner, 2026-11-27: "B: one shared tracker"). A frame is
+ * whatever is running now, in any system: an effect in one system that reads
+ * another system's fact records that key, and `/adapter-utils`' selector
+ * records what it reads through a copy of a system or from a second system.
+ * Each frame restores the one before it, so systems run interleaved without
+ * seeing each other's sets. Both fields from the start: a field added later
+ * would give every hot tracker read a second shape.
+ */
+export const sharedTracker: Tracker = { deps: null, effect_: undefined };
 
 export function withTracking<T>(
   tracker: Tracker,

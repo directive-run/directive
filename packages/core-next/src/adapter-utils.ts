@@ -3,20 +3,17 @@
  * the framework adapters share, ported line for line from
  * packages/core/src/adapter-utils.ts and core/types/adapter-utils.ts.
  *
- * One difference in mechanism: 1.35 tracks a selector's reads with a
- * module-level tracker; core-next keeps one tracker per system, so
- * {@link runTrackedSelector} borrows the system's own through `scopes`
- * (api/plugins.ts), the first-party pairing persistence already reads. No
- * core seam, and nothing here reaches a `createSystem` build. Two
- * behaviours follow from it and differ from 1.35 (the fix round's notes): a
- * copy or wrapper of a system (`{ ...system }`, a Proxy) has no entry in
- * `scopes`, so its selector records no keys; and a selector that reads a
- * second system does not record that system's reads.
+ * The selector's frame goes on the one tracker every system shares
+ * (api/facts.ts `sharedTracker`), as 1.35's goes on its module-level one, so
+ * {@link runTrackedSelector} records what the selector reads through the
+ * system, through a copy or wrapper of it (`{ ...system }`, a Proxy), and
+ * from any other system. `scopes` (api/plugins.ts) is read only to set the
+ * system's graph aside while the selector runs.
  * @internal
  */
 
 import isDevelopment from "#is-development";
-import { MEMBER_DEP_PREFIX, type Tracker } from "./api/facts.js";
+import { MEMBER_DEP_PREFIX, sharedTracker } from "./api/facts.js";
 import { scopes } from "./api/plugins.js";
 import type { Graph } from "./graph.js";
 import type { Facts } from "./types/facts.js";
@@ -302,8 +299,8 @@ export interface TrackedSelectorResult<R> {
 }
 
 /**
- * Run `selector` with `deps` as the tracker's frame, apart from whatever is
- * running around it, as 1.35's nested frame is.
+ * Run `selector` with `deps` as the shared tracker's frame, apart from
+ * whatever is running around it in any system, as 1.35's nested frame is.
  *
  * - The frame is the tracker's effect frame as well, so a membership test
  *   (`"double" in system.derive`) and a read of an unknown derivation take
@@ -313,14 +310,16 @@ export interface TrackedSelectorResult<R> {
  * - Inside a derivation's compute the graph would link that derivation to
  *   every fact the selector reads, so the selector runs outside the graph's
  *   active node (as `graph.untracked` does, without a closure per call).
+ *   `graph` is the system's own, found by identity: a copy of a system has
+ *   none here, so a selector over a copy inside a derivation still links.
  */
 function framed<R>(
-  tracker: Tracker,
   graph: Graph | undefined,
   deps: Set<string>,
   selector: (state: Record<string, unknown>) => R,
   state: Record<string, unknown>,
 ): R {
+  const tracker = sharedTracker;
   const prevDeps = tracker.deps;
   const prevEffect = tracker.effect_;
   const prevActive = graph?.active;
@@ -381,19 +380,9 @@ export function runTrackedSelector<R>(
     },
   );
 
-  // 1.35's tracker is module-level; this system's is in its context. An
-  // object no system made (a hand-built SystemLike) has none, and nothing it
-  // reads could be recorded on either engine: a tracker of its own gives the
-  // same empty list.
-  const context = scopes.get(system);
-  const tracker: Tracker = context?.tracker ?? {
-    deps: null,
-    effect_: undefined,
-  };
   const deps = new Set<string>();
   const value = framed(
-    tracker,
-    context?.kernel.graph,
+    scopes.get(system)?.kernel.graph,
     deps,
     selector,
     stateProxy as Record<string, unknown>,
