@@ -191,6 +191,12 @@ jobs:
         env:
           DIRECTIVE_ENGINE: v2
         run: |
+          # Unset, the switch runs the suites on 1.35 and they pass: fail
+          # here instead, in the shell the suites inherit their engine from.
+          if [ "${DIRECTIVE_ENGINE}" != "v2" ]; then
+            echo "::error::adapters-v2 must run with DIRECTIVE_ENGINE=v2, got '${DIRECTIVE_ENGINE}'"
+            exit 1
+          fi
           for pkg in react vue svelte solid lit el; do
             pnpm --filter "@directive-run/${pkg}" test
           done
