@@ -189,9 +189,44 @@
     "with maxRuns 0 the trace stays empty, and only runs without a resolver report (U2)": "L9",
     "meta.subscribe is called for immediate only, not on a write or a new inheritance (U3)": "L9",
     "byTag computes derivations nothing has read, and lists them as inherited (U4)": "L9",
-    "a resolver error is stored as its string, and a pass that only re-hits the constraint is its own run (U8)": "L9"
+    "a resolver error is stored as its string, and a pass that only re-hits the constraint is its own run (U8)": "L9",
+    "settle() resolves when a write and a destroy share a tick": "L3"
   },
   "rules": {
+    "tests/core/l0-own-keys-pins-oracle.test.ts": {
+      "rule": "L0",
+      "pin": true
+    },
+    "tests/core/l2-own-keys-pins-oracle.test.ts": {
+      "rule": "L2",
+      "pin": true,
+      "instruments": ["member .inspect"]
+    },
+    "tests/core/l9-own-keys-pins-oracle.test.ts": {
+      "rule": "L9",
+      "pin": true
+    },
+    "tests/core/l10-own-keys-pins-oracle.test.ts": {
+      "rule": "L10",
+      "pin": true
+    },
+    "tests/core/l3-settle-after-destroy-pins-oracle.test.ts": {
+      "rule": "L3",
+      "pin": true,
+      "instruments": ["member .inspect"]
+    },
+    "tests/core/l2-controls-nullish-pins-oracle-production.test.ts": {
+      "rule": "L2",
+      "pin": true
+    },
+    "tests/core/l2-controls-nullish-pins-oracle.test.ts": {
+      "rule": "L2",
+      "pin": true
+    },
+    "tests/core/l1-unknown-event-pins-oracle.test.ts": {
+      "rule": "L1",
+      "pin": true
+    },
     "tests/core/blackbox-tracking.test.ts": {
       "rule": "L0"
     },

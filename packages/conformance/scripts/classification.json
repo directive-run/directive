@@ -545,6 +545,15 @@
     "notes": []
   },
   {
+    "file": "src/core/__tests__/l0-own-keys-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
     "file": "src/core/__tests__/l1-derivations-effects.test.ts",
     "category": "black-box",
     "cases": 9,
@@ -593,6 +602,15 @@
     "file": "src/core/__tests__/l1-gate-rest.test.ts",
     "category": "black-box",
     "cases": 9,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l1-unknown-event-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 3,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -656,6 +674,15 @@
     "file": "src/core/__tests__/l10-gate-pins-oracle.test.ts",
     "category": "black-box",
     "cases": 5,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l10-own-keys-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 4,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -809,6 +836,33 @@
     "file": "src/core/__tests__/l2-constraints-oracle.test.ts",
     "category": "black-box",
     "cases": 57,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l2-controls-nullish-pins-oracle-production.test.ts",
+    "category": "black-box",
+    "cases": 3,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l2-controls-nullish-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 4,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l2-own-keys-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 4,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -971,6 +1025,15 @@
     "file": "src/core/__tests__/l3-proxies-oracle.test.ts",
     "category": "black-box",
     "cases": 16,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l3-settle-after-destroy-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 3,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
@@ -1223,6 +1286,15 @@
     "file": "src/core/__tests__/l9-meta-trace-gate-debt-oracle.test.ts",
     "category": "black-box",
     "cases": 22,
+    "internals": [],
+    "internalsValues": [],
+    "typeOnlyNonPublic": [],
+    "notes": []
+  },
+  {
+    "file": "src/core/__tests__/l9-own-keys-pins-oracle.test.ts",
+    "category": "black-box",
+    "cases": 1,
     "internals": [],
     "internalsValues": [],
     "typeOnlyNonPublic": [],
