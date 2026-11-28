@@ -56,18 +56,49 @@ declare module "../kernel.js" {
 
 export const withReconcile: SystemPart = (context) => {
   const { constraints, resolvers } = context.module;
+  /** The constraints, once the feature is built. */
+  let built: ReturnType<typeof build> | undefined;
+  const make = () => {
+    built = build(context);
+  };
+  // 1.35's controls are there with or without a constraint: until one is
+  // registered every id is unknown (its development warning) and none is
+  // disabled.
+  context.system.constraints = {
+    disable(id: string) {
+      if (isDevelopment && !built) {
+        unknown("disable", id);
+      }
+      // Quirk e: a dependent it held back is asked again.
+      if (built?.disable(id)) {
+        context.schedule();
+      }
+    },
+    // As 1.35 (constraints.ts:1600-1614, engine.ts:2610): enabling marks
+    // it dirty and asks for no pass; the next pass evaluates it.
+    enable(id: string) {
+      if (isDevelopment && !built) {
+        unknown("enable", id);
+      }
+      built?.enable(id);
+    },
+    isDisabled: (id: string) => !!built?.isDisabled(id),
+  };
   if (
     !Object.keys(constraints ?? {}).length &&
     !Object.keys(resolvers ?? {}).length
   ) {
     // No feature: the core's pass stays exactly the L1 pass, until a
     // constraint or resolver is registered (L10).
-    context.l2_ = () => build(context);
-
-    return;
+    context.l2_ = make;
+  } else {
+    make();
   }
-  build(context);
 };
+
+/** 1.35's warning for an id that is no constraint (constraints.ts:1582). */
+const unknown = (verb: string, id: string) =>
+  console.warn(`[Directive] constraints.${verb}("${id}") — no such constraint`);
 
 const build = (context: SystemContext) => {
   const { kernel, module, system, reportError, schedule, settled } = context;
@@ -882,17 +913,6 @@ const build = (context: SystemContext) => {
     retire_: resolvers.retire_,
     // `call` on a resolver is dynamic.ts's own (it needs only the map).
   };
-  system.constraints ??= {};
-  Object.assign(system.constraints as object, {
-    disable(id: string) {
-      // Quirk e: a dependent it held back is asked again.
-      if (constraints.disable(id)) {
-        schedule();
-      }
-    },
-    // As 1.35 (constraints.ts:1600-1614, engine.ts:2610): enabling marks
-    // it dirty and asks for no pass; the next pass evaluates it.
-    enable: (id: string) => constraints.enable(id),
-    isDisabled: (id: string) => constraints.isDisabled(id),
-  });
+
+  return constraints;
 };
