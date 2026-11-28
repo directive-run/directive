@@ -20,7 +20,7 @@
 // Run from the package: `pnpm --filter @directive-run/core-next size`.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
 import ts from "typescript";
@@ -115,8 +115,18 @@ const sourcesIn = (dir) =>
       return e.name === "__tests__" ? [] : sourcesIn(p);
     }
 
-    return /\.ts$/.test(e.name) && !/\.(test|d)\.ts$/.test(e.name) ? [p] : [];
+    return /\.ts$/.test(e.name) &&
+      !/\.(test|d)\.ts$/.test(e.name) &&
+      (!reachable || reachable.has(p))
+      ? [p]
+      : [];
   });
+// The source files the built entries reach, from esbuild's metafile for the
+// bundle of all seven (set by bundleEntry below, before either derivation
+// runs). A file no entry imports ships no text, so its strings are not
+// candidates: as of L13b every entry is built and nothing imports
+// api/missing.ts, which is kept for the beta's feature imports and its tests.
+let reachable = null;
 const hasDevConjunct = (n) =>
   ts.isParenthesizedExpression(n)
     ? hasDevConjunct(n.expression)
@@ -414,24 +424,27 @@ const inlineIsDevelopment = {
 // (`assertSystem` throws in development only, AU3).
 const entryContents =
   'export * as a from "./index.ts"; export * as b from "./internals.ts"; export * as c from "./plugins/index.ts"; export * as d from "./utils/testing.ts"; export * as e from "./adapters/worker.ts"; export * as f from "./migration.ts"; export * as g from "./adapter-utils.ts";';
-const bundleEntry = async (nodeEnv) =>
-  Buffer.from(
-    (
-      await build({
-        stdin: { contents: entryContents, resolveDir: src, loader: "ts" },
-        bundle: true,
-        minify: true,
-        format: "esm",
-        target: "es2022",
-        write: false,
-        logLevel: "silent",
-        mangleProps: /_$/,
-        // Minified, esbuild would otherwise define NODE_ENV as "production" itself.
-        define: { "process.env.NODE_ENV": JSON.stringify(nodeEnv) },
-        plugins: [inlineIsDevelopment],
-      })
-    ).outputFiles[0].contents,
+const bundleEntry = async (nodeEnv) => {
+  const result = await build({
+    stdin: { contents: entryContents, resolveDir: src, loader: "ts" },
+    bundle: true,
+    minify: true,
+    format: "esm",
+    target: "es2022",
+    write: false,
+    logLevel: "silent",
+    mangleProps: /_$/,
+    // Minified, esbuild would otherwise define NODE_ENV as "production" itself.
+    define: { "process.env.NODE_ENV": JSON.stringify(nodeEnv) },
+    plugins: [inlineIsDevelopment],
+    metafile: true,
+  });
+  reachable ??= new Set(
+    Object.keys(result.metafile.inputs).map((f) => resolve(f)),
   );
+
+  return Buffer.from(result.outputFiles[0].contents);
+};
 const devBundle = await bundleEntry("development");
 const prodBundle = await bundleEntry("production");
 const analysed = devOnlyNeedles(src);
