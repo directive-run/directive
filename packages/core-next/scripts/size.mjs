@@ -348,7 +348,7 @@ const engines = {
       plugins: "../src/plugins/index.ts",
       testing: "../src/utils/testing.ts",
       "adapter-utils": "../src/adapter-utils.ts",
-      worker: "../src/worker.ts",
+      worker: "../src/adapters/worker.ts",
       migration: "../src/migration.ts",
       internals: "../src/internals.ts",
     },
@@ -410,11 +410,11 @@ const inlineIsDevelopment = {
 // needle that matches nothing; and the list must hold exactly DEV_STRINGS_MIN
 // strings, so an under-derived list fails loudly.
 // All seven entries are in it: /testing's own text since L13a built it, and
-// /worker, /migration and /adapter-utils because their stubs are the ones
-// that still throw featureMissing (no /plugins or /testing stub does), so
-// missing.ts's development text is reached only from those three.
+// /worker since L13c; /migration and /adapter-utils because their stubs are
+// the ones that still throw featureMissing, so missing.ts's development text
+// is reached only from those two.
 const entryContents =
-  'export * as a from "./index.ts"; export * as b from "./internals.ts"; export * as c from "./plugins/index.ts"; export * as d from "./utils/testing.ts"; export * as e from "./worker.ts"; export * as f from "./migration.ts"; export * as g from "./adapter-utils.ts";';
+  'export * as a from "./index.ts"; export * as b from "./internals.ts"; export * as c from "./plugins/index.ts"; export * as d from "./utils/testing.ts"; export * as e from "./adapters/worker.ts"; export * as f from "./migration.ts"; export * as g from "./adapter-utils.ts";';
 const bundleEntry = async (nodeEnv) =>
   Buffer.from(
     (

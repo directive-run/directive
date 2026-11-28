@@ -71,20 +71,23 @@ function inlineIsDevelopment(
 export const DEV_CHECK =
   'typeof process === "undefined" ? false : !process.env ? false : process.env.NODE_ENV !== "production"';
 
-// The four built entries package.json `exports` serves.
+// The built entries package.json `exports` serves. `worker` is built with
+// the root (L13c): its worker side imports `createSystem` lazily, and in one
+// build that import lands on the chunks the root already uses, so the package
+// holds one engine and not a second copy beside dist/worker.js.
 const entry = {
   index: "src/index.ts",
   internals: "src/internals.ts",
   plugins: "src/plugins/index.ts",
   testing: "src/utils/testing.ts",
+  worker: "src/adapters/worker.ts",
 };
 
-// 1.35's other three entries, which 2.0 has not built: 1.35's export names,
+// 1.35's other two entries, which 2.0 has not built: 1.35's export names,
 // each function throwing `featureMissing` (src/api/missing.ts). Built on their
-// own so the four entries above split into the same chunks as before and
+// own so the entries above split into the same chunks as before and
 // their ESM output does not change (slice P3-F5).
 const stubEntry = {
-  worker: "src/worker.ts",
   migration: "src/migration.ts",
   "adapter-utils": "src/adapter-utils.ts",
 };
