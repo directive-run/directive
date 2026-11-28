@@ -1975,6 +1975,9 @@ export function createSystemCore<const M extends ModuleSchema>(
       }
       system.stop();
       destroyed = true;
+      // As 1.35, whose microtask always clears the flag: the flush that
+      // would have is dropped with the kernel, and nothing is left to do.
+      scheduled = false;
       (store as unknown as { destroy(): void }).destroy();
       settleListeners.clear();
       emit("system.destroy", { system });
