@@ -5333,6 +5333,53 @@
         }
       }
     },
+    "tests/core/l0-own-keys-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L0",
+      "pin": true,
+      "tests": {
+        "an inherited function is not a derivation": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .read",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
+        },
+        "an inherited object, resolver-shaped or not, does not stop createSystem": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .read",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
+        },
+        "an inherited key adds no derivation to the module's own": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .derive",
+            "member .facts",
+            "member .read",
+            "option derivations",
+            "option events",
+            "option init"
+          ]
+        }
+      }
+    },
     "tests/core/l1-derivations-effects.test.ts": {
       "category": "black-box",
       "rule": "L0",
@@ -6406,6 +6453,50 @@
         }
       }
     },
+    "tests/core/l1-unknown-event-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L1",
+      "pin": true,
+      "tests": {
+        "\"an unknown event name, %s\" > \"is a dispatcher that does nothing but warn (started: %s)\"": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "member .facts",
+            "option events",
+            "option init"
+          ],
+          "dynamic": true
+        },
+        "\"an unknown event name, %s\" > keeps `in` and the keys as they were": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "option events",
+            "option init"
+          ],
+          "dynamic": true
+        },
+        "still dispatches a known event": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "member .facts",
+            "option events",
+            "option init"
+          ]
+        }
+      }
+    },
     "tests/core/l1-views.test.ts": {
       "category": "black-box",
       "rule": "L1",
@@ -7120,6 +7211,41 @@
           "by": ["member .registerModule"]
         },
         "a history snapshot taken after registerModule carries the module's facts (L10 gate; the RFC's H1) > goTo the registration's snapshot puts the module's fact back": {
+          "layer": "L10",
+          "by": ["member .registerModule"]
+        }
+      }
+    },
+    "tests/core/l10-own-keys-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L10",
+      "pin": true,
+      "tests": {
+        "call: a built-in member's name does not exist (no pollution)": {
+          "layer": "L10",
+          "by": ["member .derive.call"]
+        },
+        "call: an inherited name does not exist": {
+          "layer": "L10",
+          "by": ["member .derive.call"]
+        },
+        "register and assign: an inherited name is free to register, and nothing to assign": {
+          "layer": "L10",
+          "by": [
+            "member .constraints.assign",
+            "member .constraints.isDynamic",
+            "member .constraints.register",
+            "member .constraints.unregister",
+            "member .derive.assign",
+            "member .derive.register",
+            "member .effects.assign",
+            "member .effects.isDynamic",
+            "member .effects.register",
+            "member .resolvers.isDynamic",
+            "member .resolvers.register"
+          ]
+        },
+        "registerModule: an inherited key is not a schema collision": {
           "layer": "L10",
           "by": ["member .registerModule"]
         }
@@ -8730,6 +8856,105 @@
         }
       }
     },
+    "tests/core/l2-controls-nullish-pins-oracle-production.test.ts": {
+      "category": "black-box",
+      "rule": "L2",
+      "pin": true,
+      "tests": {
+        "a module with no constraints and no resolvers has the three controls": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option events",
+            "option init"
+          ]
+        },
+        "an unknown event name is a dispatcher that does nothing": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .events",
+            "member .facts",
+            "option events",
+            "option init"
+          ]
+        },
+        "\"a %s definition\" > \"as one of %s: createSystem throws a TypeError\"": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option events",
+            "option init"
+          ],
+          "dynamic": true
+        }
+      }
+    },
+    "tests/core/l2-controls-nullish-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L2",
+      "pin": true,
+      "tests": {
+        "\"controls, %s\" > \"a module with no constraints and no resolvers has the three controls (started: %s)\"": {
+          "layer": "L1",
+          "by": ["option modules"],
+          "dynamic": true
+        },
+        "\"a %s definition\" > as an effect: createSystem throws a TypeError": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "option effects",
+            "option init"
+          ],
+          "dynamic": true
+        },
+        "\"a %s definition\" > as a constraint: createSystem throws a TypeError": {
+          "layer": "L2",
+          "by": ["option constraints"],
+          "dynamic": true
+        },
+        "a module with whole effects and resolvers is built": {
+          "layer": "L2",
+          "by": ["option resolvers"]
+        }
+      }
+    },
+    "tests/core/l2-own-keys-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L2",
+      "pin": true,
+      "tests": {
+        "an inherited object shaped like a resolver handles nothing": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "an inherited object shaped like a constraint is never asked": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "an inherited resolver-shaped object does not stop createSystem": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        },
+        "disable, enable and isDisabled know only a constraint's own ids": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
+        }
+      }
+    },
     "tests/core/l2-requirements-oracle.test.ts": {
       "category": "black-box",
       "rule": "L2",
@@ -10253,6 +10478,38 @@
         "the facts a resolver receives > keeps a dependency's subscription quiet when only its own facts change": {
           "layer": "L2",
           "by": ["option constraints", "option resolvers"]
+        }
+      }
+    },
+    "tests/core/l3-settle-after-destroy-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L3",
+      "pin": true,
+      "tests": {
+        "write, settle, destroy in one tick: settle resolves": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
+        },
+        "write, destroy, then settle: settle resolves": {
+          "layer": "L0",
+          "by": [
+            "import createModule",
+            "import createSystem",
+            "import t",
+            "member .facts",
+            "option init"
+          ]
+        },
+        "a resolver in flight, a write, settle, destroy in one tick: settle resolves": {
+          "layer": "L2",
+          "by": ["option constraints", "option resolvers"],
+          "pulledDown": ["member .inspect (L9)"]
         }
       }
     },
@@ -11861,6 +12118,17 @@
         "explain() of a requirement whose constraint has no dependency record (L9 gate debt) > lists every fact, cuts a long value at 50 characters, and gives the description": {
           "layer": "L9",
           "by": ["member .explain", "member .inspect", "option meta"]
+        }
+      }
+    },
+    "tests/core/l9-own-keys-pins-oracle.test.ts": {
+      "category": "black-box",
+      "rule": "L9",
+      "pin": true,
+      "tests": {
+        "an inherited key is no meta row and answers no lookup": {
+          "layer": "L9",
+          "by": ["member .meta", "option meta"]
         }
       }
     },

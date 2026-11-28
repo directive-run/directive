@@ -2,6 +2,31 @@
   "$comment": "The v2 ratchet (lib/ratchet.ts): every ported test core-next has passed, per v2 source project, measured with the layer gate opened (DIRECTIVE_V2_ALL=1). Each must keep passing on core-next's source and its built dist. Grow it with `pnpm --filter @directive-run/conformance ratchet --update`; never edit it to remove a test except with a `removed` entry giving the reason, in a PR labelled oracle-change.",
   "tests": {
     "conformance:v2": {
+      "tests/adapters/l13-worker-pins-oracle.test.ts": [
+        "L13 probe pins: /worker > U13: a fact key with no module posts ERROR naming the format, and one for an unknown module names the module",
+        "L13 probe pins: /worker > U13: an unregistered module at INIT posts ERROR from INIT, and the worker stays uninitialised",
+        "L13 probe pins: /worker > U14: a message after DESTROY is dropped with no reply, and a second INIT starts afresh (shows cc)",
+        "L13 probe pins: /worker > U14: a message before INIT is dropped with no reply (shows cc)",
+        "L13 probe pins: /worker > U15: GET_SNAPSHOT after a write posts DERIVATION_CHANGED, then SNAPSHOT_RESULT, and SET_FACTS folds a key's run into one message",
+        "L13 probe pins: /worker > U15: START posts the init write's changes before STARTED; an equal write posts nothing"
+      ],
+      "tests/adapters/worker-mirrors-batched-writes.test.ts": [
+        "the worker adapter and batched writes > mirrors a write an event handler made",
+        "the worker adapter and batched writes > posts one message per run of writes to a key, not one per write",
+        "the worker adapter and batched writes > sends the fact before the value computed from it"
+      ],
+      "tests/adapters/worker-set-fact.test.ts": [
+        "writing facts into a worker system > applies a single fact and mirrors it back",
+        "writing facts into a worker system > applies several facts as one batch",
+        "writing facts into a worker system > reports a key that names no module rather than failing silently"
+      ],
+      "tests/adapters/worker.test.ts": [
+        "createWorkerClient — pending request hygiene > clears the timeout when a response arrives in time (no leak)",
+        "createWorkerClient — pending request hygiene > does NOT time out when timeoutMs is 0 (opt-out)",
+        "createWorkerClient — pending request hygiene > does NOT time out when timeoutMs is Infinity (opt-out)",
+        "createWorkerClient — pending request hygiene > rejects a stalled request after the default 30s timeout",
+        "createWorkerClient — pending request hygiene > rejects all pending requests when worker.onerror fires"
+      ],
       "tests/core/batch-resolve-fallback.test.ts": [
         "batch + cancel > stops batched resolvers when system is stopped during batch window",
         "batch + error handling > handles errors in batched resolve() fallback without crashing",
@@ -814,6 +839,11 @@
         "history snapshots never alias live state > names the fact it could not capture",
         "history snapshots never alias live state > still deep-clones ordinary facts"
       ],
+      "tests/core/l0-own-keys-pins-oracle.test.ts": [
+        "an inherited function is not a derivation",
+        "an inherited key adds no derivation to the module's own",
+        "an inherited object, resolver-shaped or not, does not stop createSystem"
+      ],
       "tests/core/l1-derivations-effects.test.ts": [
         "a derivation reading a derivation > then a fact depends on that fact too",
         "a derivation whose compute is not a function > is refused when the system is built",
@@ -908,6 +938,15 @@
         "tracking: a body that has already awaited > an effect still reads derivations after it awaits",
         "tracking: what is read after an untracked read > a derivation keeps tracking the reads that follow a $snapshot membership test",
         "tracking: what is read after an untracked read > a derivation keeps tracking the reads that follow a $snapshot read"
+      ],
+      "tests/core/l1-unknown-event-pins-oracle.test.ts": [
+        "an unknown event name, a module with events > is a dispatcher that does nothing but warn (started: false)",
+        "an unknown event name, a module with events > is a dispatcher that does nothing but warn (started: true)",
+        "an unknown event name, a module with events > keeps `in` and the keys as they were",
+        "an unknown event name, a module with none > is a dispatcher that does nothing but warn (started: false)",
+        "an unknown event name, a module with none > is a dispatcher that does nothing but warn (started: true)",
+        "an unknown event name, a module with none > keeps `in` and the keys as they were",
+        "still dispatches a known event"
       ],
       "tests/core/l1-views.test.ts": [
         "a change is reported once, then the check starts over > a later run that changes something else reports that",
@@ -1020,6 +1059,12 @@
         "a retired resolver's write after the 10 s drain (L10 gate; row cd) > the drain gives up at 10 s and a same-key replacement starts from its own init",
         "restore() after unregisterModule drops the retired keys silently (L10 gate) > namespaced: `x::c` is dropped after unregisterModule('x'), and `m::n` is written",
         "restore() after unregisterModule drops the retired keys silently (L10 gate) > single module: the retired key is dropped and the live one is written"
+      ],
+      "tests/core/l10-own-keys-pins-oracle.test.ts": [
+        "call: a built-in member's name does not exist (no pollution)",
+        "call: an inherited name does not exist",
+        "register and assign: an inherited name is free to register, and nothing to assign",
+        "registerModule: an inherited key is not a schema collision"
       ],
       "tests/core/l11-explain-combinators-oracle.test.ts": [
         "explain() — combinator clauses in a data-form when > renders $all, $any and $not with a passing and a failing child"
@@ -1366,6 +1411,23 @@
         "when and require > wakes a constraint on a fact only its require read",
         "when and require > warns in development when one constraint emits more than ten requirements, and not at ten"
       ],
+      "tests/core/l2-controls-nullish-pins-oracle.test.ts": [
+        "a module with whole effects and resolvers is built",
+        "a null definition > as a constraint: createSystem throws a TypeError",
+        "a null definition > as an effect: createSystem throws a TypeError",
+        "a undefined definition > as a constraint: createSystem throws a TypeError",
+        "a undefined definition > as an effect: createSystem throws a TypeError",
+        "controls, flat > a module with no constraints and no resolvers has the three controls (started: false)",
+        "controls, flat > a module with no constraints and no resolvers has the three controls (started: true)",
+        "controls, namespaced > a module with no constraints and no resolvers has the three controls (started: false)",
+        "controls, namespaced > a module with no constraints and no resolvers has the three controls (started: true)"
+      ],
+      "tests/core/l2-own-keys-pins-oracle.test.ts": [
+        "an inherited object shaped like a constraint is never asked",
+        "an inherited object shaped like a resolver handles nothing",
+        "an inherited resolver-shaped object does not stop createSystem",
+        "disable, enable and isDisabled know only a constraint's own ids"
+      ],
       "tests/core/l2-requirements-oracle.test.ts": [
         "forType > makes a predicate for one requirement type",
         "generateRequirementId > derives the id from the type and the content, whatever the key order",
@@ -1675,6 +1737,11 @@
         "the facts a resolver receives > keeps a dependency's subscription quiet when only its own facts change",
         "the facts a resolver receives > reads and writes its own module's facts, reads dependencies, and cannot write them",
         "the facts a resolver receives > scopes the store a resolver reaches through its facts to its own module"
+      ],
+      "tests/core/l3-settle-after-destroy-pins-oracle.test.ts": [
+        "a resolver in flight, a write, settle, destroy in one tick: settle resolves",
+        "write, destroy, then settle: settle resolves",
+        "write, settle, destroy in one tick: settle resolves"
       ],
       "tests/core/l3-small-oracle-accessors.test.ts": [
         "system.derive > `in` is true for a derivation and false for anything else",
@@ -2044,6 +2111,9 @@
         "trace entries (L9 gate debt) > a resolver's completion and its error carry the resolver's meta",
         "trace entries (L9 gate debt) > an async constraint with no deps whose require reads no fact is hit with no deps",
         "trace entries (L9 gate debt) > with no plugin configured, an observer hears no reconcile.end; with one it does"
+      ],
+      "tests/core/l9-own-keys-pins-oracle.test.ts": [
+        "an inherited key is no meta row and answers no lookup"
       ],
       "tests/core/l9-trace-pins-oracle.test.ts": [
         "a caller's tags array is copied when the system is built (U6) > emptying it, or adding to it, afterwards changes no answer",
@@ -3280,6 +3350,20 @@
         "persistencePlugin > onSave callback > fires on destroy save",
         "persistencePlugin > save guards > does not save when system has not been initialized"
       ],
+      "tests/utils/l13-testing-pins-oracle.test.ts": [
+        "L13 probe pins: /testing (development) > U1: start() works on a test system: the constraint fires and the mock resolver runs",
+        "L13 probe pins: /testing (development) > U2: eventHistory records dispatch only; events.* changes the fact and is not recorded (shows ca)",
+        "L13 probe pins: /testing (development) > U3: createFakeTimers has no way to add a timer: advance, next and runAll only move the clock (shows cb)",
+        "L13 probe pins: /testing (development) > U4: settleWithFakeTimers returns at once when nothing is in flight, advancing nothing",
+        "L13 probe pins: /testing (development) > U4: settleWithFakeTimers throws its message, naming the in-flight resolvers, when time runs out",
+        "L13 probe pins: /testing (development) > U5: mockResolver's calls and pending are plain properties holding the live arrays",
+        "L13 probe pins: /testing (development) > U6: the init write is the first getFactsHistory() row",
+        "L13 probe pins: /testing (development) > U7: assertFactSet(key, undefined) passes for any write of the key",
+        "L13 probe pins: /testing (development) > U8: a module registered after creation is not a known namespace, so its key keeps the whole name and no namespace",
+        "L13 probe pins: /testing (development) > U8: a namespaced test system records the module as the namespace and matches a short or a full key",
+        "L13 probe pins: /testing (development) > U9: assertDynamic and assertNotDynamic switch over the four registries, with their messages",
+        "L13 probe pins: the spread keeps what the system defines > a test system has the system's own enumerable keys, plus its own members"
+      ],
       "tests/utils/snapshot-signing.test.ts": [
         "verifySnapshotSignature > respects { ignoreExpiry: true } for signature-only validation",
         "verifySnapshotSignature > respects { now } override for time-based testing",
@@ -3288,7 +3372,30 @@
         "verifySnapshotSignature > returns true for a valid signed snapshot WITHOUT expiresAt",
         "verifySnapshotSignature > returns true for a valid, non-expired signed snapshot"
       ],
+      "tests/utils/testing-sees-batched-writes.test.ts": [
+        "the testing utilities and batched writes > counts a write an event handler made",
+        "the testing utilities and batched writes > counts a write made in an explicit batch",
+        "the testing utilities and batched writes > keeps the log bounded, and says when it drops anything",
+        "the testing utilities and batched writes > keeps two modules' same-named facts apart",
+        "the testing utilities and batched writes > reports the same history whether a write was batched or not"
+      ],
+      "tests/utils/testing-utils.test.ts": [
+        "createCoverageTracker > returns 1.0 coverage when all constraints hit",
+        "createCoverageTracker > returns 1.0 when no constraints defined",
+        "createCoverageTracker > tracks constraints hit",
+        "createCoverageTracker > tracks effects run",
+        "createCoverageTracker > tracks resolvers run",
+        "createTestObserver > clear resets events",
+        "createTestObserver > collects events",
+        "createTestObserver > dispose stops collecting",
+        "createTestObserver > ofType filters correctly"
+      ],
       "tests/utils/testing.test.ts": [
+        "flushAsync > drains a constraint -> resolver pipeline in a real system",
+        "flushAsync > drains a Promise.resolve() chain",
+        "flushAsync > drains chained microtask + macrotask pipelines",
+        "flushAsync > drains setTimeout(0) macrotasks",
+        "flushAsync > handles deeply chained Promise.then with intermediate setTimeouts",
         "flushMicrotasks > does not advance setTimeout(0) macrotasks",
         "flushMicrotasks > drains a single Promise.resolve() chain"
       ]
@@ -3375,6 +3482,16 @@
         "constraints in production > does not warn when one constraint emits more than ten requirements",
         "constraints in production > ignores an `after` naming no constraint without a warning",
         "constraints in production > still rejects an `after` cycle when the system is created"
+      ],
+      "tests/core/l2-controls-nullish-pins-oracle-production.test.ts": [
+        "a module with no constraints and no resolvers has the three controls",
+        "a null definition > as one of constraints: createSystem throws a TypeError",
+        "a null definition > as one of effects: createSystem throws a TypeError",
+        "a null definition > as one of resolvers: createSystem throws a TypeError",
+        "a undefined definition > as one of constraints: createSystem throws a TypeError",
+        "a undefined definition > as one of effects: createSystem throws a TypeError",
+        "a undefined definition > as one of resolvers: createSystem throws a TypeError",
+        "an unknown event name is a dispatcher that does nothing"
       ],
       "tests/core/l3-errors-oracle-production.test.ts": [
         "the error boundary in production > a failing effect under retry gives up silently once its retries are used",
