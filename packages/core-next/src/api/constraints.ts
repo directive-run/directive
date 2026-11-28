@@ -210,10 +210,12 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
   }
 
   // --- order: priority, then `after` dependencies first ------------------
+  /** `defs` itself defines `id`: 1.35's map has no prototype to answer. */
+  const known = (id: string) => Object.hasOwn(defs, id);
   const topo = new Map<string, number>();
   const visiting: string[] = [];
   const visit = (id: string) => {
-    if (topo.has(id) || !defs[id]) {
+    if (topo.has(id) || !known(id)) {
       return;
     }
     if (visiting.includes(id)) {
@@ -223,7 +225,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     }
     visiting.push(id);
     for (const dep of defs[id]!.after ?? []) {
-      if (isDevelopment && !defs[dep]) {
+      if (isDevelopment && !known(dep)) {
         console.warn(
           `[Directive] Constraint "${id}" references unknown constraint "${dep}" in \`after\`. This dependency will be ignored. Check for typos or ensure the constraint exists.`,
         );
@@ -491,7 +493,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
    * later ranks with the first, so its dependent may come before it.
    */
   const blocks = (dep: string) =>
-    !!defs[dep] &&
+    known(dep) &&
     !disabled.has(dep) &&
     ((unanswered.has(dep) && !resolved.has(dep)) ||
       (last.get(dep) ?? EMPTY).some((r) => !met.has(r.id)));
@@ -681,7 +683,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
     },
     forget: (id) => met.delete(id),
     markAllDirty() {
-      for (const id in defs) {
+      for (const id of Object.keys(defs)) {
         dirty.add(id);
       }
     },
@@ -698,7 +700,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       }
     },
     disable(id) {
-      if (!defs[id]) {
+      if (!known(id)) {
         if (isDevelopment) {
           console.warn(
             `[Directive] constraints.disable("${id}") — no such constraint`,
@@ -719,7 +721,7 @@ export function createConstraints(options: ConstraintsOptions): Constraints {
       return release();
     },
     enable(id) {
-      if (!defs[id]) {
+      if (!known(id)) {
         if (isDevelopment) {
           console.warn(
             `[Directive] constraints.enable("${id}") — no such constraint`,

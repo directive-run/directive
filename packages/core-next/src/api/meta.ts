@@ -109,9 +109,12 @@ export const withMeta: SystemPart = (context) => {
   const fenced = <T>(fn: () => T): T =>
     kernel.graph.untracked(() => withoutTracking(tracker, fn));
   const has = Object.hasOwn as (o: object, id: string) => boolean;
+  /** `o[id]` when `o` itself defines it: 1.35's maps have no prototype. */
+  const own = <T>(o: Record<string, T>, id: string): T | undefined =>
+    has(o, id) ? o[id] : undefined;
   /** The tags `id` picks up from what it read, less those it authored. */
   const inherited = (id: string): string[] => {
-    const authored = derive[id]?.meta;
+    const authored = own(derive, id)?.meta;
     const tags = new Set<string>();
     if (authored?.tagBoundary !== true) {
       const seen = new Set<string>();
@@ -154,15 +157,15 @@ export const withMeta: SystemPart = (context) => {
     for (const mod of mods) {
       push("module", mod.id, mod.meta);
     }
-    for (const key in schema) {
+    for (const key of Object.keys(schema)) {
       push("fact", key, schema[key]?._meta);
     }
     for (const [kind, defs] of kinds) {
-      for (const id in defs) {
+      for (const id of Object.keys(defs)) {
         push(kind, id, defs[id]?.meta);
       }
     }
-    for (const id in derive) {
+    for (const id of Object.keys(derive)) {
       const meta = derive[id]?.meta;
       push("derivation", id, meta);
       // An unannotated derivation still carries what its inputs carry.
@@ -174,7 +177,8 @@ export const withMeta: SystemPart = (context) => {
 
     return rows;
   };
-  const metaOf = (kind: string) => (id: string) => kinds.get(kind)![id]?.meta;
+  const metaOf = (kind: string) => (id: string) =>
+    own(kinds.get(kind)!, id)?.meta;
   const modMeta = (id: string) => mods.find((mod) => mod.id === id)?.meta;
   // 1.35's destroy clears its module and event meta maps and its meta
   // subscribers (engine.ts:3504–3506, 3552–3554) and keeps every other
@@ -186,13 +190,13 @@ export const withMeta: SystemPart = (context) => {
   });
   Object.assign(system.meta as object, {
     module: modMeta,
-    fact: (key: string) => schema[key]?._meta,
+    fact: (key: string) => own(schema, key)?._meta,
     event: metaOf("event"),
     constraint: metaOf("constraint"),
     resolver: metaOf("resolver"),
     effect: metaOf("effect"),
     derivation(id: string) {
-      const authored = derive[id]?.meta;
+      const authored = own(derive, id)?.meta;
       const tags = fenced(() => inherited(id));
 
       return tags.length

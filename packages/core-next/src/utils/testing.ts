@@ -1,17 +1,32 @@
 /**
- * `@directive-run/core/testing`, as far as L2 needs it: 1.35's
- * `flushMicrotasks`. The rest of the subpath is L13: stubs with 1.35's names
- * and signatures that throw `featureMissing` when called (P3-F3). Its own
- * entry, so nothing here reaches a bundle that does not import it.
+ * `@directive-run/core/testing`: 1.35's test helpers, ported line for line
+ * from packages/core/src/utils/testing.ts (L13a). Its own entry, so nothing
+ * here reaches a bundle that does not import it.
+ *
+ * One approved difference, row (bz) of the L13 RFC: a test system's
+ * `isRunning`, `isInitialized` and `isSettled` read the live system (see
+ * `liveFlags`). Everything else is 1.35's, quirks included: `eventHistory`
+ * records `dispatch` only (U2) and `createFakeTimers` has no way to add a
+ * timer (U3).
+ *
+ * Features:
+ * - Mock resolvers with manual resolve/reject
+ * - Fake timers integration (works with Vitest/Jest fake timers)
+ * - Assertion helpers
+ * - Facts history tracking
+ * - Pending requirements tracking
  */
 
-import { featureMissing } from "../api/missing.js";
+import { createSystem } from "../api/system.js";
 import type {
+  FactChange,
+  ModuleDef,
   ModuleSchema,
   ModulesMap,
   NamespacedSystem,
   ObservationEvent,
   Requirement,
+  RequirementWithId,
   SingleModuleSystem,
   SystemInspection,
 } from "../types/index.js";
@@ -19,6 +34,7 @@ import type {
   CoverageReport,
   CreateTestSystemOptions,
   CreateTestSystemOptionsSingle,
+  FactChangeRecord,
   FakeTimers,
   MockResolver,
   MockResolverContext,
@@ -27,13 +43,6 @@ import type {
   TestSystem,
   TestSystemSingle,
 } from "../types/testing.js";
-
-/** Ten microtask turns: lets a pass, a run and its follow-ups settle. */
-export async function flushMicrotasks(): Promise<void> {
-  for (let i = 0; i < 10; i++) {
-    await Promise.resolve();
-  }
-}
 
 // 1.35's public types for this entry, exactly: copied from 1.35 into
 // src/types/ (types only, no runtime code).
@@ -51,91 +60,476 @@ export type {
   TestSystemSingle,
 } from "../types/testing.js";
 
-// --- not built yet (layer 13): 1.35's exports, throwing when called ---------
+// ============================================================================
+// Fake Timers Integration
+// ============================================================================
 
-export function assertDynamic(
-  system: {
-    constraints: {
-      isDynamic(id: string): boolean;
-    };
-    effects: {
-      isDynamic(id: string): boolean;
-    };
-    resolvers: {
-      isDynamic(id: string): boolean;
-    };
-    derive: {
-      isDynamic(id: string): boolean;
-    };
-  },
-  type: "constraint" | "resolver" | "derivation" | "effect",
-  id: string,
-): void;
-export function assertDynamic(): never {
-  return featureMissing("assertDynamic", 13);
+/**
+ * Flush all pending microtasks by awaiting multiple rounds of `Promise.resolve()`.
+ *
+ * Call this after advancing fake timers to ensure all Promise callbacks
+ * (including nested microtasks) have run before making assertions.
+ *
+ * @returns A promise that resolves after all pending microtasks have been drained.
+ *
+ * @example
+ * ```typescript
+ * vi.useFakeTimers();
+ * system.start();
+ * system.facts.userId = 1; // Triggers constraint
+ * await flushMicrotasks(); // Let reconciliation start
+ * vi.advanceTimersByTime(100); // Advance resolver delay
+ * await flushMicrotasks(); // Let resolver complete
+ * ```
+ *
+ * @public
+ */
+export async function flushMicrotasks(): Promise<void> {
+  // Multiple rounds to catch nested microtasks
+  for (let i = 0; i < 10; i++) {
+    await Promise.resolve();
+  }
 }
 
-export function assertNotDynamic(
-  system: {
-    constraints: {
-      isDynamic(id: string): boolean;
-    };
-    effects: {
-      isDynamic(id: string): boolean;
-    };
-    resolvers: {
-      isDynamic(id: string): boolean;
-    };
-    derive: {
-      isDynamic(id: string): boolean;
-    };
-  },
-  type: "constraint" | "resolver" | "derivation" | "effect",
-  id: string,
-): void;
-export function assertNotDynamic(): never {
-  return featureMissing("assertNotDynamic", 13);
+/**
+ * Drain a full constraint → resolver → effect pipeline, including macrotasks.
+ *
+ * Performs a 3-pass / 2-`setTimeout(0)` sequence that empties microtask queues
+ * twice across two macrotask boundaries. Use this when a single
+ * {@link flushMicrotasks} pass is not enough to reach quiescence — typically
+ * when constraints schedule resolvers that schedule further constraints, or
+ * when test code uses `queueMicrotask` / `Promise.resolve()` chains that
+ * cross a `setTimeout(..., 0)` boundary inside the engine.
+ *
+ * @remarks
+ * **When to use which:**
+ * - {@link flushMicrotasks}: Fast path for a single microtask drain (e.g.
+ *   waiting for one Promise chain to settle).
+ * - `flushAsync`: Heavier pass for full constraint+resolver pipelines where
+ *   reconciliation may emit follow-up requirements, retries, or batched
+ *   resolver flushes that span a macrotask.
+ *
+ * The exact shape (3 microtask rounds → setTimeout 0 → 3 microtask rounds →
+ * setTimeout 0 → 3 microtask rounds) was extracted from a helper duplicated
+ * across 50+ migration tests; centralizing it here keeps the drain semantics
+ * consistent and lets the engine evolve without fan-out edits.
+ *
+ * @returns A promise that resolves after the full drain completes.
+ *
+ * @example
+ * ```typescript
+ * system.facts.userId = 1; // triggers constraint → resolver chain
+ * await flushAsync();      // drains constraint + resolver + follow-up effects
+ * expect(system.facts.user).toEqual({ id: 1, ... });
+ * ```
+ *
+ * @public
+ */
+export async function flushAsync(): Promise<void> {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 10; i++) await Promise.resolve();
 }
 
-export function createCoverageTracker(
-  system: SingleModuleSystem<any> | NamespacedSystem<any>,
-): {
-  run: (scenario: () => Promise<void> | void) => Promise<void>;
-  report: () => CoverageReport;
-};
-export function createCoverageTracker(): never {
-  return featureMissing("createCoverageTracker", 13);
+/**
+ * Wait for the system to settle with fake timers enabled.
+ *
+ * Repeatedly advances fake timers in discrete steps while flushing microtasks,
+ * until no resolvers remain inflight or the time budget is exhausted.
+ *
+ * @param system - The Directive system to wait on (must expose {@link SystemInspection} via `inspect()`).
+ * @param advanceTime - Function that advances fake timers by a given number of milliseconds (e.g., `vi.advanceTimersByTime`).
+ * @param options - Configuration for total time budget, step size, and iteration limit.
+ * @returns A promise that resolves once the system is idle.
+ *
+ * @throws Error if the system does not settle within the configured time budget.
+ *
+ * @example
+ * ```typescript
+ * vi.useFakeTimers();
+ * const system = createSystem({ modules: [myModule] });
+ * system.start();
+ * system.dispatch({ type: "triggerAsync" });
+ *
+ * await settleWithFakeTimers(system, vi.advanceTimersByTime, {
+ *   totalTime: 1000,
+ *   stepSize: 10,
+ * });
+ *
+ * expect(system.facts.result).toBe("done");
+ * ```
+ *
+ * @public
+ */
+export async function settleWithFakeTimers(
+  system: { inspect(): SystemInspection },
+  advanceTime: (ms: number) => void,
+  options: {
+    /** Total time to advance (default: 5000ms) */
+    totalTime?: number;
+    /** Time to advance each step (default: 10ms) */
+    stepSize?: number;
+    /** Maximum iterations before giving up (default: 1000) */
+    maxIterations?: number;
+  } = {},
+): Promise<void> {
+  const { totalTime = 5000, stepSize = 10, maxIterations = 1000 } = options;
+
+  let elapsed = 0;
+  let iterations = 0;
+
+  while (elapsed < totalTime && iterations < maxIterations) {
+    // Flush microtasks first (handles queueMicrotask, Promise.resolve)
+    await flushMicrotasks();
+
+    // Check if settled
+    const inspection = system.inspect();
+    if (inspection.inflight.length === 0) {
+      // One more flush to be safe
+      await flushMicrotasks();
+      return;
+    }
+
+    // Advance fake timers
+    advanceTime(stepSize);
+    elapsed += stepSize;
+    iterations++;
+  }
+
+  // Final check
+  const finalInspection = system.inspect();
+  if (finalInspection.inflight.length > 0) {
+    const resolverIds = finalInspection.inflight
+      .map((r) => r.resolverId)
+      .join(", ");
+    throw new Error(
+      `[Directive] settleWithFakeTimers did not settle after ${totalTime}ms. ${finalInspection.inflight.length} resolvers still inflight: ${resolverIds}`,
+    );
+  }
 }
 
-export function createFakeTimers(): FakeTimers;
-export function createFakeTimers(): never {
-  return featureMissing("createFakeTimers", 13);
+// ============================================================================
+// Fake Timers (for standalone use without vi.useFakeTimers)
+// ============================================================================
+
+/**
+ * Create standalone fake timers for testing without a framework timer mock.
+ *
+ * @remarks
+ * For most tests, prefer Vitest's `vi.useFakeTimers()` paired with
+ * {@link settleWithFakeTimers}. This factory is useful when you need an
+ * isolated timer that does not interfere with global timer state.
+ *
+ * @returns A {@link FakeTimers} controller with `advance`, `next`, `runAll`, `now`, and `reset` methods.
+ *
+ * @example
+ * ```typescript
+ * const timers = createFakeTimers();
+ * // schedule work, then:
+ * await timers.advance(500);
+ * expect(timers.now()).toBe(500);
+ * ```
+ *
+ * @public
+ */
+export function createFakeTimers(): FakeTimers {
+  let currentTime = 0;
+  const timers: Array<{ time: number; callback: () => void }> = [];
+
+  return {
+    async advance(ms: number): Promise<void> {
+      const targetTime = currentTime + ms;
+
+      // Run all timers that would fire during this advance
+      while (timers.length > 0 && timers[0]!.time <= targetTime) {
+        const timer = timers.shift()!;
+        currentTime = timer.time;
+        timer.callback();
+        await Promise.resolve(); // Allow microtasks
+      }
+
+      currentTime = targetTime;
+    },
+
+    async next(): Promise<void> {
+      if (timers.length === 0) return;
+
+      const timer = timers.shift()!;
+      currentTime = timer.time;
+      timer.callback();
+      await Promise.resolve();
+    },
+
+    async runAll(): Promise<void> {
+      while (timers.length > 0) {
+        await this.next();
+      }
+    },
+
+    now(): number {
+      return currentTime;
+    },
+
+    reset(): void {
+      currentTime = 0;
+      timers.length = 0;
+    },
+  };
 }
 
+// ============================================================================
+// Mock Resolvers
+// ============================================================================
+
+/**
+ * Create a simple mock resolver that matches requirements by type and optionally
+ * records calls, injects delays, or throws errors.
+ *
+ * @param typeOrOptions - A requirement type string, or a full {@link MockResolverOptions} object.
+ * @returns A resolver definition that can be spread into a module's `resolvers` map.
+ *
+ * @example
+ * ```typescript
+ * const calls: Requirement[] = [];
+ * const mock = createMockResolver({ requirement: (r): r is MyReq => r.type === "LOAD", calls });
+ * ```
+ *
+ * @public
+ */
 export function createMockResolver<R extends Requirement = Requirement>(
   typeOrOptions: string | MockResolverOptions<R>,
-): MockResolverDef;
-export function createMockResolver(): never {
-  return featureMissing("createMockResolver", 13);
+): MockResolverDef {
+  const options: MockResolverOptions<R> =
+    typeof typeOrOptions === "string"
+      ? {
+          requirement: ((req: Requirement) => req.type === typeOrOptions) as (
+            req: Requirement,
+          ) => req is R,
+        }
+      : typeOrOptions;
+
+  const calls: R[] = options.calls ?? [];
+
+  return {
+    requirement:
+      options.requirement ?? ((_req: Requirement): _req is R => true),
+    async resolve(req: Requirement, ctx: MockResolverContext): Promise<void> {
+      calls.push(req as R);
+
+      if (options.delay) {
+        await new Promise((resolve) => setTimeout(resolve, options.delay));
+      }
+
+      if (options.error) {
+        throw typeof options.error === "string"
+          ? new Error(options.error)
+          : options.error;
+      }
+
+      if (options.resolve) {
+        await options.resolve(req as R, ctx);
+      }
+    },
+  };
 }
 
-export function createTestObserver(
-  system: SingleModuleSystem<any> | NamespacedSystem<any>,
-): {
-  events: ObservationEvent[];
-  ofType: <T extends ObservationEvent["type"]>(
-    type: T,
-  ) => Extract<
-    ObservationEvent,
-    {
-      type: T;
-    }
-  >[];
-  clear: () => void;
-  dispose: () => void;
-};
-export function createTestObserver(): never {
-  return featureMissing("createTestObserver", 13);
+// ============================================================================
+// Mock Resolver (Advanced)
+// ============================================================================
+
+/**
+ * Create a mock resolver that captures requirements instead of resolving them,
+ * giving you manual control over when and how each requirement completes.
+ *
+ * @param _requirementType - The requirement `type` string this mock handles (used for documentation; matching is done by the test harness).
+ * @returns A {@link MockResolver} with a `handler` function suitable for passing to {@link createTestSystem} mocks.
+ *
+ * @example
+ * ```typescript
+ * const fetchMock = mockResolver<{ type: "FETCH_USER"; id: string }>("FETCH_USER");
+ *
+ * const system = createTestSystem({
+ *   modules: [userModule],
+ *   mocks: {
+ *     resolvers: {
+ *       FETCH_USER: { resolve: fetchMock.handler },
+ *     },
+ *   },
+ * });
+ *
+ * system.facts.userId = "123";
+ * await flushMicrotasks();
+ *
+ * // Requirement is pending
+ * expect(fetchMock.calls).toHaveLength(1);
+ * expect(fetchMock.calls[0].id).toBe("123");
+ *
+ * // Manually resolve it
+ * fetchMock.resolve({ name: "John" });
+ * await flushMicrotasks();
+ *
+ * expect(system.facts.user).toEqual({ name: "John" });
+ * ```
+ *
+ * @public
+ */
+export function mockResolver<R extends Requirement = Requirement>(
+  _requirementType: string,
+): MockResolver<R> & {
+  /** Handler that can be passed to createTestSystem mocks */
+  handler: (req: Requirement, ctx: MockResolverContext) => Promise<void>;
+} {
+  const calls: R[] = [];
+  const pending: Array<{
+    requirement: R;
+    resolve: (result?: unknown) => void;
+    reject: (error: Error) => void;
+  }> = [];
+
+  const mock: MockResolver<R> = {
+    get calls() {
+      return calls;
+    },
+    get pending() {
+      return pending;
+    },
+    resolve(result?: unknown) {
+      const item = pending.shift();
+      if (item) {
+        item.resolve(result);
+      }
+    },
+    reject(error: Error) {
+      const item = pending.shift();
+      if (item) {
+        item.reject(error);
+      }
+    },
+    resolveAll(result?: unknown) {
+      while (pending.length > 0) {
+        this.resolve(result);
+      }
+    },
+    rejectAll(error: Error) {
+      while (pending.length > 0) {
+        this.reject(error);
+      }
+    },
+    reset() {
+      calls.length = 0;
+      pending.length = 0;
+    },
+  };
+
+  const handler = (
+    req: Requirement,
+    _ctx: MockResolverContext,
+  ): Promise<void> => {
+    calls.push(req as R);
+    return new Promise<void>((resolve, reject) => {
+      pending.push({
+        requirement: req as R,
+        resolve: (val?: unknown) => resolve(val as undefined),
+        reject,
+      });
+    });
+  };
+
+  return {
+    ...mock,
+    handler,
+  };
+}
+
+// ============================================================================
+// Test System
+// ============================================================================
+
+/**
+ * Create a Directive system instrumented for testing.
+ *
+ * Wraps {@link createSystem} with an automatic tracking plugin that records
+ * dispatched events, resolver calls, fact changes, and generated requirements.
+ * Mock resolvers can be injected via `options.mocks.resolvers` to replace
+ * real resolvers by requirement type.
+ *
+ * @param options - System configuration with optional mock resolvers and additional plugins.
+ * @returns A {@link TestSystem} or {@link TestSystemSingle} with assertion helpers, idle waiting, and history tracking.
+ *
+ * @example
+ * ```typescript
+ * // Namespaced (multiple modules)
+ * const system = createTestSystem({
+ *   modules: { counter: counterModule },
+ *   mocks: { resolvers: { INCREMENT: { resolve: (req, context) => { context.facts.count++; } } } },
+ * });
+ *
+ * // Single module
+ * const system = createTestSystem({
+ *   module: counterModule,
+ * });
+ * system.start();
+ * ```
+ *
+ * @public
+ */
+/** Default number of fact changes a test system keeps. */
+const DEFAULT_MAX_FACTS_HISTORY = 10_000;
+
+/**
+ * Drop the oldest records once the log is over its cap, saying so once.
+ *
+ * A test that asserts an exact count against a silently truncated log fails
+ * for a reason nothing on screen explains, so the truncation announces itself.
+ */
+function capFactsHistory(history: FactChangeRecord[], max: number): void {
+  if (history.length <= max) return;
+  if (!warnedAboutFactsHistory.has(history)) {
+    warnedAboutFactsHistory.add(history);
+    console.warn(
+      `[Directive] createTestSystem: kept the most recent ${max} fact changes and dropped older ones. Counts from assertFactChanges() and getFactsHistory() are truncated. Raise \`maxFactsHistory\` if the whole run matters.`,
+    );
+  }
+  history.splice(0, history.length - max);
+}
+
+const warnedAboutFactsHistory = new WeakSet<object>();
+
+/**
+ * Row (bz) of the L13 RFC, the one approved difference from 1.35 in this
+ * file: a test system's `isRunning`, `isInitialized` and `isSettled` read the
+ * live system. 1.35 builds the test system with a spread, which runs each
+ * getter once, so the three keep their creation values (false, false, true)
+ * whatever the system does later (U1). The spread stays, so every other
+ * member is 1.35's; the three are then redefined as getters, enumerable as
+ * the spread left them. A flag stays live until it is assigned; from then on
+ * it is 1.35's plain property holding the assigned value.
+ */
+function liveFlags<T extends object>(
+  testSystem: T,
+  system: { isRunning: boolean; isInitialized: boolean; isSettled: boolean },
+): T {
+  for (const flag of ["isRunning", "isInitialized", "isSettled"] as const) {
+    Object.defineProperty(testSystem, flag, {
+      get: () => system[flag],
+      // 1.35's three are writable data properties: assigning one sets it and
+      // never throws. So an assignment turns the flag back into one.
+      set: (value: unknown) => {
+        Object.defineProperty(testSystem, flag, {
+          value,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      },
+      enumerable: true,
+      configurable: true,
+    });
+  }
+
+  return testSystem;
 }
 
 export function createTestSystem<S extends ModuleSchema>(
@@ -144,35 +538,687 @@ export function createTestSystem<S extends ModuleSchema>(
 export function createTestSystem<Modules extends ModulesMap>(
   options: CreateTestSystemOptions<Modules>,
 ): TestSystem<Modules>;
-export function createTestSystem(): never {
-  return featureMissing("createTestSystem", 13);
+/** @internal — implementation signature for the overloads above. */
+export function createTestSystem<
+  S extends ModuleSchema,
+  Modules extends ModulesMap,
+>(
+  options: CreateTestSystemOptionsSingle<S> | CreateTestSystemOptions<Modules>,
+): TestSystemSingle<S> | TestSystem<Modules> {
+  // Single module mode: wrap into namespaced and delegate
+  if ("module" in options) {
+    return createTestSystemSingle(options as CreateTestSystemOptionsSingle<S>);
+  }
+
+  return createTestSystemNamed(options as CreateTestSystemOptions<Modules>);
 }
 
-export function flushAsync(): Promise<void>;
-export function flushAsync(): never {
-  return featureMissing("flushAsync", 13);
+function createTestSystemSingle<S extends ModuleSchema>(
+  options: CreateTestSystemOptionsSingle<S>,
+): TestSystemSingle<S> {
+  const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
+  const resolverCalls = new Map<string, Requirement[]>();
+  const allRequirements: RequirementWithId[] = [];
+  const maxFactsHistory = options.maxFactsHistory ?? DEFAULT_MAX_FACTS_HISTORY;
+  const factsHistory: FactChangeRecord[] = [];
+
+  // Create mock resolvers
+  const mockResolvers: Record<string, MockResolverDef> = {};
+  if (options.mocks?.resolvers) {
+    for (const [type, mockOptions] of Object.entries(options.mocks.resolvers)) {
+      const calls: Requirement[] = [];
+      resolverCalls.set(type, calls);
+      mockResolvers[type] = createMockResolver({ ...mockOptions, calls });
+    }
+  }
+
+  // Create module with mock resolvers
+  const moduleWithMocks: ModuleDef<S> = {
+    ...options.module,
+    resolvers: {
+      ...options.module.resolvers,
+      ...mockResolvers,
+    } as any,
+  };
+
+  // Create tracking plugin
+  const recordChange = (
+    fullKey: string,
+    value: unknown,
+    previousValue: unknown,
+  ) => {
+    factsHistory.push({
+      key: fullKey,
+      fullKey,
+      namespace: undefined,
+      previousValue,
+      newValue: value,
+      timestamp: Date.now(),
+    });
+    capFactsHistory(factsHistory, maxFactsHistory);
+  };
+
+  const trackingPlugin = {
+    name: "__test-tracking__",
+    onFactSet: recordChange,
+    // Batched writes reach a different hook, and nearly every write is batched:
+    // event handlers, effects, resolvers before their first `await`, the
+    // opening state and every history navigation. Watching only the unbatched
+    // hook meant a fact that changed four times was reported as having changed
+    // once, so `assertFactChanges(key, 1)` passed for it — an assertion that a
+    // value did not change, passing for a value that did, inside the tooling
+    // written to catch exactly that.
+    onFactsBatch: (changes: FactChange[]) => {
+      for (const change of changes) {
+        recordChange(
+          change.key,
+          change.type === "delete" ? undefined : change.value,
+          change.prev,
+        );
+      }
+    },
+    onRequirementCreated: (requirement: RequirementWithId) => {
+      allRequirements.push(requirement);
+    },
+  };
+
+  // Create the underlying single-module system
+  const system = createSystem({
+    ...options,
+    module: moduleWithMocks,
+    plugins: [trackingPlugin, ...(options.plugins ?? [])],
+  } as any) as SingleModuleSystem<S>;
+
+  // Wrap dispatch to track events. 1.35 replaces `dispatch` on the object
+  // `createSystem` returned, which there is a wrapper nothing else calls: its
+  // `events.*` and its `tickMs` timer go to the engine underneath, so only a
+  // `dispatch` call is recorded (U2; row (ca), declined). core-next's system
+  // is one object and its `events.*` call `system.dispatch`, so replacing
+  // that member would record them too. The wrapper goes on the test system
+  // only, and the system is left as it was.
+  const originalDispatch = system.dispatch.bind(system);
+  const dispatch = (event: any) => {
+    eventHistory.push(event);
+    originalDispatch(event);
+  };
+
+  const testSystem: TestSystemSingle<S> = {
+    ...system,
+    dispatch,
+    eventHistory,
+    resolverCalls,
+
+    get allRequirements() {
+      return allRequirements;
+    },
+
+    getFactsHistory(): FactChangeRecord[] {
+      return [...factsHistory];
+    },
+
+    resetFactsHistory(): void {
+      factsHistory.length = 0;
+    },
+
+    async waitForIdle(maxWait = 5000): Promise<void> {
+      const startTime = Date.now();
+
+      const checkIdle = async (): Promise<void> => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const inspection = system.inspect();
+        if (inspection.inflight.length > 0) {
+          if (Date.now() - startTime > maxWait) {
+            const resolverIds = inspection.inflight.map((r) => r.id).join(", ");
+            throw new Error(
+              `[Directive] waitForIdle timed out after ${maxWait}ms. ${inspection.inflight.length} resolvers still inflight: ${resolverIds}`,
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, 10));
+
+          return checkIdle();
+        }
+      };
+
+      return checkIdle();
+    },
+
+    assertRequirement(type: string): void {
+      const hasRequirement = allRequirements.some(
+        (r) => r.requirement.type === type,
+      );
+      if (!hasRequirement) {
+        throw new Error(
+          `[Directive] Expected requirement of type "${type}" but none found`,
+        );
+      }
+    },
+
+    assertResolverCalled(type: string, times?: number): void {
+      const calls = resolverCalls.get(type) ?? [];
+      if (times !== undefined) {
+        if (calls.length !== times) {
+          throw new Error(
+            `[Directive] Expected resolver "${type}" to be called ${times} times but was called ${calls.length} times`,
+          );
+        }
+      } else if (calls.length === 0) {
+        throw new Error(
+          `[Directive] Expected resolver "${type}" to be called but it was not`,
+        );
+      }
+    },
+
+    assertFactSet(key: string, value?: unknown): void {
+      const changes = factsHistory.filter((c) => c.key === key);
+      if (changes.length === 0) {
+        throw new Error(
+          `[Directive] Expected fact "${key}" to be set but it was not`,
+        );
+      }
+      if (value !== undefined) {
+        const hasValue = changes.some((c) => c.newValue === value);
+        if (!hasValue) {
+          const actualValues = changes
+            .map((c) => JSON.stringify(c.newValue))
+            .join(", ");
+          throw new Error(
+            `[Directive] Expected fact "${key}" to be set to ${JSON.stringify(value)} but got: ${actualValues}`,
+          );
+        }
+      }
+    },
+
+    assertFactChanges(key: string, times: number): void {
+      const changes = factsHistory.filter((c) => c.key === key);
+      if (changes.length !== times) {
+        throw new Error(
+          `[Directive] Expected fact "${key}" to change ${times} times but it changed ${changes.length} times`,
+        );
+      }
+    },
+  };
+
+  return liveFlags(testSystem, system);
 }
 
-export function mockResolver<R extends Requirement = Requirement>(
-  _requirementType: string,
-): MockResolver<R> & {
-  handler: (req: Requirement, ctx: MockResolverContext) => Promise<void>;
-};
-export function mockResolver(): never {
-  return featureMissing("mockResolver", 13);
+function createTestSystemNamed<Modules extends ModulesMap>(
+  options: CreateTestSystemOptions<Modules>,
+): TestSystem<Modules> {
+  const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
+  const resolverCalls = new Map<string, Requirement[]>();
+  const allRequirements: RequirementWithId[] = [];
+  const maxFactsHistory = options.maxFactsHistory ?? DEFAULT_MAX_FACTS_HISTORY;
+  const factsHistory: FactChangeRecord[] = [];
+
+  // Create mock resolvers
+  const mockResolvers: Record<string, MockResolverDef> = {};
+  if (options.mocks?.resolvers) {
+    for (const [type, mockOptions] of Object.entries(options.mocks.resolvers)) {
+      const calls: Requirement[] = [];
+      resolverCalls.set(type, calls);
+      mockResolvers[type] = createMockResolver({ ...mockOptions, calls });
+    }
+  }
+
+  // Create modules with mock resolvers
+  const modulesWithMocks: Modules = {} as Modules;
+  for (const [name, module] of Object.entries(options.modules)) {
+    (modulesWithMocks as any)[name] = {
+      ...module,
+      resolvers: {
+        ...module.resolvers,
+        ...mockResolvers,
+      },
+    };
+  }
+
+  // Get module namespaces for key parsing
+  const moduleNamespaces = new Set(Object.keys(options.modules));
+
+  // Create tracking plugin
+  const recordChange = (
+    fullKey: string,
+    value: unknown,
+    previousValue: unknown,
+  ) => {
+    // Parse namespaced key (e.g., "test::value" -> namespace: "test", key: "value")
+    const SEPARATOR = "::";
+    const sepIndex = fullKey.indexOf(SEPARATOR);
+    let namespace: string | undefined;
+    let key: string;
+
+    if (sepIndex > 0) {
+      const possibleNamespace = fullKey.substring(0, sepIndex);
+      if (moduleNamespaces.has(possibleNamespace)) {
+        namespace = possibleNamespace;
+        key = fullKey.substring(sepIndex + SEPARATOR.length);
+      } else {
+        key = fullKey;
+      }
+    } else {
+      key = fullKey;
+    }
+
+    factsHistory.push({
+      key,
+      fullKey,
+      namespace,
+      previousValue,
+      newValue: value,
+      timestamp: Date.now(),
+    });
+    capFactsHistory(factsHistory, maxFactsHistory);
+  };
+
+  /**
+   * Records for a key, by its short name or its namespaced one.
+   *
+   * Matching only the short name meant two modules with a fact of the same
+   * name shared a count, and the namespaced name that would have told them
+   * apart matched nothing at all. It began failing the moment every module's
+   * own opening write started being recorded: a two-module system reported a
+   * fact as having changed twice before anything ran.
+   */
+  const matching = (key: string) =>
+    factsHistory.filter((c) => c.key === key || c.fullKey === key);
+
+  const trackingPlugin = {
+    name: "__test-tracking__",
+    onFactSet: recordChange,
+    // See the single-module tracker above: nearly every write is batched, and
+    // watching only the unbatched hook under-reports how many times a fact
+    // changed.
+    onFactsBatch: (changes: FactChange[]) => {
+      for (const change of changes) {
+        recordChange(
+          change.key,
+          change.type === "delete" ? undefined : change.value,
+          change.prev,
+        );
+      }
+    },
+    onRequirementCreated: (requirement: RequirementWithId) => {
+      allRequirements.push(requirement);
+    },
+  };
+
+  // Create the underlying system
+  const system = createSystem({
+    ...options,
+    modules: modulesWithMocks,
+    plugins: [trackingPlugin, ...(options.plugins ?? [])],
+  }) as NamespacedSystem<Modules>;
+
+  // Wrap dispatch to track events. 1.35 replaces `dispatch` on the object
+  // `createSystem` returned, which there is a wrapper nothing else calls: its
+  // `events.*` and its `tickMs` timer go to the engine underneath, so only a
+  // `dispatch` call is recorded (U2; row (ca), declined). core-next's system
+  // is one object and its `events.*` call `system.dispatch`, so replacing
+  // that member would record them too. The wrapper goes on the test system
+  // only, and the system is left as it was.
+  const originalDispatch = system.dispatch.bind(system);
+  const dispatch = (event: any) => {
+    eventHistory.push(event);
+    originalDispatch(event);
+  };
+
+  const testSystem: TestSystem<Modules> = {
+    ...system,
+    dispatch,
+    eventHistory,
+    resolverCalls,
+
+    get allRequirements() {
+      return allRequirements;
+    },
+
+    getFactsHistory(): FactChangeRecord[] {
+      return [...factsHistory];
+    },
+
+    resetFactsHistory(): void {
+      factsHistory.length = 0;
+    },
+
+    async waitForIdle(maxWait = 5000): Promise<void> {
+      const startTime = Date.now();
+
+      const checkIdle = async (): Promise<void> => {
+        // Wait for microtasks
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        // Check if there are inflight resolvers
+        const inspection = system.inspect();
+        if (inspection.inflight.length > 0) {
+          // Check timeout
+          if (Date.now() - startTime > maxWait) {
+            const resolverIds = inspection.inflight.map((r) => r.id).join(", ");
+            throw new Error(
+              `[Directive] waitForIdle timed out after ${maxWait}ms. ${inspection.inflight.length} resolvers still inflight: ${resolverIds}`,
+            );
+          }
+          // Wait a bit more and check again
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return checkIdle();
+        }
+      };
+
+      return checkIdle();
+    },
+
+    assertRequirement(type: string): void {
+      const hasRequirement = allRequirements.some(
+        (r) => r.requirement.type === type,
+      );
+      if (!hasRequirement) {
+        throw new Error(
+          `[Directive] Expected requirement of type "${type}" but none found`,
+        );
+      }
+    },
+
+    assertResolverCalled(type: string, times?: number): void {
+      const calls = resolverCalls.get(type) ?? [];
+      if (times !== undefined) {
+        if (calls.length !== times) {
+          throw new Error(
+            `[Directive] Expected resolver "${type}" to be called ${times} times but was called ${calls.length} times`,
+          );
+        }
+      } else if (calls.length === 0) {
+        throw new Error(
+          `[Directive] Expected resolver "${type}" to be called but it was not`,
+        );
+      }
+    },
+
+    assertFactSet(key: string, value?: unknown): void {
+      const changes = matching(key);
+      if (changes.length === 0) {
+        throw new Error(
+          `[Directive] Expected fact "${key}" to be set but it was not`,
+        );
+      }
+      if (value !== undefined) {
+        const hasValue = changes.some((c) => c.newValue === value);
+        if (!hasValue) {
+          const actualValues = changes
+            .map((c) => JSON.stringify(c.newValue))
+            .join(", ");
+          throw new Error(
+            `[Directive] Expected fact "${key}" to be set to ${JSON.stringify(value)} but got: ${actualValues}`,
+          );
+        }
+      }
+    },
+
+    assertFactChanges(key: string, times: number): void {
+      const changes = matching(key);
+      if (changes.length !== times) {
+        throw new Error(
+          `[Directive] Expected fact "${key}" to change ${times} times but it changed ${changes.length} times`,
+        );
+      }
+    },
+  };
+
+  return liveFlags(testSystem, system);
 }
 
-export function settleWithFakeTimers(
+// ============================================================================
+// Dynamic Definition Assertions
+// ============================================================================
+
+/**
+ * Assert that a definition was dynamically registered on the system.
+ *
+ * @param system - The Directive system to check.
+ * @param type - The definition type: "constraint", "resolver", "derivation", or "effect".
+ * @param id - The definition ID.
+ * @throws Error if the definition is not dynamic.
+ *
+ * @example
+ * ```typescript
+ * system.constraints.register("myRule", { when: () => true, require: { type: "DO" } });
+ * assertDynamic(system, "constraint", "myRule"); // passes
+ * assertDynamic(system, "constraint", "staticRule"); // throws
+ * ```
+ *
+ * @public
+ */
+export function assertDynamic(
   system: {
-    inspect(): SystemInspection;
+    constraints: { isDynamic(id: string): boolean };
+    effects: { isDynamic(id: string): boolean };
+    resolvers: { isDynamic(id: string): boolean };
+    derive: { isDynamic(id: string): boolean };
   },
-  advanceTime: (ms: number) => void,
-  options?: {
-    totalTime?: number;
-    stepSize?: number;
-    maxIterations?: number;
+  type: "constraint" | "resolver" | "derivation" | "effect",
+  id: string,
+): void {
+  const isDynamic = getDynamicCheck(system, type, id);
+  if (!isDynamic) {
+    throw new Error(
+      `[Directive] Expected ${type} "${id}" to be dynamic, but it is not.`,
+    );
+  }
+}
+
+/**
+ * Assert that a definition is NOT dynamically registered (i.e., is static or does not exist).
+ *
+ * @param system - The Directive system to check.
+ * @param type - The definition type: "constraint", "resolver", "derivation", or "effect".
+ * @param id - The definition ID.
+ * @throws Error if the definition is dynamic.
+ *
+ * @example
+ * ```typescript
+ * assertNotDynamic(system, "constraint", "staticRule"); // passes
+ * system.constraints.register("myRule", def);
+ * assertNotDynamic(system, "constraint", "myRule"); // throws
+ * ```
+ *
+ * @public
+ */
+export function assertNotDynamic(
+  system: {
+    constraints: { isDynamic(id: string): boolean };
+    effects: { isDynamic(id: string): boolean };
+    resolvers: { isDynamic(id: string): boolean };
+    derive: { isDynamic(id: string): boolean };
   },
-): Promise<void>;
-export function settleWithFakeTimers(): never {
-  return featureMissing("settleWithFakeTimers", 13);
+  type: "constraint" | "resolver" | "derivation" | "effect",
+  id: string,
+): void {
+  const isDynamic = getDynamicCheck(system, type, id);
+  if (isDynamic) {
+    throw new Error(
+      `[Directive] Expected ${type} "${id}" to NOT be dynamic, but it is.`,
+    );
+  }
+}
+
+/** @internal */
+function getDynamicCheck(
+  system: {
+    constraints: { isDynamic(id: string): boolean };
+    effects: { isDynamic(id: string): boolean };
+    resolvers: { isDynamic(id: string): boolean };
+    derive: { isDynamic(id: string): boolean };
+  },
+  type: "constraint" | "resolver" | "derivation" | "effect",
+  id: string,
+): boolean {
+  switch (type) {
+    case "constraint":
+      return system.constraints.isDynamic(id);
+    case "resolver":
+      return system.resolvers.isDynamic(id);
+    case "derivation":
+      return system.derive.isDynamic(id);
+    case "effect":
+      return system.effects.isDynamic(id);
+  }
+}
+
+// ============================================================================
+// Constraint Coverage
+// ============================================================================
+
+/**
+ * Track which constraints, resolvers, effects, and derivations are exercised
+ * during a test scenario. Returns a coverage report after the scenario runs.
+ *
+ * @example
+ * ```typescript
+ * const { run, report } = createCoverageTracker(system);
+ *
+ * await run(async () => {
+ *   system.facts.userId = 123;
+ *   await system.settle();
+ *   system.facts.userId = 0;
+ *   await system.settle();
+ * });
+ *
+ * const coverage = report();
+ * expect(coverage.constraintCoverage).toBe(1); // All constraints hit
+ * expect(coverage.constraintsMissed.size).toBe(0);
+ * ```
+ */
+export function createCoverageTracker(
+  system: SingleModuleSystem<any> | NamespacedSystem<any>,
+): {
+  /** Run a test scenario while tracking coverage. */
+  run: (scenario: () => Promise<void> | void) => Promise<void>;
+  /** Get the coverage report. */
+  report: () => CoverageReport;
+} {
+  const constraintsHit = new Set<string>();
+  const resolversRun = new Set<string>();
+  const effectsRun = new Set<string>();
+  const derivationsComputed = new Set<string>();
+
+  let unsub: (() => void) | null = null;
+
+  return {
+    async run(scenario) {
+      unsub = system.observe((event) => {
+        switch (event.type) {
+          case "constraint.evaluate":
+            if (event.active) constraintsHit.add(event.id);
+            break;
+          case "resolver.start":
+            resolversRun.add(event.resolver);
+            break;
+          case "effect.run":
+            effectsRun.add(event.id);
+            break;
+          case "derivation.compute":
+            derivationsComputed.add(event.id);
+            break;
+        }
+      });
+
+      try {
+        await scenario();
+      } finally {
+        unsub?.();
+        unsub = null;
+      }
+    },
+
+    report(): CoverageReport {
+      const inspection = system.inspect();
+
+      const allConstraints = new Set(inspection.constraints.map((c) => c.id));
+      const allResolvers = new Set(inspection.resolverDefs.map((r) => r.id));
+
+      const constraintsMissed = new Set<string>();
+      for (const id of allConstraints) {
+        if (!constraintsHit.has(id)) constraintsMissed.add(id);
+      }
+
+      const resolversMissed = new Set<string>();
+      for (const id of allResolvers) {
+        if (!resolversRun.has(id)) resolversMissed.add(id);
+      }
+
+      return {
+        constraintsHit,
+        constraintsMissed,
+        resolversRun,
+        resolversMissed,
+        effectsRun,
+        derivationsComputed,
+        constraintCoverage:
+          allConstraints.size === 0
+            ? 1
+            : constraintsHit.size / allConstraints.size,
+        resolverCoverage:
+          allResolvers.size === 0 ? 1 : resolversRun.size / allResolvers.size,
+        effectCoverage:
+          inspection.effects.length === 0
+            ? 1
+            : effectsRun.size / inspection.effects.length,
+        derivationCoverage:
+          inspection.derivations.length === 0
+            ? 1
+            : derivationsComputed.size / inspection.derivations.length,
+      };
+    },
+  };
+}
+
+// ============================================================================
+// Test Observer
+// ============================================================================
+
+/**
+ * Create a test observer that collects all observation events.
+ * Useful for assertion-based testing of system behavior.
+ *
+ * @example
+ * ```typescript
+ * const observer = createTestObserver(system);
+ *
+ * system.facts.count = 5;
+ * await system.settle();
+ *
+ * expect(observer.events.filter(e => e.type === "constraint.evaluate")).toHaveLength(1);
+ * expect(observer.ofType("resolver.complete")).toHaveLength(1);
+ *
+ * observer.clear();
+ * observer.dispose();
+ * ```
+ */
+export function createTestObserver(
+  system: SingleModuleSystem<any> | NamespacedSystem<any>,
+): {
+  /** All collected events. */
+  events: ObservationEvent[];
+  /** Filter events by type. */
+  ofType: <T extends ObservationEvent["type"]>(
+    type: T,
+  ) => Extract<ObservationEvent, { type: T }>[];
+  /** Clear collected events. */
+  clear: () => void;
+  /** Stop observing. */
+  dispose: () => void;
+} {
+  const events: ObservationEvent[] = [];
+  const unsub = system.observe((event) => events.push(event));
+
+  return {
+    events,
+    ofType(type) {
+      return events.filter((e) => e.type === type) as any;
+    },
+    clear() {
+      events.length = 0;
+    },
+    dispose() {
+      unsub();
+    },
+  };
 }
