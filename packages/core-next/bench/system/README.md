@@ -118,3 +118,23 @@ forced-gc run stays as a leak check (report-only).
   hand-worked expectations before it is timed.
 - `runner.mjs`: runs one engine in one process; `entry-v1.mjs`, `entry-v2.mjs` load it.
 - `run.mjs`: the driver (rounds, alternating order, tables, JSON, `--show`, `--compare`).
+
+## The selector workload (B5)
+
+`selector-1000` is 1,000 `runTrackedSelector` calls over one system with five facts and
+two derivations, the call every adapter's `useSelector` makes on a re-select.
+
+The L13 RFC's B5 bar for it was 1.0 or better against 1.35. The accepted bar is now
+**up to 1.04** (core-next may take up to 4% longer per call than 1.35).
+
+Owner decision, 2026-11-27. Asked whether to accept `selector-1000` at 1.02 to 1.04 of
+1.35's time after the two 0 B fixes, he answered, verbatim: "Accept 1.02-1.04
+(Recommended)".
+
+- The two fixes are the selector's frame matching 1.35's: a membership test on
+  `system.derive` records nothing, and a selector inside a derivation does not link
+  that derivation to its reads. They cost about 20 ns a call.
+- Measured after the shared tracker went in (L13b fix round 2, 10 rounds, twice): 1.01
+  and 1.03 (333 and 336 ns against 332 and 329 ns).
+- A ratio above 1.04 is outside what was accepted: stop and report it, do not raise
+  the bar here.
