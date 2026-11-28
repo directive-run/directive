@@ -74,20 +74,23 @@ export const DEV_CHECK =
 // The built entries package.json `exports` serves. `adapter-utils` is here,
 // not below, because its selector reads the engine's `scopes` (api/plugins.ts):
 // built on its own it would carry a second, empty copy of that WeakMap.
+// `worker` is built with the root (L13c): its worker side imports
+// `createSystem` lazily, and in one build that import lands on the chunks the
+// root already uses, so the package holds one engine and not a second copy
+// beside dist/worker.js.
 const entry = {
   index: "src/index.ts",
   internals: "src/internals.ts",
   plugins: "src/plugins/index.ts",
   testing: "src/utils/testing.ts",
   "adapter-utils": "src/adapter-utils.ts",
+  worker: "src/adapters/worker.ts",
 };
 
-// The entries that share no state with the engine, built on their own so the
+// The entry that shares no state with the engine, built on its own so the
 // entries above keep their chunks (slice P3-F5). `migration` is built (L13b)
-// and imports nothing; `worker` is still 1.35's export names, each function
-// throwing `featureMissing` (src/api/missing.ts).
+// and imports nothing.
 const stubEntry = {
-  worker: "src/worker.ts",
   migration: "src/migration.ts",
 };
 

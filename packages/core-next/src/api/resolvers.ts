@@ -326,7 +326,7 @@ export function createResolvers(options: ResolversOptions): Resolvers {
 
   /** The id of the first resolver that handles it, if any. */
   const find = (req: Requirement) => {
-    for (const id in defs) {
+    for (const id of Object.keys(defs)) {
       const def = defs[id];
       // As 1.35: only an object definition handles requirements.
       if (typeof def !== "object" || def === null) {

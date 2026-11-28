@@ -6,8 +6,9 @@
  * - The unbuilt system members are left out (their names alone would put the
  *   minimal app past its 28,800 B ceiling): a call is the platform's
  *   TypeError, as before this slice.
- * - A `/testing` stub throws E_FEATURE_MISSING with the code
- *   and the export's name as its message, none of the development text.
+ * - `featureMissing` (the other L13 entries' stubs; `/testing` is built since
+ *   L13a) throws E_FEATURE_MISSING with the code and the export's name as its
+ *   message, none of the development text.
  * - `plugins: [undefined]` throws 1.35's production TypeError (reading
  *   'name'), not a mangled one at the first hook.
  */
@@ -16,10 +17,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("#is-development", () => ({ default: false }));
 
 const { createModule } = await import("../api/core.js");
-const { FEATURE_MISSING } = await import("../api/missing.js");
+const { FEATURE_MISSING, featureMissing } = await import("../api/missing.js");
 const { t } = await import("../api/schema-builders.js");
 const { createSystem } = await import("../api/system.js");
-const testing = await import("../utils/testing.js");
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -86,12 +86,13 @@ describe.each(["single", "namespaced"])("production, %s system", (form) => {
 });
 
 describe("production stub exports", () => {
-  it("throw E_FEATURE_MISSING with the code and the name, no development text", () => {
-    for (const [stub, name, layer] of [
-      [testing.createTestSystem, "createTestSystem", 13],
-      [testing.mockResolver, "mockResolver", 13],
+  it("featureMissing throws E_FEATURE_MISSING with the code and the name, no development text", () => {
+    // /testing is built (L13a); the other L13 entries' stubs still call this.
+    for (const [name, layer] of [
+      ["createWorkerClient", 13],
+      ["analyzeReduxSlice", 13],
     ] as const) {
-      const error = thrown(() => (stub as (...a: unknown[]) => unknown)({}));
+      const error = thrown(() => featureMissing(name, layer));
       expect(error).toMatchObject({
         code: FEATURE_MISSING,
         feature: name,

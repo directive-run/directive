@@ -32,7 +32,7 @@ if (!tarballArg) {
 }
 const tarball = resolve(process.env.INIT_CWD ?? process.cwd(), tarballArg);
 
-const STUBS = ["./worker"];
+const STUBS = [];
 const PARTIAL = new Set([".", "./internals"]);
 const notBuilt = {};
 const TYPE_KINDS = new Set(["InterfaceDeclaration", "TypeAliasDeclaration"]);

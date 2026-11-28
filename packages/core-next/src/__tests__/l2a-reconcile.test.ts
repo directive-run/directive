@@ -464,9 +464,24 @@ describe("quirk j: start() after stop() dispatches what is still wanted", () => 
 
 describe("zero cost when unused", () => {
   it("a module with no constraints and no resolvers defines no L2 feature", () => {
-    const { system } = build({}, { name: "none" });
+    let features: any;
+    const mod = createModule("m", {
+      schema: { facts: { n: t.number() } },
+      init: (f: any) => {
+        f.n = 0;
+      },
+    } as never);
+    const system = createSystemCore({ module: mod } as never, [
+      withReconcile,
+      (context) => {
+        features = context.kernel.features;
+      },
+    ]) as any;
     system.start();
-    expect(system.constraints).toBeUndefined();
+    expect(features.reconcile).toBeUndefined();
+    // 1.35's three controls are there all the same, with nothing to control
+    // (l13-gap-constraint-controls).
+    expect(system.constraints.isDisabled("x")).toBe(false);
     system.destroy();
   });
 });

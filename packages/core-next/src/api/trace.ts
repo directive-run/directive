@@ -40,7 +40,7 @@ const lock = (o: any, depth: number): any => {
         value && typeof value === "object" && lock(value, depth - 1);
       }
     } else {
-      for (const key in o) {
+      for (const key of Object.keys(o)) {
         const value = o[key];
         if (
           value &&
